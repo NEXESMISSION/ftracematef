@@ -1,0 +1,66 @@
+{
+  "howItWorks": [
+    {
+      "id": "upload",
+      "title": "Upload Image",
+      "description": "Upload any image you want to trace from your device",
+      "sources": [
+        {
+          "src": "/videos/upload-demo.webm",
+          "type": "video/webm"
+        },
+        {
+          "src": "/videos/upload-demo.mp4",
+          "type": "video/mp4"
+        }
+      ],
+      "poster": "/images/upload-poster.jpg"
+    },
+    {
+      "id": "adjust",
+      "title": "Adjust Overlay",
+      "description": "Position, scale, and adjust opacity to your preference",
+      "sources": [
+        {
+          "src": "/videos/adjust-demo.webm",
+          "type": "video/webm"
+        },
+        {
+          "src": "/videos/adjust-demo.mp4",
+          "type": "video/mp4"
+        }
+      ],
+      "poster": "/images/adjust-poster.jpg"
+    },
+    {
+      "id": "trace",
+      "title": "Start Tracing",
+      "description": "Trace over the image with your finger or stylus",
+      "sources": [
+        {
+          "src": "/videos/trace-demo.webm",
+          "type": "video/webm"
+        },
+        {
+          "src": "/videos/trace-demo.mp4",
+          "type": "video/mp4"
+        }
+      ],
+      "poster": "/images/trace-poster.jpg"
+    }
+  ],
+  "beforeAfter": [
+    {
+      "id": "example1",
+      "title": "Portrait Drawing",
+      "before": "/images/before-portrait.jpg",
+      "after": "/images/after-portrait.jpg"
+    },
+    {
+      "id": "example2",
+      "title": "Landscape Drawing",
+      "before": "/images/before-landscape.jpg",
+      "after": "/images/after-landscape.jpg"
+    }
+  ]
+}
