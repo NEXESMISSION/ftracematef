@@ -83,7 +83,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         controls={controls}
         playsInline
         aria-label={title}
-        loading="lazy"
       >
         {sources.map((source, index) => (
           <source key={index} src={source.src} type={source.type} />
