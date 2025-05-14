@@ -1,7 +1,9 @@
-import React, { useState, useRef } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
+import Button from '../components/Button';
 
 // Define the taglines for the hero section
 const taglines = [
@@ -52,12 +54,10 @@ const faqs = [
     answer: "Yes! TraceMate is perfect for artists of all skill levels, from complete beginners to professionals."
   },
   {
-    question: "Can I save my progress?",
-    answer: "Yes, you can save your work at any stage and come back to it later."
+    question: "Do I need to upload my image each time?",
+    answer: "Yes, TraceMate is designed for one-time image tracing. You'll need to upload your image each time you use the app."
   }
 ];
-
-
 
 const LandingPage: React.FC = () => {
   const { user } = useAuth();
@@ -67,11 +67,12 @@ const LandingPage: React.FC = () => {
   // Refs for scroll animations
   const videosRef = useRef<HTMLDivElement>(null);
   const beforeAfterRef = useRef<HTMLDivElement>(null);
+  const featuresRef = useRef<HTMLDivElement>(null);
   const testimonialsRef = useRef<HTMLDivElement>(null);
   const faqRef = useRef<HTMLDivElement>(null);
 
   // Rotate through taglines
-  React.useEffect(() => {
+  useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTagline((prev) => (prev + 1) % taglines.length);
     }, 3000);
@@ -80,7 +81,7 @@ const LandingPage: React.FC = () => {
   }, []);
 
   // Rotate through testimonials
-  React.useEffect(() => {
+  useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTestimonial((prev) => (prev + 1) % testimonials.length);
     }, 5000);
@@ -103,72 +104,90 @@ const LandingPage: React.FC = () => {
           <div className="flex justify-between items-center">
             <div className="flex items-center">
               <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10 mr-3" />
-              <h3 className="text-2xl font-bold font-heading bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-primary-600">TraceMate</h3>
             </div>
-            <div className="hidden md:flex space-x-8 items-center">
-              <button onClick={() => scrollToSection(videosRef)} className="text-white hover:text-primary-100 transition-colors font-medium">How It Works</button>
-              <button onClick={() => scrollToSection(beforeAfterRef)} className="text-white hover:text-primary-100 transition-colors font-medium">Examples</button>
-              <button onClick={() => scrollToSection(testimonialsRef)} className="text-white hover:text-primary-100 transition-colors font-medium">Testimonials</button>
-              {user ? (
-                <Link to="/dashboard">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="px-5 py-2 rounded-lg font-medium relative overflow-hidden group"
-                  >
-                    <span className="absolute inset-0 bg-gradient-to-r from-orange-600 to-orange-500 group-hover:from-orange-500 group-hover:to-orange-400 transition-all duration-300"></span>
-                    <span className="relative text-white flex items-center justify-center">Go to Dashboard</span>
-                  </motion.button>
+            
+            <div className="hidden md:flex items-center">
+              <div className="flex space-x-10">
+                <Link to="/" className="text-white hover:text-primary-100 transition-colors font-medium">
+                  Home
                 </Link>
-              ) : (
-                <Link to="/payment">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="px-5 py-2 rounded-lg font-medium relative overflow-hidden group"
-                  >
-                    <span className="absolute inset-0 bg-gradient-to-r from-orange-600 to-orange-500 group-hover:from-orange-500 group-hover:to-orange-400 transition-all duration-300"></span>
-                    <span className="relative text-white flex items-center justify-center">Try For Free</span>
-                  </motion.button>
-                </Link>
-              )}
+                <button onClick={() => scrollToSection(videosRef)} className="text-white hover:text-primary-100 transition-colors font-medium">How It Works</button>
+                <button onClick={() => scrollToSection(featuresRef)} className="text-white hover:text-primary-100 transition-colors font-medium">Features</button>
+                <button onClick={() => scrollToSection(faqRef)} className="text-white hover:text-primary-100 transition-colors font-medium">FAQ</button>
+              </div>
             </div>
-            <button className="md:hidden text-white" onClick={() => document.getElementById('mobileMenu')?.classList.toggle('hidden')}>
+            
+            <button 
+              className="md:hidden text-white p-2 rounded-lg bg-dark-400/50 border border-primary-500/20"
+              onClick={() => {
+                const menu = document.getElementById('mobileMenu');
+                if (menu) {
+                  menu.classList.toggle('hidden');
+                  menu.classList.toggle('flex');
+                }
+              }}
+            >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            
-            {/* Mobile Menu */}
-            <div id="mobileMenu" className="hidden absolute top-full left-0 right-0 bg-dark-500/95 backdrop-blur-md p-4 rounded-b-lg border-t border-primary-500/20 z-50">
-              <div className="flex flex-col space-y-4 py-2">
-                <button onClick={() => {
-                  scrollToSection(videosRef);
-                  document.getElementById('mobileMenu')?.classList.add('hidden');
-                }} className="text-white hover:text-primary-100 transition-colors font-medium py-2">How It Works</button>
-                <button onClick={() => {
-                  scrollToSection(beforeAfterRef);
-                  document.getElementById('mobileMenu')?.classList.add('hidden');
-                }} className="text-white hover:text-primary-100 transition-colors font-medium py-2">Examples</button>
-                <button onClick={() => {
-                  scrollToSection(testimonialsRef);
-                  document.getElementById('mobileMenu')?.classList.add('hidden');
-                }} className="text-white hover:text-primary-100 transition-colors font-medium py-2">Testimonials</button>
-                <Link to="/login" className="w-full">
-                  <button className="w-full py-2 px-4 bg-primary-500/20 border border-primary-500/30 rounded-lg text-white font-medium hover:bg-primary-500/30 transition-colors">
-                    Sign In
-                  </button>
-                </Link>
-                <Link to="/payment" className="w-full">
-                  <button className="w-full py-2 px-4 bg-gradient-to-r from-orange-600 to-orange-500 rounded-lg text-white font-medium hover:from-orange-500 hover:to-orange-400 transition-colors">
-                    Try For Free
-                  </button>
-                </Link>
-              </div>
-            </div>
           </div>
         </div>
+        
       </nav>
+
+      {/* Mobile Menu */}
+      <div 
+        id="mobileMenu" 
+        className="hidden fixed top-0 left-0 right-0 bottom-0 flex-col bg-dark-500/95 backdrop-blur-md p-6 z-[100] overflow-y-auto"
+      >
+        <div className="flex justify-end mb-4">
+          <button 
+            onClick={() => document.getElementById('mobileMenu')?.classList.add('hidden')}
+            className="text-white p-2 rounded-full bg-dark-400/70 hover:bg-dark-300/70 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex flex-col space-y-6 py-4 mt-10">
+          <Link 
+            to="/" 
+            className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
+            onClick={() => document.getElementById('mobileMenu')?.classList.add('hidden')}
+          >
+            Home
+          </Link>
+          <button 
+            onClick={() => {
+              scrollToSection(videosRef);
+              document.getElementById('mobileMenu')?.classList.add('hidden');
+            }} 
+            className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
+          >
+            How It Works
+          </button>
+          <button 
+            onClick={() => {
+              scrollToSection(featuresRef);
+              document.getElementById('mobileMenu')?.classList.add('hidden');
+            }} 
+            className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
+          >
+            Features
+          </button>
+          <button 
+            onClick={() => {
+              scrollToSection(faqRef);
+              document.getElementById('mobileMenu')?.classList.add('hidden');
+            }} 
+            className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
+          >
+            FAQ
+          </button>
+        </div>
+      </div>
 
       {/* Hero Section */}
       <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-dark-600">
@@ -182,149 +201,158 @@ const LandingPage: React.FC = () => {
             playsInline
             className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-dark-600/90 via-dark-600/80 to-dark-500/90"></div>
+          <div className="absolute inset-0 bg-black/80"></div>
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary-600/20 via-transparent to-transparent opacity-70"></div>
           <div className="absolute top-[10%] right-[10%] w-[40%] h-[40%] rounded-full bg-primary-500/10 blur-[100px]"></div>
           <div className="absolute bottom-[10%] left-[10%] w-[30%] h-[30%] rounded-full bg-primary-500/10 blur-[100px]"></div>
         </div>
         
-        <div className="container mx-auto px-4 relative z-10 pt-20 pb-32">
+        <div className="container mx-auto px-4 relative z-10 pt-10 pb-16">
           <div className="flex flex-wrap items-center">
             <div className="w-full lg:w-8/12 px-4 mx-auto text-center">
               <motion.div 
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, ease: "easeOut" }}
+                className="space-y-3"
               >
-                <div className="mb-8 flex justify-center">
-                  <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-24 md:h-32" />
+                <div className="mb-4 flex justify-center">
+                  <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-20 md:h-28" />
                 </div>
-                <div className="mb-4 inline-block">
+                <div className="inline-block">
                   <span className="px-4 py-1 text-sm rounded-full bg-primary-500/20 border border-primary-500/30 text-primary-300 backdrop-blur-sm font-medium">
                     Transform Your Drawing Skills
                   </span>
                 </div>
-                <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold font-heading leading-tight mt-4 mb-6 bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-primary-600">
+                <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold font-heading leading-tight text-white">
                   TraceMate
                 </h1>
-                <motion.h2 
+                <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5 }}
-                  className="text-xl md:text-2xl lg:text-3xl font-light leading-normal mt-0 mb-8 text-primary-200 h-16"
+                  className="text-xl md:text-2xl lg:text-3xl font-light leading-normal text-primary-200 h-16 flex items-center justify-center"
                 >
-                  {taglines[currentTagline]}
-                </motion.h2>
+                  <AnimatePresence mode="wait">
+                    <motion.h2
+                      key={currentTagline}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.3 }}
+                      className="flex"
+                    >
+                      {taglines[currentTagline].split('').map((char, index) => (
+                        <motion.span
+                          key={index}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ duration: 0.2, delay: index * 0.03 }}
+                        >
+                          {char}
+                        </motion.span>
+                      ))}
+                    </motion.h2>
+                  </AnimatePresence>
+                </motion.div>
                 
-                <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
+                <div className="mt-10 flex flex-col items-center">
                   {user ? (
-                    <Link to="/dashboard">
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="px-8 py-4 rounded-lg font-medium relative overflow-hidden group text-lg"
+                    <div className="w-full max-w-xs">
+                      <button 
+                        onClick={() => window.location.href = '/dashboard'}
+                        className="w-full py-4 px-8 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 text-lg"
                       >
-                        <span className="absolute inset-0 bg-gradient-to-r from-orange-600 to-orange-500 group-hover:from-orange-500 group-hover:to-orange-400 transition-all duration-300"></span>
-                        <span className="relative text-white flex items-center justify-center gap-2 font-heading">
-                          Go to Dashboard
+                        <span>Go to Dashboard</span>
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-full max-w-md">
+                      <div className="flex flex-col sm:flex-row gap-4 sm:gap-0 w-full">
+                        <button 
+                          onClick={() => window.location.href = '/app'}
+                          className="flex-1 py-4 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium rounded-l-xl sm:rounded-r-none rounded-r-xl sm:border-r border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 text-lg"
+                        >
+                          <span>Try It Free</span>
                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
                           </svg>
-                        </span>
-                      </motion.button>
-                    </Link>
-                  ) : (
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      <Link to="/payment">
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="px-8 py-4 rounded-lg font-medium relative overflow-hidden group text-lg"
+                        </button>
+                        
+                        <button 
+                          onClick={() => window.location.href = '/signin'}
+                          className="flex-1 py-4 px-6 bg-dark-400 hover:bg-dark-300 border border-primary-500/30 text-white font-medium rounded-r-xl sm:rounded-l-none rounded-l-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 text-lg"
                         >
-                          <span className="absolute inset-0 bg-gradient-to-r from-orange-600 to-orange-500 group-hover:from-orange-500 group-hover:to-orange-400 transition-all duration-300"></span>
-                          <span className="relative text-white flex items-center justify-center gap-2 font-heading">
-                            Try For Free
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                            </svg>
-                          </span>
-                        </motion.button>
-                      </Link>
-                      <Link to="/login">
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="px-8 py-4 rounded-lg font-medium bg-dark-300/50 border border-primary-500/30 backdrop-blur-sm hover:bg-dark-300/80 transition-all duration-300 text-white text-lg"
-                        >
-                          Sign In
-                        </motion.button>
-                      </Link>
+                          <span>Sign In</span>
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                          </svg>
+                        </button>
+                      </div>
+                      
+                      <div className="mt-4 text-center text-primary-200/60 text-sm">
+                        No credit card required • Free 5-minute sessions daily
+                      </div>
                     </div>
-
                   )}
                 </div>
               </motion.div>
             </div>
           </div>
-          
-
         </div>
       </div>
       
       {/* How It Works Videos Section */}
       <div ref={videosRef} className="py-20 relative overflow-hidden">
-        <div className="absolute -top-[10%] right-[10%] w-[30%] h-[30%] rounded-full bg-primary-500/10 blur-[100px]"></div>
+        <div className="absolute top-[10%] left-[10%] w-[40%] h-[40%] rounded-full bg-primary-500/10 blur-[100px]"></div>
+        <div className="absolute bottom-[10%] right-[10%] w-[30%] h-[30%] rounded-full bg-primary-500/10 blur-[100px]"></div>
         
         <div className="container mx-auto px-4 relative z-10">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
+            viewport={{ once: true }}
             transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <span className="px-4 py-1 text-sm rounded-full bg-primary-500/20 border border-primary-500/30 text-white backdrop-blur-sm font-medium">
-              Watch & Learn
-            </span>
-            <h2 className="text-4xl font-bold font-heading mt-6 mb-4 text-white">
+            <h2 className="text-4xl font-bold font-heading mb-4 text-white">
               How TraceMate Works
             </h2>
-            <p className="text-xl text-white max-w-3xl mx-auto font-light">
+            <p className="text-xl text-primary-200 max-w-3xl mx-auto font-light">
               See TraceMate in action with these helpful tutorial videos
             </p>
           </motion.div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[1, 2, 3].map((_, index) => (
+            {['Upload & Align', 'Trace & Create', 'Share & Enjoy'].map((title, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-100px" }}
+                viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="bg-dark-300/50 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden"
+                className="bg-dark-300/70 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300"
               >
-                <div className="aspect-video w-full md:h-[300px] lg:h-[400px]">
+                <div className="w-full h-full md:h-[400px] lg:h-[500px] aspect-[3/4] md:aspect-auto relative">
                   <video 
-                    src={`/assests/vedios of how it works/video${index + 1}.mp4`} 
-                    autoPlay 
-                    muted 
+                    src={`/assests/vedios of how it works/${index + 1}.mp4`} 
+                    className="w-full h-full object-cover pointer-events-none select-none"
+                    autoPlay
+                    muted
                     loop
                     playsInline
-                    className="w-full h-full object-cover pointer-events-none select-none"
-                    poster="/assests/logo/logo-dark-bg.png"
                   />
+                  <div className="absolute inset-0 bg-transparent"></div>
                 </div>
                 <div className="p-6">
-                  <h3 className="text-xl font-semibold mb-3 text-white font-heading">
-                    {index === 0 ? "Getting Started with TraceMate" : 
-                     index === 1 ? "Advanced Tracing Techniques" : 
-                     "Creating Complex Artwork"}
-                  </h3>
-                  <p className="text-white/80">
-                    {index === 0 ? "Learn the basics of setting up and using TraceMate for your first project." : 
-                     index === 1 ? "Discover pro tips and tricks to enhance your tracing skills." : 
-                     "See how to tackle more detailed and complex drawings with TraceMate."}
+                  <h3 className="text-xl font-bold font-heading mb-2 text-white">{title}</h3>
+                  <p className="text-primary-200/80 font-light">
+                    {index === 0 && 'Upload your reference image and align it with your camera view for perfect tracing.'}
+                    {index === 1 && 'Use the overlay to trace your image with precision and create amazing artwork.'}
+                    {index === 2 && 'Share your creations with friends and enjoy the satisfaction of your new skills.'}
                   </p>
                 </div>
               </motion.div>
@@ -341,17 +369,14 @@ const LandingPage: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
+            viewport={{ once: true }}
             transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <span className="px-4 py-1 text-sm rounded-full bg-primary-500/20 border border-primary-500/30 text-white backdrop-blur-sm font-medium">
-              Real Results
-            </span>
-            <h2 className="text-4xl font-bold font-heading mt-6 mb-4 text-white">
+            <h2 className="text-4xl font-bold font-heading mb-4 text-white">
               Before & After
             </h2>
-            <p className="text-xl text-white max-w-3xl mx-auto font-light">
+            <p className="text-xl text-primary-200 max-w-3xl mx-auto font-light">
               See the amazing transformations our users achieve with TraceMate
             </p>
           </motion.div>
@@ -363,7 +388,7 @@ const LandingPage: React.FC = () => {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5 }}
-                className="bg-dark-300/50 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden"
+                className="bg-dark-300/50 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300"
               >
                 <div className="p-4 border-b border-primary-500/20">
                   <h3 className="text-lg font-medium text-primary-200 font-heading">Before</h3>
@@ -382,7 +407,7 @@ const LandingPage: React.FC = () => {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: 0.2 }}
-                className="bg-dark-300/50 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden"
+                className="bg-dark-300/50 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300"
               >
                 <div className="p-4 border-b border-primary-500/20">
                   <h3 className="text-lg font-medium text-primary-200 font-heading">After</h3>
@@ -404,9 +429,237 @@ const LandingPage: React.FC = () => {
               transition={{ duration: 0.5, delay: 0.4 }}
               className="text-center mt-12 bg-dark-300/30 backdrop-blur-sm border border-primary-500/10 rounded-xl p-6 max-w-2xl mx-auto"
             >
-              <h3 className="text-xl font-heading mb-2">Amazing Transformation</h3>
-              <p className="text-primary-200/80">Created using TraceMate's real-time tracing technology. Our users achieve professional results with minimal effort!</p>
+              <h3 className="text-xl font-heading mb-2 text-white">Amazing Transformation</h3>
+              <p className="text-primary-200/80 font-light">Created using TraceMate's real-time tracing technology. Our users achieve professional results with minimal effort!</p>
             </motion.div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Pricing Section */}
+      <div className="py-20 relative overflow-hidden">
+        <div className="absolute -top-[10%] right-[10%] w-[40%] h-[40%] rounded-full bg-primary-500/10 blur-[100px]"></div>
+        <div className="absolute -bottom-[10%] left-[10%] w-[30%] h-[30%] rounded-full bg-primary-500/10 blur-[100px]"></div>
+        
+        <div className="container mx-auto px-4 relative z-10">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-4xl font-bold font-heading mb-4 text-white">
+              Simple, Transparent Pricing
+            </h2>
+            <p className="text-xl text-primary-200 max-w-3xl mx-auto font-light">
+              Choose the plan that works best for you
+            </p>
+          </motion.div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {/* Free Plan */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="bg-dark-300/50 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300 flex flex-col h-full"
+            >
+              <div className="p-8 border-b border-primary-500/20 text-center">
+                <h3 className="text-2xl font-bold text-white font-heading mb-2">Free Plan</h3>
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-4xl font-bold text-white">$0</span>
+                  <span className="text-primary-200/70 font-light">/forever</span>
+                </div>
+                <p className="mt-4 text-primary-200/80 font-light">Perfect for casual users and beginners</p>
+              </div>
+              
+              <div className="p-8 flex-grow">
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white">1-minute sessions</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white">5 sessions per day</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white">Basic image adjustments</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white">No account required</span>
+                  </li>
+                </ul>
+              </div>
+              
+              <div className="p-8 pt-0">
+                <button 
+                  onClick={() => window.location.href = '/app'}
+                  className="w-full py-3 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                >
+                  <span>Try For Free</span>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </button>
+              </div>
+            </motion.div>
+            
+            {/* Monthly Plan */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="bg-dark-300/50 backdrop-blur-sm border border-primary-500/40 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/20 transition-all duration-300 flex flex-col h-full relative"
+            >
+              <div className="absolute top-0 right-0 bg-gradient-to-r from-primary-600 to-primary-500 text-white text-sm font-medium py-1 px-4 rounded-bl-lg">
+                Popular
+              </div>
+              
+              <div className="p-8 border-b border-primary-500/20 text-center">
+                <h3 className="text-2xl font-bold text-white font-heading mb-2">Monthly Plan</h3>
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-4xl font-bold text-white">$6</span>
+                  <span className="text-primary-200/70 font-light">/month</span>
+                </div>
+                <p className="mt-4 text-primary-200/80 font-light">For artists who want unlimited access</p>
+              </div>
+              
+              <div className="p-8 flex-grow">
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white">Unlimited session duration</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white">Unlimited sessions</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white">Advanced image controls</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white">Simple one-click tracing</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white">Priority support</span>
+                  </li>
+                </ul>
+              </div>
+              
+              <div className="p-8 pt-0">
+                <button 
+                  onClick={() => window.location.href = '/payment'}
+                  className="w-full py-3 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                >
+                  <span>Get Monthly</span>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </button>
+              </div>
+            </motion.div>
+
+            {/* Lifetime Plan */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="bg-dark-300/50 backdrop-blur-sm border border-primary-500/40 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/20 transition-all duration-300 flex flex-col h-full relative"
+            >
+              <div className="absolute top-0 right-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium py-1 px-4 rounded-bl-lg">
+                Best Value
+              </div>
+              
+              <div className="p-8 border-b border-primary-500/20 text-center">
+                <h3 className="text-2xl font-bold text-white font-heading mb-2">Lifetime Access</h3>
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-4xl font-bold text-white">$15</span>
+                  <span className="text-primary-200/70 font-light">/once</span>
+                </div>
+                <p className="mt-4 text-primary-200/80 font-light">Pay once, use forever</p>
+              </div>
+              
+              <div className="p-8 flex-grow">
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white">Everything in Monthly plan</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white">Never pay again</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white">All premium features included</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white">Premium support</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white">Early access to new features</span>
+                  </li>
+                </ul>
+              </div>
+              
+              <div className="p-8 pt-0">
+                <button 
+                  onClick={() => window.location.href = '/payment'}
+                  className="w-full py-3 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                >
+                  <span>Get Lifetime Access</span>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+          
+          <div className="mt-12 text-center">
+            <p className="text-primary-200/70 max-w-2xl mx-auto font-light">
+              All plans include access to basic tracing features. Premium users get unlimited usage and advanced controls for the best experience.
+            </p>
           </div>
         </div>
       </div>
@@ -542,21 +795,18 @@ const LandingPage: React.FC = () => {
             transition={{ duration: 0.6, delay: 0.4 }}
             className="text-center mt-16"
           >
-            <Link to="/payment">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-8 py-3 rounded-lg font-medium relative overflow-hidden group"
-              >
-                <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 group-hover:from-blue-500 group-hover:to-purple-500 transition-all duration-300"></span>
-                <span className="relative text-white flex items-center justify-center gap-2">
-                  Get Started Now
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
-                </span>
-              </motion.button>
-            </Link>
+            <Button 
+              to="/app" 
+              variant="blue" 
+              size="md" 
+              icon={
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              }
+            >
+              Get Started Now
+            </Button>
           </motion.div>
         </div>
       </div>
@@ -573,27 +823,24 @@ const LandingPage: React.FC = () => {
             transition={{ duration: 0.6, delay: 0.4 }}
             className="text-center max-w-3xl mx-auto bg-dark-300/50 backdrop-blur-sm border border-primary-500/20 rounded-xl p-10"
           >
-            <h2 className="text-4xl font-bold font-heading mb-6 bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-primary-600">
+            <h2 className="text-4xl font-bold font-heading mb-6 text-white">
               Ready to Transform Your Drawing Skills?
             </h2>
             <p className="text-xl text-primary-200/90 mb-8 font-light">
               Join thousands of artists who use TraceMate to create amazing artwork
             </p>
-            <Link to="/payment">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 rounded-lg font-medium relative overflow-hidden group text-lg"
-              >
-                <span className="absolute inset-0 bg-gradient-to-r from-primary-600 to-primary-500 group-hover:from-primary-500 group-hover:to-primary-400 transition-all duration-300"></span>
-                <span className="relative text-white flex items-center justify-center gap-2 font-heading">
-                  Get Started Now
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
-                </span>
-              </motion.button>
-            </Link>
+            <Button 
+              to="/app" 
+              variant="primary" 
+              size="lg" 
+              icon={
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              }
+            >
+              Get Started Now
+            </Button>
           </motion.div>
         </div>
       </div>
@@ -608,27 +855,13 @@ const LandingPage: React.FC = () => {
             <div className="w-full md:w-4/12 px-4 mb-8 md:mb-0">
               <div className="flex items-center">
                 <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10 mr-3" />
-                <h3 className="text-2xl font-bold font-heading bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-primary-600">TraceMate</h3>
+                <h3 className="text-2xl font-bold font-heading text-white">TraceMate</h3>
               </div>
               <p className="text-primary-200/70 mt-3 font-light">Transform your drawing skills with real-time tracing</p>
             </div>
             <div className="w-full md:w-6/12 px-4">
               <div className="flex flex-wrap justify-end">
-                <div className="px-4 mb-4">
-                  <a href="#" className="text-primary-300 hover:text-primary-100 transition-colors duration-300 font-medium">
-                    Privacy Policy
-                  </a>
-                </div>
-                <div className="px-4 mb-4">
-                  <a href="#" className="text-primary-300 hover:text-primary-100 transition-colors duration-300 font-medium">
-                    Terms of Service
-                  </a>
-                </div>
-                <div className="px-4 mb-4">
-                  <a href="#" className="text-primary-300 hover:text-primary-100 transition-colors duration-300 font-medium">
-                    Contact
-                  </a>
-                </div>
+                {/* Footer links removed as requested */}
               </div>
             </div>
           </div>
