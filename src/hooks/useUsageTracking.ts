@@ -28,16 +28,24 @@ export const useUsageTracking = (): UseUsageTrackingReturn => {
 
   // Fetch user's daily usage stats
   const refreshUsageStats = async () => {
-    if (!user) {
-      setUsageStats({ sessions: 0, totalDuration: 0 });
-      return;
-    }
-
     try {
+      if (!user) {
+        // For non-logged in users, try to get session count from localStorage
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const storedSessions = localStorage.getItem(`sessions_${today}`);
+        const sessionCount = storedSessions ? parseInt(storedSessions, 10) : 0;
+        
+        setUsageStats({ sessions: sessionCount, totalDuration: 0 });
+        return;
+      }
+
+      // For logged-in users, get stats from database
       const stats = await getUserDailyUsage(user.id);
       setUsageStats(stats);
     } catch (error) {
       console.error('Error fetching usage stats:', error);
+      // Default to 0 if there's an error
+      setUsageStats({ sessions: 0, totalDuration: 0 });
     }
   };
 
@@ -47,12 +55,29 @@ export const useUsageTracking = (): UseUsageTrackingReturn => {
       console.warn('Daily session limit reached');
       return;
     }
-
+    
+    // Set session start time
     setSessionStartTime(new Date());
     setIsSessionActive(true);
-
-    // Start timer to track remaining time for free users
-    if (userRole === 'free') {
+    
+    // Increment session count for tracking
+    const newSessionCount = usageStats.sessions + 1;
+    setUsageStats(prev => ({
+      ...prev,
+      sessions: newSessionCount
+    }));
+    
+    // Save to localStorage for persistence
+    try {
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      localStorage.setItem(`sessions_${today}`, String(newSessionCount));
+      console.log(`Session tracking: ${newSessionCount} sessions used today`);
+    } catch (error) {
+      console.error('Error saving session count to localStorage:', error);
+    }
+    
+    // Start timer for free users or non-signed in users
+    if (userRole === 'free' || !user) {
       if (timerRef.current) {
         window.clearInterval(timerRef.current);
       }
@@ -65,7 +90,7 @@ export const useUsageTracking = (): UseUsageTrackingReturn => {
 
         setRemainingSessionTime(Math.max(0, remaining));
 
-        // Auto-end session when time is up for free users
+        // Auto-end session when time is up for free users or non-signed in users
         if (remaining <= 0) {
           endSession();
         }

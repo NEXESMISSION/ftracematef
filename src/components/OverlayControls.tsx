@@ -8,6 +8,7 @@ interface OverlayControlsProps {
   onCameraSwitch: () => void;
   visible: boolean;
   className?: string;
+  onReset?: () => void;
 }
 
 const OverlayControls: React.FC<OverlayControlsProps> = ({
@@ -16,6 +17,7 @@ const OverlayControls: React.FC<OverlayControlsProps> = ({
   onCameraSwitch,
   visible,
   className = '',
+  onReset,
 }) => {
   // Animation variants for the controls panel
   const variants = {
@@ -37,7 +39,7 @@ const OverlayControls: React.FC<OverlayControlsProps> = ({
           <label htmlFor="opacity-slider" className="text-white text-sm">
             Opacity
           </label>
-          <span className="text-white text-sm">
+          <span className="text-white text-sm font-medium">
             {Math.round(settings.opacity * 100)}%
           </span>
         </div>
@@ -49,9 +51,13 @@ const OverlayControls: React.FC<OverlayControlsProps> = ({
           step="0.01"
           value={settings.opacity}
           onChange={(e) => onSettingChange('opacity', parseFloat(e.target.value))}
-          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+          className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
           aria-label={`Opacity: ${Math.round(settings.opacity * 100)}%`}
         />
+        <div className="flex justify-between text-xs text-gray-400 mt-1">
+          <span>0%</span>
+          <span>100%</span>
+        </div>
       </div>
       
       {/* Scale Slider */}
@@ -60,7 +66,7 @@ const OverlayControls: React.FC<OverlayControlsProps> = ({
           <label htmlFor="scale-slider" className="text-white text-sm">
             Scale
           </label>
-          <span className="text-white text-sm">
+          <span className="text-white text-sm font-medium">
             {settings.scale.toFixed(1)}×
           </span>
         </div>
@@ -72,9 +78,13 @@ const OverlayControls: React.FC<OverlayControlsProps> = ({
           step="0.1"
           value={settings.scale}
           onChange={(e) => onSettingChange('scale', parseFloat(e.target.value))}
-          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+          className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
           aria-label={`Scale: ${settings.scale.toFixed(1)}×`}
         />
+        <div className="flex justify-between text-xs text-gray-400 mt-1">
+          <span>0.1×</span>
+          <span>3.0×</span>
+        </div>
       </div>
       
       {/* Rotation Slider */}
@@ -83,7 +93,7 @@ const OverlayControls: React.FC<OverlayControlsProps> = ({
           <label htmlFor="rotation-slider" className="text-white text-sm">
             Rotation
           </label>
-          <span className="text-white text-sm">
+          <span className="text-white text-sm font-medium">
             {settings.rotation}°
           </span>
         </div>
@@ -95,13 +105,37 @@ const OverlayControls: React.FC<OverlayControlsProps> = ({
           step="1"
           value={settings.rotation}
           onChange={(e) => onSettingChange('rotation', parseInt(e.target.value))}
-          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+          className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
           aria-label={`Rotation: ${settings.rotation}°`}
         />
+        <div className="flex justify-between text-xs text-gray-400 mt-1">
+          <span>-180°</span>
+          <span>180°</span>
+        </div>
       </div>
       
-      {/* Camera Switch Button */}
-      <div className="flex justify-center mt-6">
+      {/* Action Buttons */}
+      <div className="flex justify-between mt-6">
+        {/* Reset Button */}
+        {onReset && (
+          <button
+            onClick={onReset}
+            className="bg-gray-600 text-white px-4 py-2 rounded-full flex items-center hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+            aria-label="Reset settings"
+          >
+            <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            Reset Settings
+          </button>
+        )}
+        
+        {/* Camera Switch Button */}
         <button
           onClick={onCameraSwitch}
           className="bg-indigo-600 text-white px-4 py-2 rounded-full flex items-center hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"

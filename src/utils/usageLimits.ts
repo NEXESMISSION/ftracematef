@@ -4,7 +4,7 @@ import { UsageLimit, UserPlan } from '../types';
 export const USAGE_LIMITS: Record<UserPlan, UsageLimit> = {
   free: {
     sessionDurationSecs: 60, // 1 minute per session
-    sessionsPerDay: 5, // 5 sessions per day
+    sessionsPerDay: 5, // Changed back to 5 sessions per day
   },
   paid: {
     sessionDurationSecs: Infinity, // Unlimited time

@@ -20,6 +20,7 @@ interface UseCameraReturn {
   stopCamera: () => void;
   switchCamera: () => Promise<void>;
   enableMockCamera: () => void;
+  getCameraDevices: () => Promise<MediaDeviceInfo[]>;
 }
 
 export const useCamera = ({
@@ -212,6 +213,19 @@ export const useCamera = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Get available camera devices
+  const getCameraDevices = async (): Promise<MediaDeviceInfo[]> => {
+    try {
+      const videoDevices = await getVideoDevices();
+      setDevices(videoDevices);
+      return videoDevices;
+    } catch (err) {
+      console.error('Error fetching video devices:', err);
+      setError('Failed to get camera devices');
+      return [];
+    }
+  };
+
   return {
     stream,
     videoRef,
@@ -224,6 +238,7 @@ export const useCamera = ({
     startCamera,
     stopCamera,
     switchCamera,
-    enableMockCamera
+    enableMockCamera,
+    getCameraDevices
   };
 };

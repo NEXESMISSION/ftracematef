@@ -16,6 +16,8 @@ function App() {
           <Route path="/signin" element={<SignInPage />} />
           <Route path="/payment" element={<PaymentPage />} />
           <Route path="/app" element={<AppMainPage />} />
+          {/* Multiple paths for tracing page to ensure it's accessible */}
+          <Route path="/tracing" element={<TracingPage />} />
           <Route path="/trace" element={<TracingPage />} />
         </Routes>
       </Router>

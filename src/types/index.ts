@@ -26,11 +26,13 @@ export interface OverlaySettings {
   opacity: number;
   scale: number;
   rotation: number;
+  positionX: number;
+  positionY: number;
   cornerTransforms: {
-    topLeft: { x: number, y: number };
-    topRight: { x: number, y: number };
-    bottomLeft: { x: number, y: number };
-    bottomRight: { x: number, y: number };
+    topLeft: { x: number; y: number };
+    topRight: { x: number; y: number };
+    bottomLeft: { x: number; y: number };
+    bottomRight: { x: number; y: number };
   };
 }
 

@@ -37,3 +37,22 @@ export const getUserDailyUsage = async (userId: string) => {
   
   return { sessions, totalDuration };
 };
+
+// Reset user's daily usage stats (for testing purposes)
+export const resetUserDailyUsage = async (userId: string) => {
+  const today = new Date().toISOString().split('T')[0];
+  
+  const { error } = await supabase
+    .from('usage_sessions')
+    .delete()
+    .eq('user_id', userId)
+    .gte('started_at', `${today}T00:00:00`)
+    .lte('started_at', `${today}T23:59:59`);
+    
+  if (error) {
+    console.error('Error resetting user daily usage:', error);
+    throw error;
+  }
+  
+  return true;
+};

@@ -1,17 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
+import { isOnline, isSupabaseReachable } from '../utils/networkStatus';
+import { SUPABASE_URL } from '../config/supabase';
+import NetworkStatusIndicator from '../components/NetworkStatusIndicator';
 
 const SignInPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [networkStatus, setNetworkStatus] = useState<{ online: boolean; supabaseReachable: boolean | null }>({ 
+    online: true, 
+    supabaseReachable: null 
+  });
+
+  // Check network status on component mount
+  useEffect(() => {
+    const checkNetworkStatus = async () => {
+      const online = isOnline();
+      let supabaseReachable = null;
+      
+      if (online) {
+        supabaseReachable = await isSupabaseReachable(SUPABASE_URL);
+      }
+      
+      setNetworkStatus({ online, supabaseReachable });
+    };
+    
+    checkNetworkStatus();
+    
+    // Set up event listeners for online/offline status
+    const handleOnline = () => {
+      setNetworkStatus(prev => ({ ...prev, online: true }));
+      isSupabaseReachable(SUPABASE_URL).then(reachable => 
+        setNetworkStatus(prev => ({ ...prev, supabaseReachable: reachable }))
+      );
+    };
+    
+    const handleOffline = () => {
+      setNetworkStatus({ online: false, supabaseReachable: false });
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
   const { signIn } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
+    // Check network status before attempting to sign in
+    if (!networkStatus.online) {
+      setError('You are currently offline. Please check your internet connection.');
+      return;
+    }
+    
+    if (networkStatus.supabaseReachable === false) {
+      setError('Unable to reach the authentication server. Please check your Supabase configuration or try again later.');
+      return;
+    }
     e.preventDefault();
     
     if (!email || !password) {
@@ -32,7 +85,18 @@ const SignInPage: React.FC = () => {
       // Redirect to app on successful login
       navigate('/app');
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in');
+      console.error('Sign in error:', err);
+      
+      // Provide more specific error messages
+      if (err.message?.includes('fetch') || err.message?.includes('network')) {
+        setError('Network error: Failed to connect to the server. Please check your internet connection and Supabase configuration in .env file.');
+      } else if (err.message?.includes('Invalid login')) {
+        setError('Invalid email or password. Please try again.');
+      } else if (err.message?.includes('Email not confirmed')) {
+        setError('Your email has not been confirmed. Please check your inbox for a confirmation email.');
+      } else {
+        setError(err.message || 'Failed to sign in');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -45,7 +109,10 @@ const SignInPage: React.FC = () => {
         <div className="container mx-auto px-4 py-3">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10 mr-3" />
+              <Link to="/" className="flex items-center">
+                <img src="/assets/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10 mr-3" />
+                <span className="text-xl font-bold text-white">TraceMate</span>
+              </Link>
             </div>
             
             <div className="hidden md:flex items-center">
@@ -53,7 +120,7 @@ const SignInPage: React.FC = () => {
                 <Link to="/" className="text-white hover:text-primary-100 transition-colors font-medium">
                   Home
                 </Link>
-                <Link to="/tracing" className="text-white hover:text-primary-100 transition-colors font-medium">
+                <Link to="/app" className="text-white hover:text-primary-100 transition-colors font-medium">
                   App
                 </Link>
                 <Link to="/payment" className="text-white hover:text-primary-100 transition-colors font-medium">
@@ -137,8 +204,12 @@ const SignInPage: React.FC = () => {
             className="flex-1 bg-dark-400/30 border border-primary-500/20 rounded-xl backdrop-blur-sm overflow-hidden"
           >
             <div className="py-8 px-6 md:px-10">
+              <NetworkStatusIndicator 
+                online={networkStatus.online} 
+                supabaseReachable={networkStatus.supabaseReachable} 
+              />
               <div className="text-center mb-10">
-                <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-16 mx-auto mb-4" />
+                <img src="/assets/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-16 mx-auto mb-4" />
                 <h1 className="text-3xl font-bold gradient-text">Sign In to TraceMate</h1>
                 <p className="mt-2 text-sm text-blue-200/80">
                   Enter your credentials to access your account

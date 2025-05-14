@@ -46,10 +46,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       return;
     }
     
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image size should be less than 5MB');
-      return;
+    // No file size limit - allow large images
+    // Just add a warning for very large files
+    if (file.size > 50 * 1024 * 1024) {
+      console.warn('Very large image detected:', file.size / (1024 * 1024), 'MB');
     }
     
     // Convert file to base64 data URL instead of blob URL
@@ -156,7 +156,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
               {isDragging ? 'Drop image here' : 'Click to select an image or drag and drop'}
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
-              PNG, JPG, GIF up to 5MB
+              PNG, JPG, GIF - No size limit
             </p>
           </motion.div>
         )}

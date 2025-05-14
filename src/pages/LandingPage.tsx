@@ -264,10 +264,10 @@ const LandingPage: React.FC = () => {
                   {user ? (
                     <div className="w-full max-w-xs">
                       <button 
-                        onClick={() => window.location.href = '/dashboard'}
+                        onClick={() => window.location.href = '/app'}
                         className="w-full py-4 px-8 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 text-lg"
                       >
-                        <span>Go to Dashboard</span>
+                        <span>Go to App</span>
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
                         </svg>

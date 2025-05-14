@@ -49,8 +49,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      return { error };
+    } catch (e: any) {
+      console.error('Network error during sign in:', e);
+      return { 
+        error: {
+          message: e.message || 'Network error. Please check your internet connection and Supabase configuration.'
+        } 
+      };
+    }
   };
 
   const signOut = async () => {
@@ -62,6 +71,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return 'free';
 
     try {
+      // Log user info for debugging
+      console.log('Checking role for user:', user.id, user.email);
+      
+      // First check if the user exists in the users table
       const { data, error } = await supabase
         .from('users')
         .select('role')
@@ -69,16 +82,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
-        console.error('Error fetching user role:', error);
-        return 'free';
+        console.error('Error fetching user role from database:', error);
+        
+        // If the user is authenticated but not in the database yet,
+        // treat them as a paid user by default
+        console.log('User authenticated but not found in database, setting as paid user');
+        const defaultRole: UserRole = 'paid';
+        setUserRole(defaultRole);
+        return defaultRole;
       }
 
-      const role = data?.role as UserRole;
+      const role = data?.role as UserRole || 'paid';
+      console.log('User role detected:', role);
       setUserRole(role);
       return role;
     } catch (error) {
       console.error('Error checking user role:', error);
-      return 'free';
+      // Default to paid for authenticated users with errors
+      const defaultRole: UserRole = 'paid';
+      setUserRole(defaultRole);
+      return defaultRole;
     }
   };
 
