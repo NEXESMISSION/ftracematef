@@ -10,7 +10,6 @@ interface ImageUploaderProps {
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({
   onImageSelect,
-  selectedImage,
   previewUrl,
   className = '',
 }) => {
