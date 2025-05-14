@@ -52,9 +52,18 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       return;
     }
     
-    // Create preview URL and pass to parent
-    const url = URL.createObjectURL(file);
-    onImageSelect(file, url);
+    // Convert file to base64 data URL instead of blob URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        // Pass the base64 data URL to parent
+        onImageSelect(file, reader.result);
+      }
+    };
+    reader.onerror = () => {
+      setError('Error reading the image file. Please try again.');
+    };
+    reader.readAsDataURL(file);
   };
 
   // Handle click on the upload area

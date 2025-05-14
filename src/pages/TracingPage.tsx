@@ -31,7 +31,8 @@ const TracingPage: React.FC = () => {
     isLoading: cameraLoading, 
     error: cameraError, 
     startCamera, 
-    switchCamera
+    switchCamera,
+    enableMockCamera
   } = useCamera({ autoStart: true });
   
   // Usage tracking
@@ -48,8 +49,9 @@ const TracingPage: React.FC = () => {
   // Get the uploaded image from session storage
   useEffect(() => {
     const imageUrl = sessionStorage.getItem('traceImageUrl');
+    const imageData = sessionStorage.getItem('traceImageData');
     
-    if (!imageUrl) {
+    if (!imageUrl && !imageData) {
       // No image found, redirect back to app main
       navigate('/app');
       return;
@@ -57,11 +59,32 @@ const TracingPage: React.FC = () => {
     
     // Load the image
     const img = new Image();
-    img.src = imageUrl;
+    
+    // Set up error handling for the image
+    img.onerror = () => {
+      console.error('Failed to load image');
+      // If all attempts fail, redirect back
+      navigate('/app');
+    };
+    
     img.onload = () => {
       overlayImageRef.current = img;
       drawCanvas();
     };
+    
+    // Try to load from base64 data first (more reliable)
+    if (imageData) {
+      console.log('Loading image from base64 data');
+      img.src = imageData;
+    } else if (imageUrl && !imageUrl.startsWith('blob:')) {
+      // Only use imageUrl if it's not a blob URL
+      console.log('Loading image from URL');
+      img.src = imageUrl;
+    } else {
+      console.error('No valid image source found');
+      navigate('/app');
+      return;
+    }
     
     // Start the usage session
     startSession();
@@ -70,6 +93,19 @@ const TracingPage: React.FC = () => {
     return () => {
       if (isSessionActive) {
         endSession();
+      }
+      
+      // Clear the session storage to prevent stale data
+      sessionStorage.removeItem('traceImageUrl');
+      sessionStorage.removeItem('traceImageData');
+      
+      // Revoke any blob URLs to prevent memory leaks
+      if (imageUrl && imageUrl.startsWith('blob:')) {
+        try {
+          URL.revokeObjectURL(imageUrl);
+        } catch (e) {
+          console.error('Error revoking object URL:', e);
+        }
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -106,13 +142,30 @@ const TracingPage: React.FC = () => {
     const video = videoRef.current;
     const img = overlayImageRef.current;
     
-    if (!canvas || !video || !img) return;
+    if (!canvas || !img) return;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
     // Clear the canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // If we have a video, draw it first as the background
+    if (video && video.readyState >= 2) { // HAVE_CURRENT_DATA or higher
+      try {
+        // Try to draw the video frame
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      } catch (e) {
+        console.error('Error drawing video to canvas:', e);
+        // If video drawing fails, fill with a dark background
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    } else {
+      // No video available, fill with a dark background
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
     
     // Set global opacity for the overlay
     ctx.globalAlpha = overlaySettings.opacity;
@@ -132,13 +185,20 @@ const TracingPage: React.FC = () => {
     // Draw the image centered
     const imgWidth = img.width;
     const imgHeight = img.height;
-    ctx.drawImage(img, -imgWidth / 2, -imgHeight / 2, imgWidth, imgHeight);
+    try {
+      ctx.drawImage(img, -imgWidth / 2, -imgHeight / 2, imgWidth, imgHeight);
+    } catch (e) {
+      console.error('Error drawing overlay image to canvas:', e);
+    }
     
     // Restore the context
     ctx.restore();
     
     // Reset global alpha
     ctx.globalAlpha = 1.0;
+    
+    // Request animation frame to keep updating the canvas
+    requestAnimationFrame(drawCanvas);
   };
   
   // Handle slider changes
@@ -201,22 +261,39 @@ const TracingPage: React.FC = () => {
             <svg className="h-12 w-12 text-red-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Camera Access Denied</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              {cameraError.includes('No camera found') ? 'No Camera Detected' : 'Camera Access Denied'}
+            </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              TraceMate needs camera access to work. Please enable camera access in your browser settings.
+              {cameraError.includes('No camera found') 
+                ? 'TraceMate couldn\'t find a camera on your device. You can still use the app with limited functionality.'
+                : 'TraceMate needs camera access to work properly. Please enable camera access in your browser settings.'}
             </p>
-            <button
-              onClick={() => startCamera()}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 mb-2 w-full"
-            >
-              Try Again
-            </button>
-            <button
-              onClick={handleExit}
-              className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 w-full"
-            >
-              Go Back
-            </button>
+            <div className="flex flex-col space-y-2">
+              <button
+                onClick={() => startCamera()}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 w-full"
+              >
+                Try Again
+              </button>
+              {cameraError.includes('No camera found') && (
+                <button
+                  onClick={() => {
+                    // Enable mock camera mode
+                    enableMockCamera();
+                  }}
+                  className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-md hover:bg-indigo-200 w-full"
+                >
+                  Continue Without Camera
+                </button>
+              )}
+              <button
+                onClick={handleExit}
+                className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 w-full"
+              >
+                Go Back
+              </button>
+            </div>
           </div>
         </div>
       )}

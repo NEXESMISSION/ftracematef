@@ -20,10 +20,49 @@ const AppMainPage: React.FC = () => {
     setSelectedImage(file);
     setPreviewUrl(url ? url : null);
     setError(null);
+    
+    // If this is a blob URL, immediately convert it to base64
+    // to prevent issues with blob URLs expiring
+    if (file && url && url.startsWith('blob:')) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        // Store the base64 version in state
+        if (typeof reader.result === 'string') {
+          setPreviewUrl(reader.result);
+        }
+      };
+      reader.onerror = () => {
+        console.error('Error converting image to base64');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Convert blob URL to base64 data URL
+  const convertBlobToBase64 = async (blobUrl: string): Promise<string> => {
+    try {
+      // Fetch the blob
+      const response = await fetch(blobUrl);
+      const blob = await response.blob();
+      
+      // Convert blob to base64
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64data = reader.result as string;
+          resolve(base64data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error converting blob to base64:', error);
+      throw error;
+    }
   };
 
   // Handle start tracing button click
-  const handleStartTracing = () => {
+  const handleStartTracing = async () => {
     if (!selectedImage) {
       setError('Please upload an image before starting. Click the upload area above to select an image from your device.');
       
@@ -42,10 +81,26 @@ const AppMainPage: React.FC = () => {
       return;
     }
 
-    // Store the selected image in sessionStorage (as URL)
-    if (previewUrl) {
-      sessionStorage.setItem('traceImageUrl', previewUrl);
-      navigate('/trace');
+    try {
+      // Store both the blob URL and a base64 version of the image
+      if (previewUrl) {
+        // Store the original URL (might be a blob URL)
+        sessionStorage.setItem('traceImageUrl', previewUrl);
+        
+        // Also convert and store as base64 data URL for reliability
+        if (previewUrl.startsWith('blob:')) {
+          const base64Data = await convertBlobToBase64(previewUrl);
+          sessionStorage.setItem('traceImageData', base64Data);
+        } else if (previewUrl.startsWith('data:')) {
+          // Already a data URL, store it directly
+          sessionStorage.setItem('traceImageData', previewUrl);
+        }
+        
+        navigate('/trace');
+      }
+    } catch (error) {
+      console.error('Error preparing image for tracing:', error);
+      setError('There was an error preparing your image. Please try uploading it again.');
     }
   };
 
