@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:optimized": "node scripts/optimize-videos.js && tsc && vite build",
+    "optimize-videos": "node scripts/optimize-videos.js",
+    "generate-posters": "node scripts/generate-posters.js",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },

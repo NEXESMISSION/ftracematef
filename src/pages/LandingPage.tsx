@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import OptimizedVideoPlayer from '../components/OptimizedVideoPlayer';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/Button';
 
@@ -192,14 +193,17 @@ const LandingPage: React.FC = () => {
       {/* Hero Section */}
       <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-dark-600">
         <div className="absolute inset-0 z-0">
-          {/* Video Background */}
-          <video 
-            src="/assests/main.mp4" 
-            autoPlay 
-            muted 
+          {/* Video Background - Using OptimizedVideoPlayer for better performance */}
+          <OptimizedVideoPlayer
+            sources="/assests/main.mp4"
+            autoPlay
+            muted
             loop
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+            poster="/assests/poster-main.jpg"
+            preloadStrategy="metadata"
+            className="absolute inset-0 w-full h-full"
+            objectFit="cover"
+            priority={true}
           />
           <div className="absolute inset-0 bg-black/80"></div>
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary-600/20 via-transparent to-transparent opacity-70"></div>
@@ -337,15 +341,17 @@ const LandingPage: React.FC = () => {
                 className="bg-dark-300/70 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300"
               >
                 <div className="w-full h-full md:h-[400px] lg:h-[500px] aspect-[3/4] md:aspect-auto relative">
-                  <video 
-                    src={`/assests/vedios of how it works/${index + 1}.mp4`} 
-                    className="w-full h-full object-cover pointer-events-none select-none"
+                  <OptimizedVideoPlayer
+                    sources={`/assests/vedios of how it works/${index + 1}.mp4`}
                     autoPlay
                     muted
                     loop
-                    playsInline
+                    poster={`/assests/posters/tutorial-${index + 1}.jpg`}
+                    preloadStrategy="metadata"
+                    className="w-full h-full"
+                    objectFit="cover"
+                    title={title}
                   />
-                  <div className="absolute inset-0 bg-transparent"></div>
                 </div>
                 <div className="p-6">
                   <h3 className="text-xl font-bold font-heading mb-2 text-white">{title}</h3>
