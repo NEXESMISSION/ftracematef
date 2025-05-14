@@ -17,13 +17,26 @@ export const requestCameraAccess = async (
   deviceId?: string
 ): Promise<MediaStream | null> => {
   try {
+    // First check if we have permission to access media devices
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('Camera API is not supported in this browser');
+    }
+
+    // Try with provided constraints first
     const constraints: MediaStreamConstraints = {
       video: deviceId
         ? { deviceId: { exact: deviceId } }
         : { facingMode }
     };
     
-    return await navigator.mediaDevices.getUserMedia(constraints);
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (specificError) {
+      console.warn('Failed with specific constraints, trying fallback:', specificError);
+      
+      // If specific constraints fail, try with any camera
+      return await navigator.mediaDevices.getUserMedia({ video: true });
+    }
   } catch (error) {
     console.error('Error accessing camera:', error);
     return null;
@@ -43,7 +56,7 @@ export const stopMediaStream = (stream: MediaStream | null): void => {
 export const checkCameraSupport = (): boolean => {
   return !!(
     navigator.mediaDevices &&
-    navigator.mediaDevices.getUserMedia &&
-    navigator.mediaDevices.enumerateDevices
+    typeof navigator.mediaDevices.getUserMedia === 'function' &&
+    typeof navigator.mediaDevices.enumerateDevices === 'function'
   );
 };
