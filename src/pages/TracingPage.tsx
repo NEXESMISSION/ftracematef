@@ -902,11 +902,11 @@ const TracingPage: React.FC = () => {
         </div>
       )}
       
-      {/* Timer moved to top center */}
+      {/* Timer moved to top center with compact width */}
       {!isLoggedIn && (
-        <div className="absolute top-4 left-0 right-0 text-center text-white bg-black bg-opacity-50 py-2 z-30 mx-auto max-w-xs rounded-full px-4">
+        <div className="absolute top-4 left-0 right-0 text-center text-white bg-black bg-opacity-70 py-1.5 z-30 mx-auto max-w-fit rounded-full px-3 font-medium text-sm">
           <span className={remainingTime <= 10 ? 'text-red-500 font-bold' : ''}>
-            Time remaining: {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')}
+            {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')}
           </span>
         </div>
       )}
