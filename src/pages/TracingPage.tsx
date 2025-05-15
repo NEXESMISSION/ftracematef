@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useCamera } from '../hooks/useCamera';
 import { useUsageTracking } from '../hooks/useUsageTracking';
+import { getVideoDevices } from '../utils/camera';
 
 interface ImageSettings {
   opacity: number;
@@ -52,8 +53,9 @@ const TracingPage: React.FC = () => {
     error: cameraError, 
     startCamera, 
     stopCamera,
-    devices: availableCameras
-  } = useCamera({ autoStart: true }); // Set autoStart to true
+    devices: availableCameras,
+    getCameraDevices
+  } = useCamera({ autoStart: false }) // Don't auto-start, we'll handle it manually
   
   // State to track if camera is active and UI states
   const [isCameraActive, setIsCameraActive] = useState(true); // Start with camera active
@@ -110,31 +112,59 @@ const TracingPage: React.FC = () => {
       // but we'll show a warning or limit functionality if needed
     }
     
-    // Log available cameras
-    console.log('Available cameras:', availableCameras);
-    
-    // Force start the camera with improved viewport fitting
+    // Force start the camera immediately on component mount
     const initCamera = async () => {
-      if (cameraVideoRef.current) {
-        try {
-          // Start camera with the back-facing camera if available
-          await startCamera();
-          setIsCameraActive(true);
-
-          // Apply styles to ensure video fills container properly
-          if (cameraVideoRef.current) {
-            cameraVideoRef.current.style.width = '100%';
-            cameraVideoRef.current.style.height = '100%';
-            cameraVideoRef.current.style.objectFit = 'cover';
-            cameraVideoRef.current.style.objectPosition = 'center';
-          }
-        } catch (error) {
-          console.error('Failed to initialize camera:', error);
+      try {
+        console.log('Initializing camera...');
+        
+        // Get available cameras
+        const camerasAvailable = await getCameraDevices();
+        console.log('Available cameras found:', camerasAvailable);
+        
+        if (camerasAvailable.length === 0) {
+          // No cameras available, show alert
+          alert('No camera devices detected. Please allow camera access or connect a camera.');
+          console.error('No camera devices available');
+          return;
         }
+        
+        // Find the back camera if available, otherwise use the first camera
+        let preferredCamera = camerasAvailable[0].deviceId; // Default to first camera
+        
+        // Try to find a back-facing camera
+        const backCamera = camerasAvailable.find(camera => 
+          camera.label?.toLowerCase().includes('back') || 
+          camera.label?.toLowerCase().includes('rear')
+        );
+        
+        if (backCamera) {
+          preferredCamera = backCamera.deviceId;
+          console.log('Using back camera:', backCamera.label);
+        } else {
+          console.log('No back camera found, using first available camera');
+        }
+        
+        // Directly start camera with the selected camera
+        console.log('Starting camera with deviceId:', preferredCamera);
+        await startCamera(preferredCamera);
+        setIsCameraActive(true);
+        
+        // Apply styles to ensure video fills container properly
+        if (cameraVideoRef.current) {
+          console.log('Applying styles to camera view');
+          cameraVideoRef.current.style.width = '100%';
+          cameraVideoRef.current.style.height = '100%';
+          cameraVideoRef.current.style.objectFit = 'cover';
+          cameraVideoRef.current.style.objectPosition = 'center';
+        }
+      } catch (error) {
+        console.error('Failed to initialize camera:', error);
+        alert('Failed to access camera. Please check your camera permissions and try again.');
       }
-    };  
-    // Start camera after a short delay to ensure everything is loaded
-    setTimeout(initCamera, 500);
+    };
+    
+    // Run the camera initialization immediately
+    initCamera();
     
     // Clean up when component unmounts
     return () => {
@@ -233,7 +263,7 @@ const TracingPage: React.FC = () => {
   
   // Draw the canvas with the current settings
   const drawCanvas = () => {
-    if (!canvasRef.current || !overlayImageRef.current) return;
+    if (!canvasRef.current) return;
     
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -248,83 +278,51 @@ const TracingPage: React.FC = () => {
     // Clear the canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw the video feed if camera is active
-    if (isCameraActive && cameraVideoRef.current) {
-      try {
-        // Calculate dimensions to maintain aspect ratio
-        const videoWidth = cameraVideoRef.current.videoWidth;
-        const videoHeight = cameraVideoRef.current.videoHeight;
-        
-        if (videoWidth && videoHeight) {
-          // Calculate the dimensions to preserve aspect ratio
-          const canvasRatio = canvas.width / canvas.height;
-          const videoRatio = videoWidth / videoHeight;
-          
-          let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
-          
-          if (canvasRatio > videoRatio) {
-            // Canvas is wider than video
-            drawHeight = canvas.height;
-            drawWidth = drawHeight * videoRatio;
-            offsetX = (canvas.width - drawWidth) / 2;
-          } else {
-            // Canvas is taller than video
-            drawWidth = canvas.width;
-            drawHeight = drawWidth / videoRatio;
-            offsetY = (canvas.height - drawHeight) / 2;
-          }
-          
-          // Draw video with preserved aspect ratio
-          ctx.drawImage(cameraVideoRef.current, offsetX, offsetY, drawWidth, drawHeight);
-        } else {
-          // If video dimensions aren't available yet, just fill the canvas
-          ctx.drawImage(cameraVideoRef.current, 0, 0, canvas.width, canvas.height);
-        }
-      } catch (error) {
-        console.error('Error drawing video to canvas:', error);
-      }
-    }
+    // We don't need to draw the camera feed on the canvas as it's shown as a background video element
+    // This prevents duplicate camera views
     
-    // Draw the overlay image with current settings
-    const img = overlayImageRef.current;
-    
-    // Save the current context state
-    ctx.save();
-    
-    // Calculate the center position of the canvas
-    const canvasCenterX = canvas.width / 2;
-    const canvasCenterY = canvas.height / 2;
-    
-    // Move to the position where we want to draw the image (center + offset)
-    ctx.translate(
-      canvasCenterX + imageSettings.positionX,
-      canvasCenterY + imageSettings.positionY
-    );
-    
-    // Rotate around this point
-    ctx.rotate((imageSettings.rotation * Math.PI) / 180);
-    
-    // Set the transparency
-    ctx.globalAlpha = imageSettings.opacity;
-    
-    // Draw the image centered at the origin
-    try {
-      const scaledWidth = img.width * imageSettings.scale;
-      const scaledHeight = img.height * imageSettings.scale;
+    // Draw the overlay image with current settings if available
+    if (overlayImageRef.current) {
+      const img = overlayImageRef.current;
       
-      ctx.drawImage(
-        img,
-        -scaledWidth / 2,  // Center horizontally
-        -scaledHeight / 2, // Center vertically
-        scaledWidth,
-        scaledHeight
+      // Save the current context state
+      ctx.save();
+      
+      // Calculate the center position of the canvas
+      const canvasCenterX = canvas.width / 2;
+      const canvasCenterY = canvas.height / 2;
+      
+      // Move to the position where we want to draw the image (center + offset)
+      ctx.translate(
+        canvasCenterX + imageSettings.positionX,
+        canvasCenterY + imageSettings.positionY
       );
-    } catch (error) {
-      console.error('Error drawing overlay image to canvas:', error);
+      
+      // Rotate around this point
+      ctx.rotate((imageSettings.rotation * Math.PI) / 180);
+      
+      // Set the transparency
+      ctx.globalAlpha = imageSettings.opacity;
+      
+      // Draw the image centered at the origin
+      try {
+        const scaledWidth = img.width * imageSettings.scale;
+        const scaledHeight = img.height * imageSettings.scale;
+        
+        ctx.drawImage(
+          img,
+          -scaledWidth / 2,  // Center horizontally
+          -scaledHeight / 2, // Center vertically
+          scaledWidth,
+          scaledHeight
+        );
+      } catch (error) {
+        console.error('Error drawing overlay image to canvas:', error);
+      }
+      
+      // Restore the context state
+      ctx.restore();
     }
-    
-    // Restore the context state
-    ctx.restore();
   };
   
   // Touch event handlers
@@ -633,6 +631,54 @@ const TracingPage: React.FC = () => {
   // Handle window resize
   useEffect(() => {
     const handleResize = () => {
+      // Force start the camera with improved viewport fitting
+      const initCamera = async () => {
+        try {
+          // Check if cameras are available
+          const camerasAvailable = await getVideoDevices();
+          console.log('Available cameras found:', camerasAvailable);
+          
+          if (camerasAvailable.length === 0) {
+            // No cameras available, show alert
+            alert('No camera devices detected. Please allow camera access or connect a camera.');
+            console.error('No camera devices available');
+            return;
+          }
+          
+          // Find the back camera if available, otherwise use the first camera
+          let preferredCamera = camerasAvailable[0].deviceId; // Default to first camera
+          
+          // Try to find a back-facing camera
+          const backCamera = camerasAvailable.find(camera => 
+            camera.label?.toLowerCase().includes('back') || 
+            camera.label?.toLowerCase().includes('rear')
+          );
+          
+          if (backCamera) {
+            preferredCamera = backCamera.deviceId;
+            console.log('Using back camera:', backCamera.label);
+          } else {
+            console.log('No back camera found, using:', camerasAvailable[0].label || 'Default camera');
+          }
+          
+          // Start camera with the selected camera
+          await startCamera(preferredCamera);
+          setIsCameraActive(true);
+          
+          // Apply styles to ensure video fills container properly
+          if (cameraVideoRef.current) {
+            cameraVideoRef.current.style.width = '100%';
+            cameraVideoRef.current.style.height = '100%';
+            cameraVideoRef.current.style.objectFit = 'cover';
+            cameraVideoRef.current.style.objectPosition = 'center';
+          }
+        } catch (error) {
+          console.error('Failed to initialize camera:', error);
+          alert('Failed to access camera. Please check your camera permissions and try again.');
+        }
+      };
+      initCamera();
+      
       // Redraw canvas when window is resized
       if (canvasRef.current) {
         canvasRef.current.width = window.innerWidth;
@@ -668,15 +714,22 @@ const TracingPage: React.FC = () => {
   
   return (
     <div className="h-screen w-screen relative bg-gray-900 overflow-hidden touch-none">
-      {/* Camera video (conditionally rendered) */}
+      {/* Camera video - Main camera view */}
       {isCameraActive && (
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 bg-black w-full h-full">
           <video
             ref={cameraVideoRef}
             autoPlay
             playsInline
             muted
             className="absolute w-full h-full object-cover"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center',
+              display: 'block'
+            }}
           />
         </div>
       )}

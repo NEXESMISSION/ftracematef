@@ -29,47 +29,90 @@ export const useUsageTracking = (): UseUsageTrackingReturn => {
   // Fetch user's daily usage stats
   const refreshUsageStats = async () => {
     try {
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      
       if (!user) {
-        // For non-logged in users, try to get session count from localStorage
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        // For non-logged in users, always use localStorage to track sessions
         const storedSessions = localStorage.getItem(`sessions_${today}`);
         const sessionCount = storedSessions ? parseInt(storedSessions, 10) : 0;
         
+        console.log(`Non-logged in user has used ${sessionCount} sessions today`);
         setUsageStats({ sessions: sessionCount, totalDuration: 0 });
         return;
       }
 
-      // For logged-in users, get stats from database
-      const stats = await getUserDailyUsage(user.id);
-      setUsageStats(stats);
+      // For logged-in users, prioritize DB stats but also check localStorage
+      const dbStats = await getUserDailyUsage(user.id);
+      const storedSessions = localStorage.getItem(`sessions_${today}`);
+      const localSessionCount = storedSessions ? parseInt(storedSessions, 10) : 0;
+      
+      // Use the higher count to ensure we don't miss any sessions
+      const combinedSessions = Math.max(dbStats.sessions, localSessionCount);
+      
+      console.log(`Logged-in user has used ${combinedSessions} sessions today (DB: ${dbStats.sessions}, Local: ${localSessionCount})`);
+      setUsageStats({
+        ...dbStats,
+        sessions: combinedSessions
+      });
     } catch (error) {
       console.error('Error fetching usage stats:', error);
-      // Default to 0 if there's an error
-      setUsageStats({ sessions: 0, totalDuration: 0 });
+      
+      // If there's an error, still try to get count from localStorage
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const storedSessions = localStorage.getItem(`sessions_${today}`);
+        const sessionCount = storedSessions ? parseInt(storedSessions, 10) : 0;
+        
+        setUsageStats({ sessions: sessionCount, totalDuration: 0 });
+      } catch {
+        // Last resort: default to 0
+        setUsageStats({ sessions: 0, totalDuration: 0 });
+      }
     }
   };
 
   // Start a new usage session
   const startSession = () => {
-    if (hasReachedLimit && userRole === 'free') {
-      console.warn('Daily session limit reached');
-      return;
+    // Check if it's a new day and reset localStorage if needed
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const storedDate = localStorage.getItem('last_session_date');
+    
+    if (storedDate !== today) {
+      // It's a new day, reset the session count
+      localStorage.setItem('last_session_date', today);
+      localStorage.setItem(`sessions_${today}`, '0');
+      console.log('New day detected, session count reset');
+    }
+
+    // Get current sessions from localStorage for all users (even logged in ones)
+    const storedSessions = localStorage.getItem(`sessions_${today}`);
+    const currentSessions = storedSessions ? parseInt(storedSessions, 10) : 0;
+
+    // For non-logged-in users and free tier, check limits based on localStorage count
+    if (!user || userRole === 'free') {
+      if (currentSessions >= USAGE_LIMITS.free.sessionsPerDay) {
+        console.warn('Daily session limit reached');
+        setUsageStats({ sessions: currentSessions, totalDuration: 0 });
+        return;
+      }
     }
     
     // Set session start time
-    setSessionStartTime(new Date());
+    const startTime = new Date();
+    setSessionStartTime(startTime);
     setIsSessionActive(true);
     
     // Increment session count for tracking
-    const newSessionCount = usageStats.sessions + 1;
+    const newSessionCount = currentSessions + 1;
+    
+    // Update state
     setUsageStats(prev => ({
       ...prev,
       sessions: newSessionCount
     }));
     
-    // Save to localStorage for persistence
+    // Save to localStorage for all users
     try {
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
       localStorage.setItem(`sessions_${today}`, String(newSessionCount));
       console.log(`Session tracking: ${newSessionCount} sessions used today`);
     } catch (error) {
@@ -78,20 +121,24 @@ export const useUsageTracking = (): UseUsageTrackingReturn => {
     
     // Start timer for free users or non-signed in users
     if (userRole === 'free' || !user) {
+      // Clear any existing timer
       if (timerRef.current) {
         window.clearInterval(timerRef.current);
       }
 
-      timerRef.current = window.setInterval(() => {
-        if (!sessionStartTime) return;
+      // Set the remaining time immediately
+      setRemainingSessionTime(USAGE_LIMITS.free.sessionDurationSecs);
 
-        const elapsedSecs = Math.floor((Date.now() - sessionStartTime.getTime()) / 1000);
+      // Start countdown timer
+      timerRef.current = window.setInterval(() => {
+        const elapsedSecs = Math.floor((Date.now() - startTime.getTime()) / 1000);
         const remaining = USAGE_LIMITS.free.sessionDurationSecs - elapsedSecs;
 
         setRemainingSessionTime(Math.max(0, remaining));
 
         // Auto-end session when time is up for free users or non-signed in users
         if (remaining <= 0) {
+          console.log('Session time limit reached, ending session');
           endSession();
         }
       }, 1000);
@@ -100,7 +147,7 @@ export const useUsageTracking = (): UseUsageTrackingReturn => {
 
   // End the current usage session
   const endSession = async () => {
-    if (!isSessionActive || !sessionStartTime || !user) return;
+    if (!isSessionActive || !sessionStartTime) return;
 
     // Clear timer
     if (timerRef.current) {
@@ -112,13 +159,20 @@ export const useUsageTracking = (): UseUsageTrackingReturn => {
     const endTime = new Date();
     const durationSecs = Math.floor((endTime.getTime() - sessionStartTime.getTime()) / 1000);
 
-    // Record session in database
-    try {
-      await trackUsageSession(user.id, durationSecs);
+    // For logged-in users, record in database
+    if (user) {
+      try {
+        await trackUsageSession(user.id, durationSecs);
+        await refreshUsageStats();
+      } catch (error) {
+        console.error('Error tracking session:', error);
+      }
+    } else {
+      // For non-logged in users, just refresh local stats
       await refreshUsageStats();
-    } catch (error) {
-      console.error('Error tracking session:', error);
     }
+
+    console.log(`Session ended after ${durationSecs} seconds`);
 
     // Reset session state
     setSessionStartTime(null);

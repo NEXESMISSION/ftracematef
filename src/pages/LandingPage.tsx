@@ -461,7 +461,7 @@ const LandingPage: React.FC = () => {
                     style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
                   >
                     <iframe
-                      src={`https://www.youtube.com/embed/${item.videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${item.videoId}&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&disablekb=1&vq=small`}
+                      src={`https://www.youtube.com/embed/${item.videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${item.videoId}&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&disablekb=1&vq=hd1080`}
                       title={item.title}
                       frameBorder="0"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
