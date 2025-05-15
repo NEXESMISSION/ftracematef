@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { generateVideoPoster } from '../utils/videoPreloader';
 import { generateGradientPlaceholder } from '../utils/generatePlaceholders';
 
@@ -33,10 +34,14 @@ export function useOptimizedVideo({
   src,
   poster,
   autoPlay = false,
-  muted: _muted = true,
-  loop: _loop = false,
-  preloadStrategy: _preloadStrategy = 'metadata',
-  priority: _priority = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  muted = true,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  loop = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  preloadStrategy = 'metadata',
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  priority = false,
   onLoad,
   onError
 }: UseOptimizedVideoProps): UseOptimizedVideoReturn {

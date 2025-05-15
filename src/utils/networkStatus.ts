@@ -14,7 +14,12 @@ export const isOnline = (): boolean => {
  * @param {number} timeout - Timeout in milliseconds
  * @returns {Promise<boolean>} True if reachable, false if not
  */
-export const isUrlReachable = async (_url: string, _timeout = 5000): Promise<boolean> => {
+export const isUrlReachable = async (
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  url: string, 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  timeout = 5000
+): Promise<boolean> => {
   // Instead of directly fetching the URL which might fail with 404,
   // we'll just check if we have network connectivity in general
   try {
@@ -32,7 +37,10 @@ export const isUrlReachable = async (_url: string, _timeout = 5000): Promise<boo
  * @param {string} supabaseUrl - The Supabase URL to check
  * @returns {Promise<boolean>} True if reachable, false if not
  */
-export const isSupabaseReachable = async (_supabaseUrl: string): Promise<boolean> => {
+export const isSupabaseReachable = async (
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  supabaseUrl: string
+): Promise<boolean> => {
   // We'll assume Supabase is reachable if we have internet connectivity
   // This prevents unnecessary 404 errors in the console
   return navigator.onLine;

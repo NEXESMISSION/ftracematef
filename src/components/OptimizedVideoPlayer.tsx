@@ -72,6 +72,10 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = ({
     isPlaying,
     error,
     dynamicPoster,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    play,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    pause,
     togglePlay
   } = useOptimizedVideo({
     src: processedSources[0].src,
