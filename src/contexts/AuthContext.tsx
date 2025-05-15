@@ -63,8 +63,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUserRole('free');
+    try {
+      // Try to sign out using Supabase
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      
+      if (error) {
+        console.error('Error signing out:', error);
+        // If there's an error, we'll still clear the local state
+      }
+    } catch (err) {
+      console.error('Exception during sign out:', err);
+      // If there's an exception, we'll still clear the local state
+    } finally {
+      // Always clear local state regardless of server response
+      setSession(null);
+      setUser(null);
+      setUserRole('free');
+      
+      // Manually clear all Supabase-related items from localStorage
+      try {
+        // Get all keys from localStorage
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          // Remove any keys related to Supabase auth
+          if (key && key.includes('supabase.auth')) {
+            localStorage.removeItem(key);
+          }
+        }
+        
+        // Force state update
+        const event = new Event('visibilitychange');
+        document.dispatchEvent(event);
+      } catch (e) {
+        console.error('Error clearing localStorage:', e);
+      }
+    }
   };
 
   const checkUserRole = async (): Promise<UserRole> => {

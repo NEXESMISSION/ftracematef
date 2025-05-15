@@ -61,7 +61,7 @@ const faqs = [
 ];
 
 const LandingPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [currentTagline, setCurrentTagline] = useState(0);
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
   
@@ -120,8 +120,11 @@ const LandingPage: React.FC = () => {
                 <button onClick={() => scrollToSection(videosRef)} className="text-white hover:text-primary-100 transition-colors font-medium">How It Works</button>
                 <button onClick={() => scrollToSection(featuresRef)} className="text-white hover:text-primary-100 transition-colors font-medium">Features</button>
                 <button onClick={() => scrollToSection(faqRef)} className="text-white hover:text-primary-100 transition-colors font-medium">FAQ</button>
+                <Link to="/payment" className="text-white hover:text-primary-100 transition-colors font-medium">Pricing</Link>
               </div>
             </div>
+            
+            {/* Sign Out button moved to mobile menu only */}
             
             <button 
               className="md:hidden text-white p-2 rounded-lg bg-dark-400/50 border border-primary-500/20"
@@ -199,6 +202,25 @@ const LandingPage: React.FC = () => {
           >
             FAQ
           </button>
+          <Link 
+            to="/payment"
+            className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
+            onClick={() => document.getElementById('mobileMenu')?.classList.add('hidden')}
+          >
+            Pricing
+          </Link>
+          
+          {user && (
+            <button
+              onClick={() => {
+                signOut();
+                document.getElementById('mobileMenu')?.classList.add('hidden');
+              }}
+              className="text-white bg-red-600/80 hover:bg-red-700 transition-colors font-medium py-3 px-4 rounded-lg text-center text-lg mt-6"
+            >
+              Sign Out
+            </button>
+          )}
         </div>
       </div>
 
@@ -369,24 +391,50 @@ const LandingPage: React.FC = () => {
                     muted
                     loop
                     playsInline
+                    controls={false}
                     poster={`/assests/posters/tutorial-${index + 1}.jpg`}
                     title={title}
-                    preload="auto"
-                    controls={false}
+                    preload="metadata"
                     style={{ objectFit: 'cover' }}
                     ref={(el) => {
                       if (el) {
+                        // Set critical mobile-specific attributes
                         el.setAttribute('webkit-playsinline', 'true');
+                        el.setAttribute('playsinline', 'true');
                         el.setAttribute('x5-playsinline', 'true');
                         el.setAttribute('x5-video-player-type', 'h5');
                         el.setAttribute('x5-video-player-fullscreen', 'true');
                         el.setAttribute('disablePictureInPicture', '');
                         el.setAttribute('disableRemotePlayback', '');
+                        
+                        // Force play to ensure video starts on mobile
+                        const playPromise = el.play();
+                        if (playPromise !== undefined) {
+                          playPromise.catch(error => {
+                            // Auto-play was prevented, try muted
+                            el.muted = true;
+                            el.play().catch(e => console.log('Video still cannot play:', e));
+                          });
+                        }
+                      }
+                    }}
+                    onError={(e) => {
+                      console.error('Video error:', e);
+                      // Try to recover from video error
+                      const target = e.currentTarget;
+                      if (target.src && target.src.includes('/assests/')) {
+                        target.src = target.src.replace('/assests/', '/assets/');
+                      } else if (target.src && target.src.includes('/assets/')) {
+                        target.src = target.src.replace('/assets/', '/assests/');
                       }
                     }}
                   >
+                    {/* Primary source */}
                     <source src={`/assests/vedios of how it works/${index + 1}.mp4`} type="video/mp4" />
+                    {/* Fallback paths */}
                     <source src={`/assets/vedios of how it works/${index + 1}.mp4`} type="video/mp4" />
+                    <source src={`/assests/vedios of how it works/${index + 1}.mp4?v=${Date.now()}`} type="video/mp4" />
+                    <source src={`/assets/vedios of how it works/${index + 1}.mp4?v=${Date.now()}`} type="video/mp4" />
                     Your browser does not support HTML video.
                   </video>
                 </div>

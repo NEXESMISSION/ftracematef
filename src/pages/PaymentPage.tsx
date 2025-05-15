@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '../contexts/AuthContext';
 
 // Define simplified pricing plans
 type PricingPlan = {
@@ -46,6 +47,7 @@ const paymentMethods: PaymentMethod[] = [
 ];
 
 const PaymentPage: React.FC = () => {
+  const { user, signOut } = useAuth();
   // Function to open WhatsApp with prefilled message
   const handleWhatsAppContact = () => {
     const message = encodeURIComponent(
@@ -100,10 +102,22 @@ const PaymentPage: React.FC = () => {
                 <Link to="/app" className="text-white hover:text-blue-300 transition-colors font-medium">
                   App
                 </Link>
-                <Link to="/payment" className="text-white hover:text-blue-300 transition-colors font-medium">
-                  Pricing
-                </Link>
+                {/* Only show Pricing link if user is not signed in */}
+                {!user && (
+                  <Link to="/payment" className="text-white hover:text-blue-300 transition-colors font-medium">
+                    Pricing
+                  </Link>
+                )}
               </div>
+              
+              {user && (
+                <button
+                  onClick={signOut}
+                  className="ml-8 px-4 py-1.5 bg-red-600/80 hover:bg-red-700 text-white rounded-lg transition-colors duration-300 text-sm font-medium"
+                >
+                  Sign Out
+                </button>
+              )}
             </div>
             
             <button 
@@ -161,6 +175,14 @@ const PaymentPage: React.FC = () => {
           >
             Pricing
           </Link>
+          {user && (
+            <button
+              onClick={signOut}
+              className="text-white bg-red-600/80 hover:bg-red-700 py-3 px-4 rounded-lg text-center text-lg mt-6 w-full"
+            >
+              Sign Out
+            </button>
+          )}
         </div>
       </div>
 
@@ -328,7 +350,7 @@ const PaymentPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold mb-1">Get Access 🔑</h3>
-                  <p className="text-blue-100/70">Receive your login details within 15-20 minutes</p>
+                  <p className="text-blue-100/70">Receive your login details in less than 10 minutes</p>
                 </div>
               </div>
             </div>

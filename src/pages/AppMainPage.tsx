@@ -400,6 +400,13 @@ const AppMainPage: React.FC = () => {
               <Link to="/" className="text-white hover:text-primary-100 transition-colors font-medium">
                 Home
               </Link>
+              
+              {/* Only show Pricing link if user is not signed in */}
+              {!user && (
+                <Link to="/payment" className="text-white hover:text-primary-100 transition-colors font-medium">
+                  Pricing
+                </Link>
+              )}
             </div>
           </div>
         </div>
