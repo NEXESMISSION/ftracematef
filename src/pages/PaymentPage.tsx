@@ -36,13 +36,13 @@ type PaymentMethod = {
 };
 
 const paymentMethods: PaymentMethod[] = [
-  { id: 'visa', name: 'Visa', icon: '/assets/payment methods icons/Visa_Logo.png' },
-  { id: 'mastercard', name: 'MasterCard', icon: '/assets/payment methods icons/Mastercard-logo.svg' },
-  { id: 'binance', name: 'Binance', icon: '/assets/payment methods icons/Binance_Logo.png' },
-  { id: 'coinbase', name: 'Coinbase', icon: '/assets/payment methods icons/coinbase.png' },
-  { id: 'bitcoin', name: 'Bitcoin', icon: '/assets/payment methods icons/Bitcoin.svg' },
-  { id: 'wise', name: 'Wise', icon: '/assets/payment methods icons/wise.png' },
-  { id: 'kraken', name: 'Kraken', icon: '/assets/payment methods icons/kraken.png' },
+  { id: 'visa', name: 'Visa', icon: '/assests/payment methods icons/Visa_Logo.png' },
+  { id: 'mastercard', name: 'MasterCard', icon: '/assests/payment methods icons/Mastercard-logo.svg' },
+  { id: 'binance', name: 'Binance', icon: '/assests/payment methods icons/Binance_Logo.png' },
+  { id: 'coinbase', name: 'Coinbase', icon: '/assests/payment methods icons/coinbase.png' },
+  { id: 'bitcoin', name: 'Bitcoin', icon: '/assests/payment methods icons/Bitcoin.svg' },
+  { id: 'wise', name: 'Wise', icon: '/assests/payment methods icons/wise.png' },
+  { id: 'kraken', name: 'Kraken', icon: '/assests/payment methods icons/kraken.png' },
 ];
 
 const PaymentPage: React.FC = () => {
@@ -78,7 +78,17 @@ const PaymentPage: React.FC = () => {
           <div className="flex justify-between items-center">
             <div className="flex items-center">
               <Link to="/">
-                <img src="/assets/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10" />
+                <img 
+                  src="/assests/logo/logo-dark-bg.png" 
+                  alt="TraceMate Logo" 
+                  className="h-10" 
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    if (target.src !== '/assets/logo/logo-dark-bg.png') {
+                      target.src = '/assets/logo/logo-dark-bg.png';
+                    }
+                  }}
+                />
               </Link>
             </div>
             
@@ -156,36 +166,71 @@ const PaymentPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="pt-24 pb-16 px-4 container mx-auto max-w-6xl relative z-10">
-        {/* Page Title */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-12 bg-dark-400/30 backdrop-blur-sm border border-primary-500/20 rounded-xl p-6 md:p-8 max-w-3xl mx-auto"
-        >
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">Payment Options</span> <span className="text-white">💳</span>
-          </h1>
-          <p className="text-xl text-blue-100/80 max-w-2xl mx-auto">
-            Contact us to set up your account
-          </p>
-        </motion.div>
-
-        {/* Small Payment Icons */}
+        {/* Payment Methods */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="mb-8 bg-dark-400/30 backdrop-blur-sm border border-primary-500/20 rounded-xl p-4 md:p-6 max-w-3xl mx-auto"
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="mb-16"
         >
-          <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 mx-auto">
+          <h2 className="text-2xl md:text-3xl font-bold text-center mb-8">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">Payment Options</span> <span className="text-white">💳</span>
+          </h2>
+          
+          {/* Simple Pricing */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="mb-10"
+          >
+            <h3 className="text-xl font-bold text-center mb-6">Simple Pricing 💲</h3>
+            
+            <div className="grid grid-cols-2 md:grid-cols-2 gap-4 md:gap-8 mx-auto max-w-2xl">
+              {pricingPlans.map((plan, index) => (
+                <motion.div
+                  key={plan.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.2 + (index * 0.1) }}
+                  className={`bg-dark-400/30 backdrop-blur-sm border ${plan.highlight ? 'border-primary-500/40' : 'border-primary-500/20'} rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300 flex flex-col h-full`}
+                >
+                  <div className="p-4 md:p-6 text-center flex-grow">
+                    <h3 className="text-xl md:text-2xl font-bold text-white mb-2">{plan.name}</h3>
+                    <div className="flex items-center justify-center gap-1">
+                      <span className="text-3xl md:text-4xl font-bold text-white">${plan.price}</span>
+                      <span className="text-blue-200/70 font-light">/{plan.period}</span>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+          
+          {/* Small Payment Icons */}
+          <div className="flex flex-wrap justify-center items-center gap-4 mb-8">
             {paymentMethods.map((method) => (
-              <div 
+              <motion.div
                 key={method.id}
-                className={`${method.id === 'wise' || method.id === 'visa' ? 'bg-white' : 'bg-dark-400/30 backdrop-blur-sm'} border border-primary-500/20 rounded-lg p-1 flex items-center justify-center w-12 h-12 mx-auto`}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
+                className="p-3 bg-dark-400/30 backdrop-blur-sm border border-primary-500/20 rounded-xl flex items-center justify-center hover:border-blue-500/40 hover:bg-dark-400/50 transition-all duration-300"
               >
-                <img src={method.icon} alt={method.name} className="max-h-8 max-w-full" />
-              </div>
+                <img 
+                  src={method.icon} 
+                  alt={method.name} 
+                  className="h-8 md:h-10" 
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    if (target.src.includes('/assests/')) {
+                      target.src = target.src.replace('/assests/', '/assets/');
+                    } else if (target.src.includes('/assets/')) {
+                      target.src = target.src.replace('/assets/', '/assests/');
+                    }
+                  }}
+                />
+              </motion.div>
             ))}
           </div>
         </motion.div>
@@ -243,36 +288,6 @@ const PaymentPage: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Pricing Plans */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="mb-16 bg-dark-400/30 backdrop-blur-sm border border-primary-500/20 rounded-xl p-6 md:p-8 max-w-3xl mx-auto"
-        >
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-10">Simple Pricing 💲</h2>
-          
-          <div className="grid grid-cols-2 md:grid-cols-2 gap-4 md:gap-8 mx-auto">
-            {pricingPlans.map((plan, index) => (
-              <motion.div
-                key={plan.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.2 + (index * 0.1) }}
-                className={`bg-dark-400/30 backdrop-blur-sm border ${plan.highlight ? 'border-primary-500/40' : 'border-primary-500/20'} rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300 flex flex-col h-full`}
-              >
-                <div className="p-4 md:p-6 text-center flex-grow">
-                  <h3 className="text-xl md:text-2xl font-bold text-white mb-2">{plan.name}</h3>
-                  <div className="flex items-center justify-center gap-1">
-                    <span className="text-3xl md:text-4xl font-bold text-white">${plan.price}</span>
-                    <span className="text-blue-200/70 font-light">/{plan.period}</span>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-        
         {/* How It Works - Combined in One Box */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

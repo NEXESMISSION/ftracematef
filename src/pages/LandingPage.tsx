@@ -369,16 +369,19 @@ const LandingPage: React.FC = () => {
                     muted
                     loop
                     playsInline
-                    data-play="auto"
-                    controlsList="nodownload noplaybackrate"
                     poster={`/assests/posters/tutorial-${index + 1}.jpg`}
                     title={title}
+                    preload="auto"
+                    controls={false}
+                    style={{ objectFit: 'cover' }}
                     ref={(el) => {
                       if (el) {
                         el.setAttribute('webkit-playsinline', 'true');
                         el.setAttribute('x5-playsinline', 'true');
                         el.setAttribute('x5-video-player-type', 'h5');
                         el.setAttribute('x5-video-player-fullscreen', 'true');
+                        el.setAttribute('disablePictureInPicture', '');
+                        el.setAttribute('disableRemotePlayback', '');
                       }
                     }}
                   >
