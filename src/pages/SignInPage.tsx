@@ -256,7 +256,7 @@ const SignInPage: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="mb-6">
+                <div className="mb-8">
                   <button
                     type="submit"
                     disabled={isLoading}
@@ -267,6 +267,27 @@ const SignInPage: React.FC = () => {
                       {isLoading ? 'Signing in...' : 'Sign In'}
                     </span>
                   </button>
+                </div>
+                
+                <div className="py-2 flex items-center gap-4 mb-6">
+                  <div className="flex-grow h-px bg-primary-500/20"></div>
+                  <span className="text-sm text-primary-300/50">or</span>
+                  <div className="flex-grow h-px bg-primary-500/20"></div>
+                </div>
+                
+                <div className="mb-6">
+                  <Link
+                    to="/payment"
+                    className="w-full flex justify-center py-3 px-4 rounded-lg text-white font-medium relative overflow-hidden group"
+                  >
+                    <span className="absolute inset-0 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 transition-all duration-300"></span>
+                    <span className="relative flex items-center justify-center gap-2">
+                      Purchase a paid plan
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                  </Link>
                 </div>
               </form>
               
@@ -384,6 +405,25 @@ const SignInPage: React.FC = () => {
               
               <div className="mt-10 space-y-4">
                 <Link 
+                  to="/payment" 
+                  className="block w-full py-3 px-4 rounded-lg text-white font-medium relative overflow-hidden group text-center"
+                >
+                  <span className="absolute inset-0 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 transition-all duration-300"></span>
+                  <span className="relative flex items-center justify-center gap-2">
+                    Purchase a paid plan
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </span>
+                </Link>
+                
+                <div className="py-2 flex items-center gap-4">
+                  <div className="flex-grow h-px bg-primary-500/20"></div>
+                  <span className="text-sm text-primary-300/50">or</span>
+                  <div className="flex-grow h-px bg-primary-500/20"></div>
+                </div>
+                
+                <Link 
                   to="/" 
                   className="block w-full py-3 px-4 rounded-lg text-white font-medium relative overflow-hidden group text-center"
                 >
@@ -393,19 +433,6 @@ const SignInPage: React.FC = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                     Back to Home
-                  </span>
-                </Link>
-                
-                <Link 
-                  to="/payment" 
-                  className="block w-full py-3 px-4 rounded-lg text-white font-medium relative overflow-hidden group text-center"
-                >
-                  <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 transition-all duration-300"></span>
-                  <span className="relative flex items-center justify-center gap-2">
-                    Get Your Account
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
                   </span>
                 </Link>
               </div>
