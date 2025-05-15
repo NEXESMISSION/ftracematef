@@ -1,12 +1,16 @@
 // Permissions utility for managing browser permissions
 
+// Check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined' && typeof navigator !== 'undefined';
+
 // Ensure TypeScript recognizes the navigator object properly
-declare const navigator: Navigator & {
-  permissions?: {
-    query: (permissionDesc: { name: string }) => Promise<{ state: PermissionState }>;
-  };
-  mediaDevices?: MediaDevices;
-};
+declare global {
+  interface Navigator {
+    permissions?: {
+      query: (permissionDesc: { name: string }) => Promise<{ state: PermissionState }>;
+    };
+  }
+}
 
 /**
  * Permission status stored in localStorage
@@ -44,8 +48,8 @@ export const checkCameraPermission = async (): Promise<boolean> => {
     
     // Fallback: Try to access the camera to check permission
     try {
-      // Use a safer way to check for mediaDevices
-      if (!navigator.mediaDevices) {
+      // Check if we're in a browser environment and if mediaDevices is available
+      if (!isBrowser || !navigator || !('mediaDevices' in navigator)) {
         throw new Error('MediaDevices API not supported');
       }
       
@@ -83,7 +87,7 @@ export const requestCameraPermission = async (): Promise<boolean> => {
     }
     
     // If not, request permission by trying to access the camera
-    if (!navigator.mediaDevices) {
+    if (!isBrowser || !navigator || !('mediaDevices' in navigator)) {
       throw new Error('MediaDevices API not supported');
     }
     
@@ -113,6 +117,9 @@ export const requestCameraPermission = async (): Promise<boolean> => {
  */
 export const storeCameraPermission = (status: PermissionState): void => {
   try {
+    // Check if we're in a browser environment
+    if (!isBrowser) return;
+    
     const permission: StoredPermission = {
       status,
       timestamp: Date.now()
@@ -129,6 +136,9 @@ export const storeCameraPermission = (status: PermissionState): void => {
  */
 export const getCameraPermissionFromStorage = (): StoredPermission | null => {
   try {
+    // Check if we're in a browser environment
+    if (!isBrowser) return null;
+    
     const storedPermission = localStorage.getItem('camera_permission');
     if (storedPermission) {
       return JSON.parse(storedPermission) as StoredPermission;
@@ -155,6 +165,9 @@ export const isPermissionRecent = (timestamp: number): boolean => {
  */
 export const clearCameraPermission = (): void => {
   try {
+    // Check if we're in a browser environment
+    if (!isBrowser) return;
+    
     localStorage.removeItem('camera_permission');
   } catch (error) {
     console.error('Error clearing camera permission:', error);
