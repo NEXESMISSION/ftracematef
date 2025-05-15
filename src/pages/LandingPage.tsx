@@ -205,21 +205,28 @@ const LandingPage: React.FC = () => {
       {/* Hero Section */}
       <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-dark-600">
         <div className="absolute inset-0 z-0">
-          {/* Video Background - Using OptimizedVideoPlayer for better performance */}
-          <OptimizedVideoPlayer
-            sources={[
-              { src: "/assests/main.mp4", type: "video/mp4" }
-            ]}
+          {/* Video Background - Direct video element for maximum compatibility */}
+          <video
+            className="absolute inset-0 w-full h-full object-cover"
             autoPlay
             muted
             loop
-            poster="/assests/poster-main.jpg"
-            preloadStrategy="auto"
-            className="absolute inset-0 w-full h-full"
-            objectFit="cover"
-            priority={true}
-            controls={false}
-          />
+            playsInline
+            data-play="auto"
+            controlsList="nodownload noplaybackrate nofullscreen"
+            ref={(el) => {
+              if (el) {
+                el.setAttribute('webkit-playsinline', 'true');
+                el.setAttribute('x5-playsinline', 'true');
+                el.setAttribute('x5-video-player-type', 'h5');
+                el.setAttribute('x5-video-player-fullscreen', 'true');
+              }
+            }}
+          >
+            <source src="/assests/main.mp4" type="video/mp4" />
+            <source src="/assets/main.mp4" type="video/mp4" />
+            Your browser does not support HTML video.
+          </video>
           <div className="absolute inset-0 bg-black/80"></div>
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary-600/20 via-transparent to-transparent opacity-70"></div>
           <div className="absolute top-[10%] right-[10%] w-[40%] h-[40%] rounded-full bg-primary-500/10 blur-[100px]"></div>
@@ -356,21 +363,29 @@ const LandingPage: React.FC = () => {
                 className="bg-dark-300/70 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300"
               >
                 <div className="w-full h-full md:h-[400px] lg:h-[500px] aspect-[3/4] md:aspect-auto relative">
-                  <OptimizedVideoPlayer
-                    sources={[
-                      { src: `/assests/vedios of how it works/${index + 1}.mp4`, type: "video/mp4" }
-                    ]}
+                  <video
+                    className="w-full h-full object-cover"
                     autoPlay
                     muted
                     loop
+                    playsInline
+                    data-play="auto"
+                    controlsList="nodownload noplaybackrate"
                     poster={`/assests/posters/tutorial-${index + 1}.jpg`}
-                    preloadStrategy="auto"
-                    priority={true}
-                    className="w-full h-full"
-                    objectFit="cover"
                     title={title}
-                    controls={false}
-                  />
+                    ref={(el) => {
+                      if (el) {
+                        el.setAttribute('webkit-playsinline', 'true');
+                        el.setAttribute('x5-playsinline', 'true');
+                        el.setAttribute('x5-video-player-type', 'h5');
+                        el.setAttribute('x5-video-player-fullscreen', 'true');
+                      }
+                    }}
+                  >
+                    <source src={`/assests/vedios of how it works/${index + 1}.mp4`} type="video/mp4" />
+                    <source src={`/assets/vedios of how it works/${index + 1}.mp4`} type="video/mp4" />
+                    Your browser does not support HTML video.
+                  </video>
                 </div>
                 <div className="p-6">
                   <h3 className="text-xl font-bold font-heading mb-2 text-white">{title}</h3>

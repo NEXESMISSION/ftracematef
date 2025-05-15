@@ -88,23 +88,39 @@ export function useOptimizedVideo({
         // Check both potential paths for the video file
         const potentialPaths = [
           src,
+          // Handle the case where src might contain 'assets' or 'assests'
           src.replace('/assets/', '/assests/'),
-          src.replace('/assests/', '/assets/')
+          src.replace('/assests/', '/assets/'),
+          // Also try absolute URLs for better cross-origin handling
+          window.location.origin + src,
+          window.location.origin + src.replace('/assets/', '/assests/'),
+          window.location.origin + src.replace('/assests/', '/assets/')
         ];
         
+        console.log('Trying to load video from these potential paths:', potentialPaths);
+        
         // Try to load from each potential path
+        let loadSuccessful = false;
         for (const path of potentialPaths) {
           try {
-            await fetch(path, { method: 'HEAD' });
+            const response = await fetch(path, { method: 'HEAD' });
             // If fetch succeeds, use this path
-            if (videoRef.current) {
+            if (response.ok && videoRef.current) {
+              console.log(`Successfully found video at: ${path}`);
               videoRef.current.src = path;
+              loadSuccessful = true;
               break;
             }
           } catch (err) {
             // Continue to next path
             console.log(`Path ${path} not accessible, trying next...`);
           }
+        }
+        
+        // If none of the paths worked, fall back to the original src as a last resort
+        if (!loadSuccessful && videoRef.current) {
+          console.log(`Falling back to original source: ${src}`);
+          videoRef.current.src = src;
         }
         
         // If video element exists, set up attributes

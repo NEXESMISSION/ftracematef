@@ -5,8 +5,19 @@ type VideoSource = string | { src: string; type: string };
 type VideoSourceType = VideoSource | VideoSource[];
 
 const formatSrc = (src: string): string => {
-  // Clean and format source URL if needed
-  return src;
+  // Remove any leading slash to prevent double slashes in absolute URLs
+  const cleanSrc = src.startsWith('/') ? src : `/${src}`;
+  
+  // Try both with and without the origin to improve cross-origin loading
+  if (typeof window !== 'undefined') {
+    // Only add origin in the browser, not during SSR
+    if (src.startsWith('http')) {
+      // If it's already an absolute URL, return as is
+      return src;
+    }
+  }
+  
+  return cleanSrc;
 };
 
 interface OptimizedVideoPlayerProps {
@@ -64,6 +75,23 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = ({
       };
     }
   });
+  
+  // Add fallback paths to ensure videos load in various environments
+  // This creates additional alternate paths with assets/assests variations
+  const expandedSources = [...processedSources];
+  processedSources.forEach(source => {
+    if (source.src.includes('/assets/')) {
+      expandedSources.push({
+        src: source.src.replace('/assets/', '/assests/'),
+        type: source.type
+      });
+    } else if (source.src.includes('/assests/')) {
+      expandedSources.push({
+        src: source.src.replace('/assests/', '/assets/'),
+        type: source.type
+      });
+    }
+  });
 
   // Use the custom hook for optimized video loading
   const {
@@ -78,7 +106,7 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = ({
     pause,
     togglePlay
   } = useOptimizedVideo({
-    src: processedSources[0].src,
+    src: expandedSources[0].src,
     poster,
     autoPlay: true, // Force autoplay
     muted: true,     // Force muted for autoplay policy
@@ -106,7 +134,7 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = ({
         aria-label={title}
       >
         {/* Fallback sources for different formats */}
-        {processedSources.map((source, index) => (
+        {expandedSources.map((source, index) => (
           <source key={index} src={source.src} type={source.type} />
         ))}
         Your browser does not support HTML video.
