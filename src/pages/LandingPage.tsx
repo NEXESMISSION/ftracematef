@@ -385,8 +385,22 @@ const LandingPage: React.FC = () => {
                 className="bg-dark-300/70 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300"
               >
                 <div className="w-full h-full md:h-[400px] lg:h-[500px] aspect-[3/4] md:aspect-auto relative">
+                  {/* Fallback poster image that's always displayed */}
+                  <img 
+                    src={`/assests/posters/tutorial-${index + 1}.jpg`} 
+                    alt={title}
+                    className="absolute inset-0 w-full h-full object-cover z-10"
+                    onError={(e) => {
+                      const target = e.currentTarget as HTMLImageElement;
+                      if (target.src.includes('/assests/')) {
+                        target.src = target.src.replace('/assests/', '/assets/');
+                      }
+                    }}
+                  />
+                  
+                  {/* Video element with playsinline and all mobile-compatible attributes */}
                   <video
-                    className="w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover z-20"
                     autoPlay
                     muted
                     loop
@@ -398,7 +412,7 @@ const LandingPage: React.FC = () => {
                     style={{ objectFit: 'cover' }}
                     ref={(el) => {
                       if (el) {
-                        // Set critical mobile-specific attributes
+                        // Apply all possible mobile playback attributes
                         el.setAttribute('webkit-playsinline', 'true');
                         el.setAttribute('playsinline', 'true');
                         el.setAttribute('x5-playsinline', 'true');
@@ -407,36 +421,49 @@ const LandingPage: React.FC = () => {
                         el.setAttribute('disablePictureInPicture', '');
                         el.setAttribute('disableRemotePlayback', '');
                         
-                        // Force play to ensure video starts on mobile
-                        const playPromise = el.play();
-                        if (playPromise !== undefined) {
-                          playPromise.catch(error => {
-                            // Auto-play was prevented, try muted
-                            el.muted = true;
-                            el.play().catch(e => console.log('Video still cannot play:', e));
-                          });
+                        // Create a simpler, more reliable video source
+                        try {
+                          // Try both asset paths to cover all bases
+                          const mainPath = `/assets/vedios of how it works/${index + 1}.mp4`;
+                          const altPath = `/assests/vedios of how it works/${index + 1}.mp4`;
+                          
+                          // Set the src directly instead of using source tags
+                          el.src = mainPath;
+                          
+                          // If video errors, try the alternate path
+                          el.onerror = () => {
+                            console.log('Trying alternate video path');
+                            el.src = altPath;
+                          };
+                          
+                          // Force play with a small delay to ensure DOM is ready
+                          setTimeout(() => {
+                            const playPromise = el.play();
+                            if (playPromise !== undefined) {
+                              playPromise.catch(error => {
+                                console.log('Video play was prevented on first try:', error);
+                                // Retry with a short timeout
+                                setTimeout(() => {
+                                  el.play().catch(e => console.log('Video still cannot play:', e));
+                                }, 1000);
+                              });
+                            }
+                          }, 500);
+                        } catch (err) {
+                          console.error('Video setup error:', err);
                         }
                       }
                     }}
-                    onError={(e) => {
-                      console.error('Video error:', e);
-                      // Try to recover from video error
-                      const target = e.currentTarget;
-                      if (target.src && target.src.includes('/assests/')) {
-                        target.src = target.src.replace('/assests/', '/assets/');
-                      } else if (target.src && target.src.includes('/assets/')) {
-                        target.src = target.src.replace('/assets/', '/assests/');
-                      }
-                    }}
-                  >
-                    {/* Primary source */}
-                    <source src={`/assests/vedios of how it works/${index + 1}.mp4`} type="video/mp4" />
-                    {/* Fallback paths */}
-                    <source src={`/assets/vedios of how it works/${index + 1}.mp4`} type="video/mp4" />
-                    <source src={`/assests/vedios of how it works/${index + 1}.mp4?v=${Date.now()}`} type="video/mp4" />
-                    <source src={`/assets/vedios of how it works/${index + 1}.mp4?v=${Date.now()}`} type="video/mp4" />
-                    Your browser does not support HTML video.
-                  </video>
+                  />
+                  
+                  {/* Play icon overlay to make it look like a video - helps users understand it's a video */}
+                  <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
+                    <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
                 <div className="p-6">
                   <h3 className="text-xl font-bold font-heading mb-2 text-white">{title}</h3>
