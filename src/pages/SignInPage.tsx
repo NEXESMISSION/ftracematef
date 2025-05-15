@@ -108,11 +108,9 @@ const SignInPage: React.FC = () => {
       <nav className="fixed top-0 left-0 w-full z-50 bg-dark-500/80 backdrop-blur-md border-b border-primary-500/20">
         <div className="container mx-auto px-4 py-3">
           <div className="flex justify-between items-center">
-            <div className="flex items-center">
-              <Link to="/">
-                <img src="/assets/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10" />
-              </Link>
-            </div>
+            <Link to="/" className="text-white text-xl font-bold flex items-center">
+              <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10" />
+            </Link>
             
             <div className="hidden md:flex items-center">
               <div className="flex space-x-10">
@@ -170,7 +168,7 @@ const SignInPage: React.FC = () => {
             Home
           </Link>
           <Link 
-            to="/tracing" 
+            to="/app" 
             className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
             onClick={() => document.getElementById('mobileMenu')?.classList.add('hidden')}
           >
@@ -208,7 +206,7 @@ const SignInPage: React.FC = () => {
                 supabaseReachable={networkStatus.supabaseReachable} 
               />
               <div className="text-center mb-10">
-                <img src="/assets/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-16 mx-auto mb-4" />
+                <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-16 mx-auto mb-4" />
                 <h1 className="text-3xl font-bold gradient-text">Sign In to TraceMate</h1>
                 <p className="mt-2 text-sm text-blue-200/80">
                   Enter your credentials to access your account

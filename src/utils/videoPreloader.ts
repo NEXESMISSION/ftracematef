@@ -8,54 +8,103 @@
 /**
  * Interface for video preloading options
  */
-interface PreloadOptions {
-  priority?: boolean;
-  metadata?: boolean;
+export interface PreloadOptions {
   timeout?: number;
+  highPriority?: boolean;
+  metadata?: boolean;
+  fallbackSources?: string[];
 }
 
-/**
- * Cache for storing preloaded video elements
- */
-const videoCache: Map<string, HTMLVideoElement> = new Map();
+const DEFAULT_TIMEOUT = 30000; // 30 seconds
+const videoCache = new Map<string, HTMLVideoElement>();
 
 /**
- * Preloads a video and stores it in the cache
- * 
+ * Check if a file exists by making a HEAD request
+ * @param url URL to check
+ * @returns Promise that resolves to true if file exists
+ */
+const checkFileExists = async (url: string): Promise<boolean> => {
+  try {
+    const response = await fetch(url, { method: 'HEAD' });
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+};
+
+/**
+ * Preloads a video and returns a promise that resolves when the video is ready to play
  * @param src Video source URL
  * @param options Preload options
- * @returns Promise that resolves when the video is preloaded
+ * @returns Promise that resolves with the video element
  */
-export const preloadVideo = (src: string, options: PreloadOptions = {}): Promise<HTMLVideoElement> => {
+const preloadVideo = (src: string, options: PreloadOptions = {}): Promise<HTMLVideoElement> => {
   // If already in cache, return it
   if (videoCache.has(src)) {
     return Promise.resolve(videoCache.get(src)!);
   }
 
-  const { 
-    priority = false, 
-    metadata = true,
-    timeout = 10000 
+  const {
+    timeout = DEFAULT_TIMEOUT,
+    highPriority = false,
+    metadata = false,
+    fallbackSources = []
   } = options;
 
-  return new Promise((resolve, reject) => {
-    const video = document.createElement('video');
-    video.muted = true;
-    video.preload = metadata ? 'metadata' : 'auto';
-    video.crossOrigin = 'anonymous';
+  // Preload the video
+  return new Promise(async (resolve, reject) => {
+    // First check if the file exists
+    const fileExists = await checkFileExists(src);
     
-    // Set timeout to avoid hanging
+    // If file doesn't exist and we have fallbacks, try them
+    if (!fileExists && fallbackSources.length > 0) {
+      // Try fallback sources one by one
+      for (const fallbackSrc of fallbackSources) {
+        const fallbackExists = await checkFileExists(fallbackSrc);
+        if (fallbackExists) {
+          // If fallback exists, use it instead
+          return preloadVideo(fallbackSrc, options)
+            .then(resolve)
+            .catch(reject);
+        }
+      }
+    }
+    
+    const video = document.createElement('video');
+    video.preload = metadata ? 'metadata' : 'auto';
+    video.playsInline = true;
+    video.muted = true;
+    
+    // Add mobile-specific attributes
+    video.setAttribute('webkit-playsinline', 'true');
+    video.setAttribute('x5-playsinline', 'true');
+    video.setAttribute('x5-video-player-type', 'h5');
+    video.setAttribute('x5-video-player-fullscreen', 'true');
+
+    // Set up timeout
     const timeoutId = setTimeout(() => {
-      // If only metadata was requested, we can resolve with partial data
-      if (metadata) {
-        videoCache.set(src, video);
-        resolve(video);
+      // If we have fallbacks, try them instead of rejecting
+      if (fallbackSources.length > 0) {
+        clearTimeout(timeoutId);
+        // Try the first fallback
+        preloadVideo(fallbackSources[0], {
+          ...options,
+          fallbackSources: fallbackSources.slice(1) // Remove the first fallback
+        })
+          .then(resolve)
+          .catch(reject);
       } else {
-        reject(new Error(`Video preload timeout: ${src}`));
+        reject(new Error(`Timeout preloading video: ${src}`));
       }
     }, timeout);
 
-    // Event listeners
+    // Set up event listeners
+    video.addEventListener('canplaythrough', () => {
+      clearTimeout(timeoutId);
+      videoCache.set(src, video);
+      resolve(video);
+    });
+
     video.addEventListener('loadedmetadata', () => {
       if (metadata) {
         clearTimeout(timeoutId);
@@ -64,22 +113,28 @@ export const preloadVideo = (src: string, options: PreloadOptions = {}): Promise
       }
     });
 
-    video.addEventListener('canplaythrough', () => {
-      clearTimeout(timeoutId);
-      videoCache.set(src, video);
-      resolve(video);
-    });
-
     video.addEventListener('error', () => {
       clearTimeout(timeoutId);
-      reject(new Error(`Failed to preload video: ${src}`));
+      
+      // If we have fallbacks, try them instead of rejecting
+      if (fallbackSources.length > 0) {
+        // Try the first fallback
+        preloadVideo(fallbackSources[0], {
+          ...options,
+          fallbackSources: fallbackSources.slice(1) // Remove the first fallback
+        })
+          .then(resolve)
+          .catch(reject);
+      } else {
+        reject(new Error(`Failed to preload video: ${src}`));
+      }
     });
 
     // Start loading
     video.src = src;
     
     // If high priority, try to load a bit of the video
-    if (priority && !metadata) {
+    if (highPriority) {
       video.load();
     }
   });
@@ -193,7 +248,7 @@ export const preloadPageVideos = (prioritySelector: string = 'video[data-priorit
   
   priorityVideos.forEach(video => {
     if (video.src && !isVideoCached(video.src)) {
-      preloadVideo(video.src, { ...options, priority: true });
+      preloadVideo(video.src, { ...options, highPriority: true });
     }
   });
   
@@ -205,11 +260,11 @@ export const preloadPageVideos = (prioritySelector: string = 'video[data-priorit
       // Use requestIdleCallback if available, otherwise setTimeout
       if ('requestIdleCallback' in window) {
         (window as any).requestIdleCallback(() => {
-          preloadVideo(video.src, { ...options, priority: false });
+          preloadVideo(video.src, { ...options, highPriority: false });
         });
       } else {
         setTimeout(() => {
-          preloadVideo(video.src, { ...options, priority: false });
+          preloadVideo(video.src, { ...options, highPriority: false });
         }, 1000);
       }
     }

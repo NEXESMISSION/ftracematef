@@ -7,8 +7,10 @@ interface VideoSource {
   type: string;
 }
 
+type VideoSourceType = VideoSource | VideoSource[] | string;
+
 interface OptimizedVideoPlayerProps {
-  sources: VideoSource[] | string;
+  sources: VideoSourceType;
   poster?: string;
   title?: string;
   autoPlay?: boolean;
@@ -30,11 +32,18 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = ({
   sources,
   poster,
   title = 'Video',
+  // We're not using these props directly as they're hardcoded in the hook
+  // but we keep them in the interface for API consistency
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   autoPlay = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   loop = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   muted = true,
   controls = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   priority = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   preloadStrategy = 'metadata',
   className = '',
   objectFit = 'cover',
@@ -42,9 +51,42 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = ({
   onError
 }) => {
   // Normalize sources to array format
-  const normalizedSources = typeof sources === 'string' 
-    ? [{ src: sources, type: `video/${sources.split('.').pop()}` }] 
-    : sources;
+  let normalizedSources: VideoSource[] = [];
+  
+  // Safely extract file extension
+  const getFileExtension = (path: string): string => {
+    return path.indexOf('.') !== -1 ? path.split('.').pop() || 'mp4' : 'mp4';
+  };
+
+  if (typeof sources === 'string') {
+    // Handle string source
+    // Keep assests in the path since this is where the actual files are
+    normalizedSources = [{ 
+      src: sources, 
+      type: `video/${getFileExtension(sources)}` 
+    }];
+  } else if (Array.isArray(sources)) {
+    // Handle array of sources
+    normalizedSources = sources.map(source => {
+      if (typeof source === 'string') {
+        return {
+          src: source,
+          type: `video/${getFileExtension(source)}`
+        };
+      } else {
+        return {
+          src: source.src,
+          type: source.type
+        };
+      }
+    });
+  } else if (sources && typeof sources === 'object') {
+    // Handle single VideoSource object
+    normalizedSources = [{
+      src: sources.src,
+      type: sources.type
+    }];
+  }
   
   // Use our optimized video hook
   const {
@@ -53,15 +95,20 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = ({
     isPlaying,
     error,
     dynamicPoster,
+    // We're not using these directly but keeping them for future use
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    play,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    pause,
     togglePlay
   } = useOptimizedVideo({
     src: normalizedSources[0].src,
     poster,
-    autoPlay,
-    muted,
-    loop,
-    preloadStrategy,
-    priority,
+    autoPlay: true, // Force autoplay to ensure videos always play
+    muted: true, // Always mute to allow autoplay on all devices
+    loop: true, // Always loop to ensure continuous playback
+    preloadStrategy: 'auto', // Always preload for better performance
+    priority: true, // Always prioritize video loading
     onLoad,
     onError
   });
@@ -150,7 +197,7 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = ({
         </AnimatePresence>
       )}
       
-      {/* Video element */}
+      {/* Video element - Enhanced for mobile compatibility */}
       <video
         ref={videoRef}
         className={`w-full h-full object-${objectFit} pointer-events-none select-none`}
@@ -159,11 +206,33 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = ({
         muted={muted}
         loop={loop}
         controls={controls}
+        preload="auto"
+        webkit-playsinline="true"
+        x5-playsinline="true"
+        x5-video-player-type="h5"
+        x5-video-player-fullscreen="true"
         aria-label={title}
       >
-        {normalizedSources.map((source, index) => (
-          <source key={index} src={source.src} type={source.type} />
-        ))}
+        {/* Add multiple source formats for better compatibility */}
+        {normalizedSources.map((source, index) => {
+          // Get the base source without extension
+          const baseSrc = source.src.replace(/\.[^/.]+$/, '');
+          const fileType = source.src.split('.').pop()?.toLowerCase();
+          
+          // If it's already an MP4, keep it as is
+          if (fileType === 'mp4') {
+            return <source key={`${index}-mp4`} src={source.src} type="video/mp4" />;
+          }
+          
+          // Otherwise, provide multiple formats
+          return (
+            <React.Fragment key={index}>
+              <source key={`${index}-mp4`} src={`${baseSrc}.mp4`} type="video/mp4" />
+              <source key={`${index}-webm`} src={`${baseSrc}.webm`} type="video/webm" />
+              <source key={`${index}-original`} src={source.src} type={source.type} />
+            </React.Fragment>
+          );
+        })}
         Your browser does not support the video tag.
       </video>
     </div>

@@ -18,8 +18,9 @@ const Layout: React.FC<LayoutProps> = ({ children, hideNav = false, hideFooter =
           <div className="container mx-auto px-4 py-3">
             <div className="flex justify-between items-center">
               <div className="flex items-center">
-                <Link to="/">
-                  <img src="/assets/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10" />
+                <Link to="/" className="flex items-center group">
+                  <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10 mr-2" />
+                  <span className="text-xl font-bold group-hover:text-primary-300 transition-colors">TRACE</span>
                 </Link>
               </div>
               
@@ -28,7 +29,7 @@ const Layout: React.FC<LayoutProps> = ({ children, hideNav = false, hideFooter =
                   <Link to="/" className="text-white hover:text-primary-100 transition-colors font-medium">
                     Home
                   </Link>
-                  <Link to="/tracing" className="text-white hover:text-primary-100 transition-colors font-medium">
+                  <Link to="/app" className="text-white hover:text-primary-100 transition-colors font-medium">
                     App
                   </Link>
                   <Link to="/payment" className="text-white hover:text-primary-100 transition-colors font-medium">
@@ -66,7 +67,7 @@ const Layout: React.FC<LayoutProps> = ({ children, hideNav = false, hideFooter =
                     Home
                   </Link>
                   <Link 
-                    to="/tracing" 
+                    to="/app" 
                     className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
                     onClick={() => document.getElementById('mobileMenu')?.classList.add('hidden')}
                   >
@@ -100,10 +101,10 @@ const Layout: React.FC<LayoutProps> = ({ children, hideNav = false, hideFooter =
           <div className="container mx-auto px-4 relative z-10">
             <div className="flex flex-wrap justify-between items-center">
               <div className="w-full md:w-4/12 px-4 mb-8 md:mb-0">
-                <div className="flex items-center">
-                  <img src="/assets/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10 mr-3" />
-                  <h3 className="text-2xl font-bold font-heading text-white">TraceMate</h3>
-                </div>
+                <Link to="/" className="flex items-center group">
+                  <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10 mr-3" />
+                  <h3 className="text-2xl font-bold font-heading text-white group-hover:text-primary-300 transition-colors">TraceMate</h3>
+                </Link>
                 <p className="text-primary-200/70 mt-3 font-light">Transform your drawing skills with real-time tracing</p>
               </div>
             </div>

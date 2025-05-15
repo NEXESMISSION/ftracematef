@@ -104,8 +104,8 @@ const LandingPage: React.FC = () => {
         <div className="container mx-auto px-4 py-3">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              <Link to="/">
-                <img src="/assets/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10" />
+              <Link to="/" className="flex items-center group">
+                <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10" />
               </Link>
             </div>
             
@@ -114,7 +114,7 @@ const LandingPage: React.FC = () => {
                 <Link to="/" className="text-white hover:text-primary-100 transition-colors font-medium">
                   Home
                 </Link>
-                <Link to="/tracing" className="text-white hover:text-primary-100 transition-colors font-medium">
+                <Link to="/app" className="text-white hover:text-primary-100 transition-colors font-medium">
                   App
                 </Link>
                 <button onClick={() => scrollToSection(videosRef)} className="text-white hover:text-primary-100 transition-colors font-medium">How It Works</button>
@@ -166,7 +166,7 @@ const LandingPage: React.FC = () => {
             Home
           </Link>
           <Link 
-            to="/tracing" 
+            to="/app" 
             className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
             onClick={() => document.getElementById('mobileMenu')?.classList.add('hidden')}
           >
@@ -207,15 +207,18 @@ const LandingPage: React.FC = () => {
         <div className="absolute inset-0 z-0">
           {/* Video Background - Using OptimizedVideoPlayer for better performance */}
           <OptimizedVideoPlayer
-            sources="/assets/main.mp4"
+            sources={[
+              { src: "/assests/main.mp4", type: "video/mp4" }
+            ]}
             autoPlay
             muted
             loop
             poster="/assests/poster-main.jpg"
-            preloadStrategy="metadata"
+            preloadStrategy="auto"
             className="absolute inset-0 w-full h-full"
             objectFit="cover"
             priority={true}
+            controls={false}
           />
           <div className="absolute inset-0 bg-black/80"></div>
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary-600/20 via-transparent to-transparent opacity-70"></div>
@@ -354,15 +357,19 @@ const LandingPage: React.FC = () => {
               >
                 <div className="w-full h-full md:h-[400px] lg:h-[500px] aspect-[3/4] md:aspect-auto relative">
                   <OptimizedVideoPlayer
-                    sources={`/assests/vedios of how it works/${index + 1}.mp4`}
+                    sources={[
+                      { src: `/assests/vedios of how it works/${index + 1}.mp4`, type: "video/mp4" }
+                    ]}
                     autoPlay
                     muted
                     loop
                     poster={`/assests/posters/tutorial-${index + 1}.jpg`}
-                    preloadStrategy="metadata"
+                    preloadStrategy="auto"
+                    priority={true}
                     className="w-full h-full"
                     objectFit="cover"
                     title={title}
+                    controls={false}
                   />
                 </div>
                 <div className="p-6">
@@ -871,10 +878,10 @@ const LandingPage: React.FC = () => {
         <div className="container mx-auto px-4 relative z-10">
           <div className="flex flex-wrap justify-between items-center">
             <div className="w-full md:w-4/12 px-4 mb-8 md:mb-0">
-              <div className="flex items-center">
+              <Link to="/" className="flex items-center group">
                 <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10 mr-3" />
-                <h3 className="text-2xl font-bold font-heading text-white">TraceMate</h3>
-              </div>
+                <h3 className="text-2xl font-bold font-heading text-white group-hover:text-primary-300 transition-colors">TraceMate</h3>
+              </Link>
               <p className="text-primary-200/70 mt-3 font-light">Transform your drawing skills with real-time tracing</p>
             </div>
             <div className="w-full md:w-6/12 px-4">

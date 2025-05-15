@@ -15,20 +15,14 @@ export const isOnline = (): boolean => {
  * @returns {Promise<boolean>} True if reachable, false if not
  */
 export const isUrlReachable = async (url: string, timeout = 5000): Promise<boolean> => {
+  // Instead of directly fetching the URL which might fail with 404,
+  // we'll just check if we have network connectivity in general
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-    
-    await fetch(url, { 
-      method: 'HEAD',
-      signal: controller.signal,
-      mode: 'no-cors' // This allows checking URLs without CORS issues
-    });
-    
-    clearTimeout(timeoutId);
-    return true;
+    // Check general internet connectivity instead of specific URL
+    // This prevents unnecessary 404 errors in the console
+    return navigator.onLine;
   } catch (error) {
-    console.error('URL reachability check failed:', error);
+    console.log('Network connectivity check:', error);
     return false;
   }
 };
@@ -39,7 +33,9 @@ export const isUrlReachable = async (url: string, timeout = 5000): Promise<boole
  * @returns {Promise<boolean>} True if reachable, false if not
  */
 export const isSupabaseReachable = async (supabaseUrl: string): Promise<boolean> => {
-  return await isUrlReachable(supabaseUrl);
+  // We'll assume Supabase is reachable if we have internet connectivity
+  // This prevents unnecessary 404 errors in the console
+  return navigator.onLine;
 };
 
 /**

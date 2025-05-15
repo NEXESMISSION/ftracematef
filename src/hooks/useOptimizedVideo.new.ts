@@ -144,111 +144,58 @@ export function useOptimizedVideo({
     const videoElement = videoRef.current;
     if (!videoElement) return;
     
-    // Keep track of whether component is mounted
-    let isMounted = true;
-    
     const handleLoadStart = () => {
-      if (isMounted) {
-        setIsLoading(true);
-        setError(null);
-      }
+      setIsLoading(true);
+      setError(null);
     };
     
     const handleLoadedData = () => {
-      if (isMounted) {
-        setIsLoading(false);
-        if (onLoad) onLoad();
-        
-        // Delay play to avoid AbortError
-        setTimeout(() => {
-          if (videoElement && isMounted) {
-            playWithRetry(videoElement, 5);
-          }
-        }, 300);
-      }
+      setIsLoading(false);
+      if (onLoad) onLoad();
+      
+      // Ensure video plays automatically
+      playWithRetry(videoElement, 5);
     };
     
     const handleError = (_: Event) => {
-      if (isMounted) {
-        setIsLoading(false);
-        const newError = new Error('Failed to load video');
-        setError(newError);
-        if (onError) onError(newError);
-      }
+      setIsLoading(false);
+      const newError = new Error('Failed to load video');
+      setError(newError);
+      if (onError) onError(newError);
     };
     
     const handlePlay = () => {
-      if (isMounted) setIsPlaying(true);
+      setIsPlaying(true);
     };
     
     const handlePause = () => {
-      // Only try to auto-play again if component is still mounted
-      if (isMounted) {
-        setIsPlaying(false);
-        setTimeout(() => {
-          if (videoElement && isMounted) {
-            playWithRetry(videoElement, 3);
-          }
-        }, 300);
-      }
+      // Prevent user from pausing by auto-playing again
+      setIsPlaying(false);
+      setTimeout(() => {
+        if (videoElement) {
+          playWithRetry(videoElement, 3);
+        }
+      }, 100);
     };
     
     const handleEnded = () => {
       // Ensure video replays when it ends
-      if (videoElement && isMounted) {
-        videoElement.currentTime = 0;
-        // Add delay before replay to prevent AbortError
-        setTimeout(() => {
-          if (videoElement && isMounted) {
-            playWithRetry(videoElement, 3);
-          }
-        }, 50);
-      }
+      videoElement.currentTime = 0;
+      playWithRetry(videoElement, 3);
     };
     
     // Function to play with multiple retries
     const playWithRetry = (video: HTMLVideoElement, maxAttempts: number, attempt = 1) => {
-      if (!isMounted) return;
-      
-      try {
-        // Check if video can play before attempting
-        if (video.readyState >= 2) {
-          const playPromise = video.play();
-          
-          if (playPromise !== undefined) {
-            playPromise.catch((error) => {
-              if (!isMounted) return;
-              
-              console.log(`Play attempt ${attempt} failed:`, error?.message || 'Unknown error');
-              
-              if (attempt < maxAttempts) {
-                setTimeout(() => {
-                  if (video && isMounted) {
-                    video.muted = true; // Ensure muted to help with autoplay
-                    playWithRetry(video, maxAttempts, attempt + 1);
-                  }
-                }, 400 * attempt); // Increasing backoff
-              }
-            });
-          }
-        } else {
-          // Video not ready yet, wait and retry
+      video.play().catch((error) => {
+        console.warn(`Play attempt ${attempt} failed:`, error);
+        
+        if (attempt < maxAttempts) {
           setTimeout(() => {
-            if (video && isMounted) {
-              playWithRetry(video, maxAttempts, attempt);
-            }
-          }, 200);
+            video.muted = true; // Ensure muted to help with autoplay
+            playWithRetry(video, maxAttempts, attempt + 1);
+          }, 500 * attempt); // Increasing backoff
         }
-      } catch (err) {
-        // Catch synchronous errors and retry
-        if (isMounted && attempt < maxAttempts) {
-          setTimeout(() => {
-            if (video && isMounted) {
-              playWithRetry(video, maxAttempts, attempt + 1);
-            }
-          }, 400 * attempt);
-        }
-      }
+      });
     };
     
     // Add event listeners
@@ -267,26 +214,17 @@ export function useOptimizedVideo({
     videoElement.preload = 'auto';
     videoElement.controls = false; // Hide controls
     
-    // Delay initial play attempt to avoid AbortError
-    const initialPlayTimer = setTimeout(() => {
-      if (videoElement && isMounted) {
-        playWithRetry(videoElement, 5);
-      }
-    }, 500);
+    // Force initial play attempt
+    playWithRetry(videoElement, 5);
     
-    // Clean up event listeners and timers
+    // Clean up event listeners
     return () => {
-      isMounted = false;
-      clearTimeout(initialPlayTimer);
-      
-      if (videoElement) {
-        videoElement.removeEventListener('loadstart', handleLoadStart);
-        videoElement.removeEventListener('loadeddata', handleLoadedData);
-        videoElement.removeEventListener('error', handleError);
-        videoElement.removeEventListener('play', handlePlay);
-        videoElement.removeEventListener('pause', handlePause);
-        videoElement.removeEventListener('ended', handleEnded);
-      }
+      videoElement.removeEventListener('loadstart', handleLoadStart);
+      videoElement.removeEventListener('loadeddata', handleLoadedData);
+      videoElement.removeEventListener('error', handleError);
+      videoElement.removeEventListener('play', handlePlay);
+      videoElement.removeEventListener('pause', handlePause);
+      videoElement.removeEventListener('ended', handleEnded);
     };
   }, [src, onLoad, onError]); // We intentionally exclude autoPlay, loop, muted, etc. as we enforce specific values
   

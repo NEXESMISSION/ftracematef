@@ -113,17 +113,26 @@ const TracingPage: React.FC = () => {
     // Log available cameras
     console.log('Available cameras:', availableCameras);
     
-    // Force start the camera
+    // Force start the camera with improved viewport fitting
     const initCamera = async () => {
-      try {
-        await startCamera();
-        setIsCameraActive(true);
-        console.log('Camera started automatically');
-      } catch (err) {
-        console.error('Failed to start camera automatically:', err);
+      if (cameraVideoRef.current) {
+        try {
+          // Start camera with the back-facing camera if available
+          await startCamera();
+          setIsCameraActive(true);
+
+          // Apply styles to ensure video fills container properly
+          if (cameraVideoRef.current) {
+            cameraVideoRef.current.style.width = '100%';
+            cameraVideoRef.current.style.height = '100%';
+            cameraVideoRef.current.style.objectFit = 'cover';
+            cameraVideoRef.current.style.objectPosition = 'center';
+          }
+        } catch (error) {
+          console.error('Failed to initialize camera:', error);
+        }
       }
-    };
-    
+    };  
     // Start camera after a short delay to ensure everything is loaded
     setTimeout(initCamera, 500);
     
@@ -624,10 +633,19 @@ const TracingPage: React.FC = () => {
   // Handle window resize
   useEffect(() => {
     const handleResize = () => {
+      // Redraw canvas when window is resized
       if (canvasRef.current) {
         canvasRef.current.width = window.innerWidth;
         canvasRef.current.height = window.innerHeight;
         drawCanvas();
+      }
+      
+      // Also update camera view to fill screen properly
+      if (cameraVideoRef.current) {
+        cameraVideoRef.current.style.width = '100%';
+        cameraVideoRef.current.style.height = '100%';
+        cameraVideoRef.current.style.objectFit = 'cover';
+        cameraVideoRef.current.style.objectPosition = 'center';
       }
     };
     
@@ -649,16 +667,25 @@ const TracingPage: React.FC = () => {
   }, [showControls]);
   
   return (
-    <div className="relative w-full h-screen bg-black overflow-hidden">
-      {/* Video element for camera feed */}
-      <video
-        ref={cameraVideoRef}
-        className="absolute inset-0 w-full h-full object-cover"
-        autoPlay
-        playsInline
-        muted
-        style={{ display: 'none' }} // Hide the video element and only show the canvas
-      />
+    <div className="h-screen w-screen relative bg-gray-900 overflow-hidden">
+      {/* Camera video (conditionally rendered) */}
+      {isCameraActive && (
+        <div className="absolute inset-0 z-0 flex items-center justify-center">
+          <video
+            ref={cameraVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute min-w-full min-h-full w-auto h-auto object-cover"
+            style={{ 
+              objectFit: 'cover',
+              objectPosition: 'center',
+              width: '100%',
+              height: '100%'
+            }}
+          />
+        </div>
+      )}
       
       {/* Canvas for drawing the overlay */}
       <canvas

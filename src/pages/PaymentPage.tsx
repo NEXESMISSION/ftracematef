@@ -87,7 +87,7 @@ const PaymentPage: React.FC = () => {
                 <Link to="/" className="text-white hover:text-blue-300 transition-colors font-medium">
                   Home
                 </Link>
-                <Link to="/trace" className="text-white hover:text-blue-300 transition-colors font-medium">
+                <Link to="/app" className="text-white hover:text-blue-300 transition-colors font-medium">
                   App
                 </Link>
                 <Link to="/payment" className="text-white hover:text-blue-300 transition-colors font-medium">
@@ -138,7 +138,7 @@ const PaymentPage: React.FC = () => {
             Home
           </Link>
           <Link 
-            to="/trace" 
+            to="/app" 
             className="text-white hover:text-blue-300 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-blue-500/10 text-center text-lg"
             onClick={() => document.getElementById('mobileMenu')?.classList.add('hidden')}
           >
