@@ -28,6 +28,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   @apply bg-dark-gradient from-dark-300 to-dark-500;
+  user-select: none; /* Disable text selection app-wide */
 }
 
 #root {
@@ -35,6 +36,9 @@ body {
 }
 
 @layer components {
+  .text-selectable {
+    user-select: text; /* Enable text selection where needed */
+  }
   .btn-primary {
     @apply bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-2 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5;
   }

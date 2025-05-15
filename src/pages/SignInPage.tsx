@@ -103,7 +103,7 @@ const SignInPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-dark-400 to-dark-600 text-white font-sans">
+    <div className="min-h-screen bg-gradient-to-b from-dark-400 to-dark-600 text-white font-sans text-selectable">
       {/* Navigation Bar */}
       <nav className="fixed top-0 left-0 w-full z-50 bg-dark-500/80 backdrop-blur-md border-b border-primary-500/20">
         <div className="container mx-auto px-4 py-3">
