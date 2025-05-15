@@ -375,7 +375,11 @@ const LandingPage: React.FC = () => {
           </motion.div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {['Upload & Align', 'Trace & Create', 'Share & Enjoy'].map((title, index) => (
+            {[
+              { title: 'Upload & Align', videoId: '_yJX6y4A6J0', desc: 'Upload your reference image and align it with your camera view for perfect tracing.' },
+              { title: 'Trace & Create', videoId: 'cZyyaP_FkB8', desc: 'Use the overlay to trace your image with precision and create amazing artwork.' },
+              { title: 'Share & Enjoy', videoId: 'mQ1zbSHoUn4', desc: 'Share your creations with friends and enjoy the satisfaction of your new skills.' }
+            ].map((item, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 20 }}
@@ -384,93 +388,49 @@ const LandingPage: React.FC = () => {
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 className="bg-dark-300/70 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300"
               >
-                <div className="w-full h-full md:h-[400px] lg:h-[500px] aspect-[3/4] md:aspect-auto relative">
-                  {/* Fallback poster image that's always displayed */}
-                  <img 
-                    src={`/assests/posters/tutorial-${index + 1}.jpg`} 
-                    alt={title}
-                    className="absolute inset-0 w-full h-full object-cover z-10"
-                    onError={(e) => {
-                      const target = e.currentTarget as HTMLImageElement;
-                      if (target.src.includes('/assests/')) {
-                        target.src = target.src.replace('/assests/', '/assets/');
-                      }
-                    }}
-                  />
+                <div className="w-full h-[300px] md:h-[350px] lg:h-[400px] relative overflow-hidden">
+                  {/* YouTube Embed with protection overlays */}
+                  <div 
+                    className="w-full h-full absolute inset-0 pointer-events-none select-none"
+                    style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+                  >
+                    <iframe
+                      src={`https://www.youtube.com/embed/${item.videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${item.videoId}&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&disablekb=1`}
+                      title={item.title}
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="w-full h-full absolute inset-0 pointer-events-none"
+                      style={{
+                        pointerEvents: 'none',
+                      }}
+                    ></iframe>
+                  </div>
                   
-                  {/* Video element with playsinline and all mobile-compatible attributes */}
-                  <video
-                    className="absolute inset-0 w-full h-full object-cover z-20"
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    controls={false}
-                    poster={`/assests/posters/tutorial-${index + 1}.jpg`}
-                    title={title}
-                    preload="metadata"
-                    style={{ objectFit: 'cover' }}
-                    ref={(el) => {
-                      if (el) {
-                        // Apply all possible mobile playback attributes
-                        el.setAttribute('webkit-playsinline', 'true');
-                        el.setAttribute('playsinline', 'true');
-                        el.setAttribute('x5-playsinline', 'true');
-                        el.setAttribute('x5-video-player-type', 'h5');
-                        el.setAttribute('x5-video-player-fullscreen', 'true');
-                        el.setAttribute('disablePictureInPicture', '');
-                        el.setAttribute('disableRemotePlayback', '');
-                        
-                        // Create a simpler, more reliable video source
-                        try {
-                          // Try both asset paths to cover all bases
-                          const mainPath = `/assets/vedios of how it works/${index + 1}.mp4`;
-                          const altPath = `/assests/vedios of how it works/${index + 1}.mp4`;
-                          
-                          // Set the src directly instead of using source tags
-                          el.src = mainPath;
-                          
-                          // If video errors, try the alternate path
-                          el.onerror = () => {
-                            console.log('Trying alternate video path');
-                            el.src = altPath;
-                          };
-                          
-                          // Force play with a small delay to ensure DOM is ready
-                          setTimeout(() => {
-                            const playPromise = el.play();
-                            if (playPromise !== undefined) {
-                              playPromise.catch(error => {
-                                console.log('Video play was prevented on first try:', error);
-                                // Retry with a short timeout
-                                setTimeout(() => {
-                                  el.play().catch(e => console.log('Video still cannot play:', e));
-                                }, 1000);
-                              });
-                            }
-                          }, 500);
-                        } catch (err) {
-                          console.error('Video setup error:', err);
-                        }
-                      }
-                    }}
-                  />
-                  
-                  {/* Play icon overlay to make it look like a video - helps users understand it's a video */}
-                  <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
-                    <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
+                  {/* Protection overlay to prevent interaction */}
+                  <div 
+                    className="absolute inset-0 z-20" 
+                    style={{ 
+                      background: 'transparent', 
+                      pointerEvents: 'auto',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      MozUserSelect: 'none'
+                    }}>
+                    {/* Play button overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                        <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
                     </div>
                   </div>
                 </div>
                 <div className="p-6">
-                  <h3 className="text-xl font-bold font-heading mb-2 text-white">{title}</h3>
+                  <h3 className="text-xl font-bold font-heading mb-2 text-white">{item.title}</h3>
                   <p className="text-primary-200/80 font-light">
-                    {index === 0 && 'Upload your reference image and align it with your camera view for perfect tracing.'}
-                    {index === 1 && 'Use the overlay to trace your image with precision and create amazing artwork.'}
-                    {index === 2 && 'Share your creations with friends and enjoy the satisfaction of your new skills.'}
+                    {item.desc}
                   </p>
                 </div>
               </motion.div>
