@@ -667,22 +667,16 @@ const TracingPage: React.FC = () => {
   }, [showControls]);
   
   return (
-    <div className="h-screen w-screen relative bg-gray-900 overflow-hidden">
+    <div className="h-screen w-screen relative bg-gray-900 overflow-hidden touch-none">
       {/* Camera video (conditionally rendered) */}
       {isCameraActive && (
-        <div className="absolute inset-0 z-0 flex items-center justify-center">
+        <div className="absolute inset-0 z-0">
           <video
             ref={cameraVideoRef}
             autoPlay
             playsInline
             muted
-            className="absolute min-w-full min-h-full w-auto h-auto object-cover"
-            style={{ 
-              objectFit: 'cover',
-              objectPosition: 'center',
-              width: '100%',
-              height: '100%'
-            }}
+            className="absolute w-full h-full object-cover"
           />
         </div>
       )}
@@ -855,19 +849,14 @@ const TracingPage: React.FC = () => {
         </div>
       )}
       
-      {/* Instructions overlay - always visible */}
-      <div className="absolute bottom-4 left-0 right-0 text-center text-white bg-black bg-opacity-50 py-2 z-20">
-        <p>Drag with one finger to move • Pinch to zoom • Rotate with two fingers</p>
-        
-        {/* Session time countdown for non-logged in users */}
-        {!isLoggedIn && (
-          <p className="mt-1 text-sm">
-            <span className={remainingTime <= 10 ? 'text-red-500 font-bold' : ''}>
-              Time remaining: {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')}
-            </span>
-          </p>
-        )}
-      </div>
+      {/* Timer moved to top center */}
+      {!isLoggedIn && (
+        <div className="absolute top-4 left-0 right-0 text-center text-white bg-black bg-opacity-50 py-2 z-30 mx-auto max-w-xs rounded-full px-4">
+          <span className={remainingTime <= 10 ? 'text-red-500 font-bold' : ''}>
+            Time remaining: {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')}
+          </span>
+        </div>
+      )}
       
       {/* Time limit alert - only shown for non-logged in users */}
       {showTimeAlert && !isLoggedIn && (

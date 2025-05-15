@@ -6,6 +6,14 @@ import OptimizedVideoPlayer from '../components/OptimizedVideoPlayer';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/Button';
 
+// Add TypeScript declaration for YouTube API
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady: () => void;
+  }
+}
+
 // Define the taglines for the hero section
 const taglines = [
   "Transform Your Drawing Skills",
@@ -96,6 +104,64 @@ const LandingPage: React.FC = () => {
       ref.current.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  // Handle scrolling to tutorials section
+  const scrollToTutorials = () => {
+    videosRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // YouTube API loading and quality enhancement
+  useEffect(() => {
+    // Load YouTube API if not already loaded
+    if (!window.YT) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+
+      // Function called when YouTube API is ready
+      window.onYouTubeIframeAPIReady = initializeYouTubeVideos;
+    } else {
+      // If API is already loaded, initialize videos directly
+      initializeYouTubeVideos();
+    }
+
+    // Initialize videos and set up quality enhancement
+    function initializeYouTubeVideos() {
+      // Enhanced logic for quality progression will be set up in timeouts
+      // Start with low quality (small) in the iframe src, then progressively enhance
+      const tutorials = [
+        { title: 'Upload & Align', videoId: '_yJX6y4A6J0', desc: 'Upload your reference image and align it with your camera view for perfect tracing.' },
+        { title: 'Trace & Create', videoId: 'cZyyaP_FkB8', desc: 'Use the overlay to trace your image with precision and create amazing artwork.' },
+        { title: 'Share & Enjoy', videoId: 'mQ1zbSHoUn4', desc: 'Share your creations with friends and enjoy the satisfaction of your new skills.' }
+      ];
+
+      tutorials.forEach((_, index) => {
+        // Set a timeout to enhance video quality after they've had time to load
+        setTimeout(() => {
+          const iframe = document.getElementById(`youtube-video-${index}`) as HTMLIFrameElement;
+          if (iframe && iframe.src) {
+            // Replace small quality with HD quality
+            let newSrc = iframe.src.replace('vq=small', 'vq=hd720');
+            iframe.src = newSrc;
+            
+            // After another delay, further enhance to highest quality
+            setTimeout(() => {
+              if (iframe && iframe.src) {
+                newSrc = iframe.src.replace('vq=hd720', 'vq=hd1080');
+                iframe.src = newSrc;
+              }
+            }, 5000); // 5 seconds later, upgrade to 1080p
+          }
+        }, 2000 + (index * 500)); // Stagger the initial quality upgrade
+      });
+    }
+
+    return () => {
+      // Cleanup function
+      window.onYouTubeIframeAPIReady = () => {};
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-dark-400 to-dark-600 text-white font-sans">
@@ -388,21 +454,26 @@ const LandingPage: React.FC = () => {
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 className="bg-dark-300/70 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300"
               >
-                <div className="w-full h-[300px] md:h-[350px] lg:h-[400px] relative overflow-hidden">
+                <div className="w-full md:h-[500px] lg:h-[600px] aspect-[3/4] md:aspect-auto relative overflow-hidden">
                   {/* YouTube Embed with protection overlays */}
                   <div 
                     className="w-full h-full absolute inset-0 pointer-events-none select-none"
                     style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
                   >
                     <iframe
-                      src={`https://www.youtube.com/embed/${item.videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${item.videoId}&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&disablekb=1`}
+                      src={`https://www.youtube.com/embed/${item.videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${item.videoId}&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&disablekb=1&vq=small`}
                       title={item.title}
                       frameBorder="0"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
-                      className="w-full h-full absolute inset-0 pointer-events-none"
+                      className="w-full h-full absolute inset-0 pointer-events-none" 
+                      id={`youtube-video-${index}`}
                       style={{
                         pointerEvents: 'none',
+                        objectFit: 'cover',
+                        width: '100%',
+                        height: '100%',
+                        transform: 'scale(1.8)', /* Scale up more to completely remove all black borders */
                       }}
                     ></iframe>
                   </div>
@@ -417,21 +488,10 @@ const LandingPage: React.FC = () => {
                       WebkitUserSelect: 'none',
                       MozUserSelect: 'none'
                     }}>
-                    {/* Play button overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                        <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      </div>
-                    </div>
                   </div>
                 </div>
                 <div className="p-6">
-                  <h3 className="text-xl font-bold font-heading mb-2 text-white">{item.title}</h3>
-                  <p className="text-primary-200/80 font-light">
-                    {item.desc}
-                  </p>
+                  <h3 className="text-xl font-bold font-heading text-white text-center">{item.title}</h3>
                 </div>
               </motion.div>
             ))}
