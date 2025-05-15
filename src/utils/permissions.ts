@@ -3,14 +3,8 @@
 // Check if we're in a browser environment
 const isBrowser = typeof window !== 'undefined' && typeof navigator !== 'undefined';
 
-// Ensure TypeScript recognizes the navigator object properly
-declare global {
-  interface Navigator {
-    permissions?: {
-      query: (permissionDesc: { name: string }) => Promise<{ state: PermissionState }>;
-    };
-  }
-}
+// Type definitions
+type PermissionState = 'granted' | 'denied' | 'prompt';
 
 /**
  * Permission status stored in localStorage
@@ -25,6 +19,9 @@ interface StoredPermission {
  * @returns Promise<boolean> True if permission is granted
  */
 export const checkCameraPermission = async (): Promise<boolean> => {
+  // If not in browser environment, return false
+  if (!isBrowser) return false;
+  
   try {
     // First check if we have a stored permission status
     const storedPermission = getCameraPermissionFromStorage();
@@ -37,37 +34,41 @@ export const checkCameraPermission = async (): Promise<boolean> => {
     }
     
     // If the Permission API is available, use it
-    if ('permissions' in navigator) {
-      const permission = await navigator.permissions.query({ name: 'camera' as PermissionName });
-      
-      // Store the permission status
-      storeCameraPermission(permission.state);
-      
-      return permission.state === 'granted';
+    if (typeof navigator !== 'undefined' && 'permissions' in navigator && navigator.permissions) {
+      try {
+        const permission = await navigator.permissions.query({ name: 'camera' as any });
+        
+        // Store the permission status
+        storeCameraPermission(permission.state);
+        
+        return permission.state === 'granted';
+      } catch (err) {
+        console.warn('Permission API error:', err);
+        // Continue to fallback method
+      }
     }
     
     // Fallback: Try to access the camera to check permission
-    try {
-      // Check if we're in a browser environment and if mediaDevices is available
-      if (!isBrowser || !navigator || !('mediaDevices' in navigator)) {
-        throw new Error('MediaDevices API not supported');
+    if (typeof navigator !== 'undefined' && 'mediaDevices' in navigator && navigator.mediaDevices) {
+      try {
+        const stream = await (navigator.mediaDevices as MediaDevices).getUserMedia({ video: true });
+        // Stop the stream immediately
+        stream.getTracks().forEach(track => track.stop());
+        
+        // Store the granted permission
+        storeCameraPermission('granted');
+        return true;
+      } catch (error) {
+        // If we get a permission error, store it
+        if (error instanceof DOMException && 
+            (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError')) {
+          storeCameraPermission('denied');
+        }
+        return false;
       }
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      // Stop the stream immediately
-      stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
-      
-      // Store the granted permission
-      storeCameraPermission('granted');
-      return true;
-    } catch (error) {
-      // If we get a permission error, store it
-      if (error instanceof DOMException && 
-          (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError')) {
-        storeCameraPermission('denied');
-      }
-      return false;
     }
+    
+    return false;
   } catch (error) {
     console.error('Error checking camera permission:', error);
     return false;
@@ -79,6 +80,9 @@ export const checkCameraPermission = async (): Promise<boolean> => {
  * @returns Promise<boolean> True if permission is granted
  */
 export const requestCameraPermission = async (): Promise<boolean> => {
+  // If not in browser environment, return false
+  if (!isBrowser) return false;
+  
   try {
     // First check if we already have permission
     const hasPermission = await checkCameraPermission();
@@ -87,26 +91,28 @@ export const requestCameraPermission = async (): Promise<boolean> => {
     }
     
     // If not, request permission by trying to access the camera
-    if (!isBrowser || !navigator || !('mediaDevices' in navigator)) {
-      throw new Error('MediaDevices API not supported');
+    if (typeof navigator !== 'undefined' && 'mediaDevices' in navigator && navigator.mediaDevices) {
+      try {
+        const stream = await (navigator.mediaDevices as MediaDevices).getUserMedia({ video: true });
+        // Stop the stream immediately
+        stream.getTracks().forEach(track => track.stop());
+        
+        // Store the granted permission
+        storeCameraPermission('granted');
+        return true;
+      } catch (error) {
+        // If we get a permission error, store it
+        if (error instanceof DOMException && 
+            (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError')) {
+          storeCameraPermission('denied');
+        }
+        return false;
+      }
     }
     
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    // Stop the stream immediately
-    stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
-    
-    // Store the granted permission
-    storeCameraPermission('granted');
-    return true;
+    return false;
   } catch (error) {
     console.error('Error requesting camera permission:', error);
-    
-    // If we get a permission error, store it
-    if (error instanceof DOMException && 
-        (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError')) {
-      storeCameraPermission('denied');
-    }
-    
     return false;
   }
 };
