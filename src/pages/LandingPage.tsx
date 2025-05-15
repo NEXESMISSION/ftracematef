@@ -104,13 +104,18 @@ const LandingPage: React.FC = () => {
         <div className="container mx-auto px-4 py-3">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10 mr-3" />
+              <Link to="/">
+                <img src="/assets/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10" />
+              </Link>
             </div>
             
             <div className="hidden md:flex items-center">
               <div className="flex space-x-10">
                 <Link to="/" className="text-white hover:text-primary-100 transition-colors font-medium">
                   Home
+                </Link>
+                <Link to="/tracing" className="text-white hover:text-primary-100 transition-colors font-medium">
+                  App
                 </Link>
                 <button onClick={() => scrollToSection(videosRef)} className="text-white hover:text-primary-100 transition-colors font-medium">How It Works</button>
                 <button onClick={() => scrollToSection(featuresRef)} className="text-white hover:text-primary-100 transition-colors font-medium">Features</button>
@@ -160,6 +165,13 @@ const LandingPage: React.FC = () => {
           >
             Home
           </Link>
+          <Link 
+            to="/tracing" 
+            className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
+            onClick={() => document.getElementById('mobileMenu')?.classList.add('hidden')}
+          >
+            App
+          </Link>
           <button 
             onClick={() => {
               scrollToSection(videosRef);
@@ -195,7 +207,7 @@ const LandingPage: React.FC = () => {
         <div className="absolute inset-0 z-0">
           {/* Video Background - Using OptimizedVideoPlayer for better performance */}
           <OptimizedVideoPlayer
-            sources="/assests/main.mp4"
+            sources="/assets/main.mp4"
             autoPlay
             muted
             loop

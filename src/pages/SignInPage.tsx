@@ -109,9 +109,8 @@ const SignInPage: React.FC = () => {
         <div className="container mx-auto px-4 py-3">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              <Link to="/" className="flex items-center">
-                <img src="/assets/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10 mr-3" />
-                <span className="text-xl font-bold text-white">TraceMate</span>
+              <Link to="/">
+                <img src="/assets/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10" />
               </Link>
             </div>
             
@@ -306,7 +305,7 @@ const SignInPage: React.FC = () => {
                   <ol className="list-decimal list-inside text-sm text-blue-200/80 space-y-2">
                     <li>Purchase a paid plan from the <Link to="/payment" className="text-blue-400 hover:text-blue-300 transition-colors">payment page</Link></li>
                     <li>After payment confirmation, you'll receive login credentials via email</li>
-                    <li>This typically takes less than 24 hours</li>
+                    <li>This typically takes less than 10 minutes</li>
                     <li>Use the provided credentials to sign in</li>
                   </ol>
                 </div>
@@ -370,7 +369,7 @@ const SignInPage: React.FC = () => {
                   </div>
                   <div>
                     <p className="font-medium text-white mb-1">Processing time</p>
-                    <p>This typically takes less than 24 hours</p>
+                    <p>This typically takes less than 10 minutes</p>
                   </div>
                 </li>
                 

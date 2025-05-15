@@ -36,13 +36,13 @@ type PaymentMethod = {
 };
 
 const paymentMethods: PaymentMethod[] = [
-  { id: 'visa', name: 'Visa', icon: '/assests/payment methods icons/Visa_Logo.png' },
-  { id: 'mastercard', name: 'MasterCard', icon: '/assests/payment methods icons/Mastercard-logo.svg' },
-  { id: 'binance', name: 'Binance', icon: '/assests/payment methods icons/Binance_Logo.png' },
-  { id: 'coinbase', name: 'Coinbase', icon: '/assests/payment methods icons/coinbase.png' },
-  { id: 'bitcoin', name: 'Bitcoin', icon: '/assests/payment methods icons/Bitcoin.svg' },
-  { id: 'wise', name: 'Wise', icon: '/assests/payment methods icons/wise.png' },
-  { id: 'kraken', name: 'Kraken', icon: '/assests/payment methods icons/kraken.png' },
+  { id: 'visa', name: 'Visa', icon: '/assets/payment methods icons/Visa_Logo.png' },
+  { id: 'mastercard', name: 'MasterCard', icon: '/assets/payment methods icons/Mastercard-logo.svg' },
+  { id: 'binance', name: 'Binance', icon: '/assets/payment methods icons/Binance_Logo.png' },
+  { id: 'coinbase', name: 'Coinbase', icon: '/assets/payment methods icons/coinbase.png' },
+  { id: 'bitcoin', name: 'Bitcoin', icon: '/assets/payment methods icons/Bitcoin.svg' },
+  { id: 'wise', name: 'Wise', icon: '/assets/payment methods icons/wise.png' },
+  { id: 'kraken', name: 'Kraken', icon: '/assets/payment methods icons/kraken.png' },
 ];
 
 const PaymentPage: React.FC = () => {
@@ -77,7 +77,9 @@ const PaymentPage: React.FC = () => {
         <div className="container mx-auto px-4 py-3">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10 mr-3" />
+              <Link to="/">
+                <img src="/assets/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10" />
+              </Link>
             </div>
             
             <div className="hidden md:flex items-center">
@@ -198,7 +200,7 @@ const PaymentPage: React.FC = () => {
           <div className="bg-dark-400/30 backdrop-blur-sm border border-primary-500/20 rounded-xl p-6 md:p-8 max-w-3xl mx-auto">
             <h2 className="text-2xl md:text-3xl font-bold text-center mb-6">Contact Us 💬</h2>
             <p className="text-center text-blue-100/80 mb-8">
-              Reach out to us through any of these platforms and we'll set up your account within 2 hours
+              Reach out to us through any of these platforms and we'll set up your account in less than 10 minutes
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

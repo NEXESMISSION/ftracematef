@@ -19,7 +19,7 @@ const Layout: React.FC<LayoutProps> = ({ children, hideNav = false, hideFooter =
             <div className="flex justify-between items-center">
               <div className="flex items-center">
                 <Link to="/">
-                  <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10 mr-3" />
+                  <img src="/assets/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10" />
                 </Link>
               </div>
               
@@ -101,7 +101,7 @@ const Layout: React.FC<LayoutProps> = ({ children, hideNav = false, hideFooter =
             <div className="flex flex-wrap justify-between items-center">
               <div className="w-full md:w-4/12 px-4 mb-8 md:mb-0">
                 <div className="flex items-center">
-                  <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10 mr-3" />
+                  <img src="/assets/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-10 mr-3" />
                   <h3 className="text-2xl font-bold font-heading text-white">TraceMate</h3>
                 </div>
                 <p className="text-primary-200/70 mt-3 font-light">Transform your drawing skills with real-time tracing</p>
