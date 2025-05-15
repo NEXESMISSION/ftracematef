@@ -177,12 +177,42 @@ const PaymentPage: React.FC = () => {
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">Payment Options</span> <span className="text-white">💳</span>
           </h2>
           
+          {/* Small Payment Icons */}
+          <div className="flex flex-wrap justify-center items-center gap-4 mb-8">
+            {paymentMethods.map((method) => (
+              <motion.div
+                key={method.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
+                className="p-3 bg-dark-400/30 backdrop-blur-sm border border-primary-500/20 rounded-xl flex items-center justify-center hover:border-blue-500/40 hover:bg-dark-400/50 transition-all duration-300"
+              >
+                <img 
+                  src={method.icon} 
+                  alt={method.name} 
+                  className={`h-8 md:h-10 ${method.name === 'Wise' || method.name === 'Visa' ? 'bg-white p-1 rounded' : ''}`} 
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    if (target.src.includes('/assests/')) {
+                      target.src = target.src.replace('/assests/', '/assets/');
+                    } else if (target.src.includes('/assets/')) {
+                      target.src = target.src.replace('/assets/', '/assests/');
+                    }
+                  }}
+                />
+              </motion.div>
+            ))}
+          </div>
+          
+          {/* Divider */}
+          <div className="border-t border-primary-500/20 my-8 max-w-4xl mx-auto"></div>
+          
           {/* Simple Pricing */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="mb-10"
+            className="mt-10 mb-6"
           >
             <h3 className="text-xl font-bold text-center mb-6">Simple Pricing 💲</h3>
             
@@ -206,33 +236,6 @@ const PaymentPage: React.FC = () => {
               ))}
             </div>
           </motion.div>
-          
-          {/* Small Payment Icons */}
-          <div className="flex flex-wrap justify-center items-center gap-4 mb-8">
-            {paymentMethods.map((method) => (
-              <motion.div
-                key={method.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3 }}
-                className="p-3 bg-dark-400/30 backdrop-blur-sm border border-primary-500/20 rounded-xl flex items-center justify-center hover:border-blue-500/40 hover:bg-dark-400/50 transition-all duration-300"
-              >
-                <img 
-                  src={method.icon} 
-                  alt={method.name} 
-                  className="h-8 md:h-10" 
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    if (target.src.includes('/assests/')) {
-                      target.src = target.src.replace('/assests/', '/assets/');
-                    } else if (target.src.includes('/assets/')) {
-                      target.src = target.src.replace('/assets/', '/assests/');
-                    }
-                  }}
-                />
-              </motion.div>
-            ))}
-          </div>
         </motion.div>
 
         {/* Contact Buttons Section */}
