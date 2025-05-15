@@ -1,0 +1,105 @@
+/* Tailwind CSS */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.95);
+  background-color: #0a0a0d;
+  
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  @apply bg-dark-500;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  min-width: 320px;
+  min-height: 100vh;
+  @apply bg-dark-gradient from-dark-300 to-dark-500;
+}
+
+#root {
+  width: 100%;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-2 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5;
+  }
+  
+  .btn-secondary {
+    @apply bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium py-2 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5;
+  }
+  
+  .btn-outline {
+    @apply border-2 border-blue-400 text-blue-400 hover:bg-blue-400/10 font-medium py-2 px-6 rounded-lg transition-all duration-300;
+  }
+  
+  .card {
+    @apply bg-dark-200 rounded-xl shadow-xl overflow-hidden border border-dark-100 backdrop-blur-sm;
+  }
+  
+  .gradient-text {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-orange-400;
+  }
+  
+  .gradient-border {
+    @apply relative before:absolute before:inset-0 before:p-[2px] before:rounded-xl before:bg-gradient-to-r before:from-blue-500 before:to-orange-500 before:-z-10;
+  }
+  
+  .glass-effect {
+    @apply bg-dark-200/80 backdrop-blur-md border border-dark-100/50;
+  }
+}
+
+.animate-gradient-x {
+  @apply bg-gradient-to-r from-blue-500 via-orange-400 to-blue-500 bg-[length:200%_100%];
+  animation: gradient-x 15s ease infinite;
+}
+
+@keyframes gradient-x {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient-xy {
+  @apply bg-gradient-to-br from-blue-500 via-orange-400 to-blue-500 bg-[length:400%_400%];
+  animation: gradient-xy 15s ease infinite;
+}
+
+@keyframes gradient-xy {
+  0% {
+    background-position: 0% 0%;
+  }
+  25% {
+    background-position: 100% 0%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  75% {
+    background-position: 0% 100%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
