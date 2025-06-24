@@ -6,10 +6,11 @@ import { useUsageTracking } from '../hooks/useUsageTracking';
 import CameraPermissionManager from '../components/CameraPermissionManager';
 import ImageUploader from '../components/ImageUploader';
 import UsageStatus from '../components/UsageStatus';
+import UsageTest from '../components/UsageTest';
 
 const AppMainPage: React.FC = () => {
   const { user, userRole, signOut } = useAuth();
-  const { hasReachedLimit, refreshUsageStats } = useUsageTracking();
+  const { hasReachedLimit, refreshUsageStats, trackSession } = useUsageTracking();
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -220,9 +221,9 @@ const AppMainPage: React.FC = () => {
       return; // Error message already set by validateImage
     }
     
-    // Only apply session limits to non-signed-in users
-    if (!user && userRole === 'free' && hasReachedLimit) {
-      setError('You have reached your daily session limit. Please sign in to continue.');
+    // Check if user has reached daily limit
+    if (hasReachedLimit) {
+      setError('You have reached your daily session limit. Please upgrade to premium for unlimited access.');
       return;
     }
     
@@ -318,6 +319,9 @@ const AppMainPage: React.FC = () => {
           throw new Error('Failed to store image data in browser storage');
         }
         
+        // Track this session
+        trackSession(0); // Start with 0 duration, will be updated when session ends
+        
         // Navigate to tracing page after successful storage
         console.log('Storage confirmed, navigating to tracing page now...');
         console.log('Navigation path: /trace');
@@ -375,9 +379,15 @@ const AppMainPage: React.FC = () => {
             <div className="flex items-center gap-4">
               {user ? (
                 <>
-                  <div className="text-sm px-3 py-1 rounded-full bg-primary-500/20 border border-primary-500/30 text-primary-300">
-                    Premium Plan
-                  </div>
+                  {userRole === 'paid' ? (
+                    <div className="text-sm px-3 py-1 rounded-full bg-primary-500/20 border border-primary-500/30 text-primary-300">
+                      Premium Plan
+                    </div>
+                  ) : (
+                    <div className="text-sm px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-300">
+                      Free Plan
+                    </div>
+                  )}
                   <button
                     onClick={signOut}
                     className="text-white hover:text-red-300 transition-colors font-medium flex items-center gap-1"
@@ -401,8 +411,8 @@ const AppMainPage: React.FC = () => {
                 Home
               </Link>
               
-              {/* Only show Pricing link if user is not signed in */}
-              {!user && (
+              {/* Show Pricing link if user is not signed in or doesn't have premium */}
+              {(!user || userRole === 'free') && (
                 <Link to="/payment" className="text-white hover:text-primary-100 transition-colors font-medium">
                   Pricing
                 </Link>
@@ -518,19 +528,29 @@ const AppMainPage: React.FC = () => {
             </div>
             
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-0">
-              {!user && (
+              {!user ? (
                 <Link 
-                  to="/signin" 
-                  className="px-5 py-2 bg-dark-500/50 hover:bg-dark-400/50 border border-primary-500/30 text-white font-medium rounded-lg transition-colors duration-300 flex items-center justify-center gap-2 w-full sm:w-auto"
+                  to="/payment" 
+                  className="px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium rounded-lg transition-all duration-300 flex items-center justify-center gap-2 w-full sm:w-auto shadow-lg hover:shadow-xl"
                 >
-                  <span>Sign In</span>
+                  <span>Get Unlimited Access</span>
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
                 </Link>
-              )}
+              ) : userRole === 'free' ? (
+                <Link 
+                  to="/payment" 
+                  className="px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium rounded-lg transition-all duration-300 flex items-center justify-center gap-2 w-full sm:w-auto shadow-lg hover:shadow-xl"
+                >
+                  <span>Upgrade to Premium</span>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </Link>
+              ) : null}
               
-              {!user && userRole === 'free' && (
+              {(!user || userRole === 'free') && (
                 <div className="hidden sm:flex items-center px-4">
                   <div className="h-8 w-px bg-primary-500/20"></div>
                 </div>
@@ -550,6 +570,9 @@ const AppMainPage: React.FC = () => {
           </p>
         </div>
       </footer>
+
+      {/* Usage Test Component (for development) */}
+      <UsageTest />
     </div>
   );
 };

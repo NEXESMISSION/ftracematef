@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { Session, User } from '@supabase/supabase-js';
+import { getUserSubscriptionStatus } from '../services/supabaseClient';
 
 type UserRole = 'free' | 'paid';
 
@@ -10,8 +11,10 @@ interface AuthContextType {
   userRole: UserRole;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   checkUserRole: () => Promise<UserRole>;
+  refreshUserRole: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,6 +43,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
         if (session?.user) {
           checkUserRole().then(setUserRole);
+        } else {
+          setUserRole('free');
         }
         setIsLoading(false);
       }
@@ -47,6 +52,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const signUp = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/signin`
+        }
+      });
+      return { error };
+    } catch (e: any) {
+      console.error('Network error during sign up:', e);
+      return { 
+        error: {
+          message: e.message || 'Network error. Please check your internet connection and Supabase configuration.'
+        } 
+      };
+    }
+  };
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -107,34 +132,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Log user info for debugging
       console.log('Checking role for user:', user.id, user.email);
       
-      // First check if the user exists in the users table
-      const { data, error } = await supabase
+      // First check if the user has an active subscription
+      const subscriptionStatus = await getUserSubscriptionStatus(user.id);
+      console.log('Subscription status:', subscriptionStatus);
+      
+      if (subscriptionStatus === 'active') {
+        console.log('User has active subscription, setting as paid');
+        setUserRole('paid');
+        return 'paid';
+      }
+      
+      // If no active subscription, check the user's role in the users table
+      const { data: userData, error: userError } = await supabase
         .from('users')
         .select('role')
         .eq('id', user.id)
         .single();
 
-      if (error) {
-        console.error('Error fetching user role from database:', error);
-        
-        // If the user is authenticated but not in the database yet,
-        // treat them as a paid user by default
-        console.log('User authenticated but not found in database, setting as paid user');
-        const defaultRole: UserRole = 'paid';
+      if (userError) {
+        console.error('Error fetching user role from database:', userError);
+        // Default to free for authenticated users with errors
+        const defaultRole: UserRole = 'free';
         setUserRole(defaultRole);
         return defaultRole;
       }
 
-      const role = data?.role as UserRole || 'paid';
-      console.log('User role detected:', role);
+      const role = userData?.role as UserRole || 'free';
+      console.log('User role from database:', role);
       setUserRole(role);
       return role;
     } catch (error) {
       console.error('Error checking user role:', error);
-      // Default to paid for authenticated users with errors
-      const defaultRole: UserRole = 'paid';
+      // Default to free for authenticated users with errors
+      const defaultRole: UserRole = 'free';
       setUserRole(defaultRole);
       return defaultRole;
+    }
+  };
+
+  const refreshUserRole = async () => {
+    if (user) {
+      console.log('Refreshing user role for user:', user.id);
+      const newRole = await checkUserRole();
+      console.log('New role detected:', newRole);
+      setUserRole(newRole);
+      
+      // Force a re-render by updating the session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setSession(session);
+      }
     }
   };
 
@@ -144,8 +191,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userRole,
     isLoading,
     signIn,
+    signUp,
     signOut,
     checkUserRole,
+    refreshUserRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

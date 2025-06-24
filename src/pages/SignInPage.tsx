@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
+import { usePayment } from '../contexts/PaymentContext';
 import { isOnline, isSupabaseReachable } from '../utils/networkStatus';
 import { SUPABASE_URL } from '../config/supabase';
 import NetworkStatusIndicator from '../components/NetworkStatusIndicator';
@@ -10,11 +11,17 @@ const SignInPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [networkStatus, setNetworkStatus] = useState<{ online: boolean; supabaseReachable: boolean | null }>({ 
     online: true, 
     supabaseReachable: null 
   });
+
+  const { signIn, session, isLoading: authIsLoading, userRole, user } = useAuth();
+  const { isPaymentFlow, selectedPlan } = usePayment();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Check network status on component mount
   useEffect(() => {
@@ -51,8 +58,52 @@ const SignInPage: React.FC = () => {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-  const { signIn } = useAuth();
-  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!authIsLoading && session) {
+      if (isPaymentFlow && selectedPlan) {
+        // User just signed in and has a selected plan, redirect back to payment page
+        navigate('/payment');
+      } else {
+        // Check if user has active subscription, if not redirect to payment
+        const checkSubscriptionAndRedirect = async () => {
+          try {
+            console.log('Checking subscription status for user:', user?.email);
+            console.log('Current user role:', userRole);
+            
+            if (userRole === 'paid') {
+              // User has active subscription, go to app
+              console.log('User has paid subscription, redirecting to app');
+              navigate('/app');
+            } else {
+              // User doesn't have active subscription, redirect to payment
+              console.log('User has no active subscription, redirecting to payment');
+              navigate('/payment');
+            }
+          } catch (error) {
+            console.error('Error checking subscription:', error);
+            // Default to payment page if there's an error
+            navigate('/payment');
+          }
+        };
+        checkSubscriptionAndRedirect();
+      }
+    }
+  }, [session, authIsLoading, navigate, isPaymentFlow, selectedPlan, userRole, user]);
+
+  // Check for success message from account creation
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const message = searchParams.get('message');
+    const userEmail = searchParams.get('email');
+    
+    if (message === 'account_created' && userEmail) {
+      setSuccessMessage(`Account created successfully! Please check your email (${userEmail}) for a verification link. You can sign in after verifying your email.`);
+      setEmail(userEmail);
+      // Clear the URL parameters
+      navigate('/signin', { replace: true });
+    }
+  }, [location, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     // Check network status before attempting to sign in
@@ -82,8 +133,7 @@ const SignInPage: React.FC = () => {
         throw new Error(error.message);
       }
       
-      // Redirect to app on successful login
-      navigate('/app');
+      // Navigation will be handled by the useEffect above
     } catch (err: any) {
       console.error('Sign in error:', err);
       
@@ -92,8 +142,10 @@ const SignInPage: React.FC = () => {
         setError('Network error: Failed to connect to the server. Please check your internet connection and Supabase configuration in .env file.');
       } else if (err.message?.includes('Invalid login')) {
         setError('Invalid email or password. Please try again.');
-      } else if (err.message?.includes('Email not confirmed')) {
-        setError('Your email has not been confirmed. Please check your inbox for a confirmation email.');
+      } else if (err.message?.includes('Email not confirmed') || err.message?.includes('email not confirmed')) {
+        setError('Your email has not been confirmed. Please check your inbox for a verification email and click the verification link before signing in.');
+      } else if (err.message?.includes('Email not verified') || err.message?.includes('email not verified')) {
+        setError('Please verify your email address first. Check your inbox for a verification email from TraceMate.');
       } else {
         setError(err.message || 'Failed to sign in');
       }
@@ -207,9 +259,12 @@ const SignInPage: React.FC = () => {
               />
               <div className="text-center mb-10">
                 <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-16 mx-auto mb-4" />
-                <h1 className="text-3xl font-bold gradient-text">Sign In to TraceMate</h1>
+                <h2 className="text-4xl font-bold text-white mb-4">Sign In</h2>
                 <p className="mt-2 text-sm text-blue-200/80">
-                  Enter your credentials to access your account
+                  {isPaymentFlow && selectedPlan 
+                    ? `Complete your ${selectedPlan} plan purchase`
+                    : 'Enter your credentials to access your account'
+                  }
                 </p>
               </div>
               
@@ -217,6 +272,27 @@ const SignInPage: React.FC = () => {
                 <div className="mb-6 p-3 bg-red-900/40 border border-red-500/50 text-red-200 rounded-lg backdrop-blur-sm">
                   {error}
                 </div>
+              )}
+              
+              {successMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6 p-4 bg-green-900/40 border border-green-500/50 text-green-200 rounded-lg backdrop-blur-sm"
+                >
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <p className="font-medium mb-1">Account Created Successfully!</p>
+                      <p className="text-sm text-green-300">{successMessage}</p>
+                      <p className="text-xs text-green-400 mt-2">
+                        💡 <strong>Tip:</strong> Check your spam folder if you don't see the email in your inbox.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
               )}
               
               <form onSubmit={handleSubmit}>
@@ -264,7 +340,7 @@ const SignInPage: React.FC = () => {
                   >
                     <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 transition-all duration-300"></span>
                     <span className="relative flex items-center justify-center gap-2">
-                      {isLoading ? 'Signing in...' : 'Sign In'}
+                      {isLoading ? 'Signing in...' : (isPaymentFlow ? 'Continue to Payment' : 'Sign In')}
                     </span>
                   </button>
                 </div>
@@ -277,12 +353,12 @@ const SignInPage: React.FC = () => {
                 
                 <div className="mb-6">
                   <Link
-                    to="/payment"
+                    to="/create-account"
                     className="w-full flex justify-center py-3 px-4 rounded-lg text-white font-medium relative overflow-hidden group"
                   >
                     <span className="absolute inset-0 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 transition-all duration-300"></span>
                     <span className="relative flex items-center justify-center gap-2">
-                      Purchase a paid plan
+                      Create an account
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -291,43 +367,12 @@ const SignInPage: React.FC = () => {
                 </div>
               </form>
               
-              <div className="mt-6 text-center md:hidden">
-                <Link 
-                  to="/" 
-                  className="inline-block py-2 px-6 rounded-lg text-white font-medium relative overflow-hidden group"
-                >
-                  <span className="absolute inset-0 bg-gradient-to-r from-blue-600/70 to-purple-600/70 hover:from-blue-500/70 hover:to-purple-500/70 transition-all duration-300"></span>
-                  <span className="relative flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
+              <div className="mt-6 text-center">
+                <p className="mt-4">
+                  <Link to="/" className="text-gray-400 hover:text-white">
                     Back to Home
-                  </span>
-                </Link>
-              </div>
-              
-              <div className="text-center mt-8">
-                <p className="text-blue-200/70 text-sm">
-                  Don't have an account?{' '}
-                  <Link to="/payment" className="text-blue-400 hover:text-blue-300 transition-colors font-medium">
-                    Get started now
                   </Link>
                 </p>
-              </div>
-              
-              {/* Mobile version of How to get an account - Only visible on mobile */}
-              <div className="mt-8 border-t border-primary-500/20 pt-6 block md:hidden">
-                <h3 className="text-lg font-medium text-white mb-4">
-                  How to get an account
-                </h3>
-                <div className="bg-dark-400/30 p-4 rounded-md border border-primary-500/20">
-                  <ol className="list-decimal list-inside text-sm text-blue-200/80 space-y-2">
-                    <li>Purchase a paid plan from the <Link to="/payment" className="text-blue-400 hover:text-blue-300 transition-colors">payment page</Link></li>
-                    <li>After payment confirmation, you'll receive login credentials via email</li>
-                    <li>This typically takes less than 10 minutes</li>
-                    <li>Use the provided credentials to sign in</li>
-                  </ol>
-                </div>
               </div>
             </div>
             
@@ -345,96 +390,6 @@ const SignInPage: React.FC = () => {
                     Terms of Service
                   </Link>
                 </div>
-              </div>
-            </div>
-          </motion.div>
-          
-          {/* How to get an account - Desktop version */}
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="hidden md:flex flex-col w-80 bg-dark-400/30 border border-primary-500/20 rounded-xl backdrop-blur-sm overflow-hidden self-start"
-          >
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-white mb-6 border-b border-primary-500/20 pb-3">
-                How to get an account
-              </h3>
-              
-              <ol className="list-none text-sm text-blue-200/80 space-y-6">
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center mr-3 mt-0.5">
-                    <span className="text-blue-400 font-bold">1</span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-white mb-1">Purchase a plan</p>
-                    <p>Visit our <Link to="/payment" className="text-blue-400 hover:text-blue-300 transition-colors">payment page</Link> and select a subscription</p>
-                  </div>
-                </li>
-                
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center mr-3 mt-0.5">
-                    <span className="text-blue-400 font-bold">2</span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-white mb-1">Confirmation email</p>
-                    <p>You'll receive your login credentials via email</p>
-                  </div>
-                </li>
-                
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center mr-3 mt-0.5">
-                    <span className="text-blue-400 font-bold">3</span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-white mb-1">Processing time</p>
-                    <p>This typically takes less than 10 minutes</p>
-                  </div>
-                </li>
-                
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center mr-3 mt-0.5">
-                    <span className="text-blue-400 font-bold">4</span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-white mb-1">Sign in</p>
-                    <p>Use the provided credentials to access your account</p>
-                  </div>
-                </li>
-              </ol>
-              
-              <div className="mt-10 space-y-4">
-                <Link 
-                  to="/payment" 
-                  className="block w-full py-3 px-4 rounded-lg text-white font-medium relative overflow-hidden group text-center"
-                >
-                  <span className="absolute inset-0 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 transition-all duration-300"></span>
-                  <span className="relative flex items-center justify-center gap-2">
-                    Purchase a paid plan
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </span>
-                </Link>
-                
-                <div className="py-2 flex items-center gap-4">
-                  <div className="flex-grow h-px bg-primary-500/20"></div>
-                  <span className="text-sm text-primary-300/50">or</span>
-                  <div className="flex-grow h-px bg-primary-500/20"></div>
-                </div>
-                
-                <Link 
-                  to="/" 
-                  className="block w-full py-3 px-4 rounded-lg text-white font-medium relative overflow-hidden group text-center"
-                >
-                  <span className="absolute inset-0 bg-gradient-to-r from-blue-600/70 to-purple-600/70 hover:from-blue-500/70 hover:to-purple-500/70 transition-all duration-300"></span>
-                  <span className="relative flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                    Back to Home
-                  </span>
-                </Link>
               </div>
             </div>
           </motion.div>

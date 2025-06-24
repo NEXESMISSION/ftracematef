@@ -3,8 +3,8 @@ import { UsageLimit, UserPlan } from '../types';
 // Define usage limits for different plans
 export const USAGE_LIMITS: Record<UserPlan, UsageLimit> = {
   free: {
-    sessionDurationSecs: 60, // 1 minute per session
-    sessionsPerDay: 5, // Changed back to 5 sessions per day
+    sessionDurationSecs: 120, // 2 minutes per session
+    sessionsPerDay: 3, // 3 sessions per day
   },
   paid: {
     sessionDurationSecs: Infinity, // Unlimited time

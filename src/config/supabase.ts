@@ -27,8 +27,9 @@ if (!supabaseAnonKey || supabaseAnonKey === 'your-actual-anon-key' || supabaseAn
   console.warn('⚠️ VITE_SUPABASE_ANON_KEY is not properly configured in your .env file');
 }
 
-export const SUPABASE_URL = supabaseUrl || 'https://your-supabase-project.supabase.co';
-export const SUPABASE_ANON_KEY = supabaseAnonKey || 'your-anon-key';
+// Use environment variables only - never hardcode API keys in source code
+export const SUPABASE_URL = supabaseUrl;
+export const SUPABASE_ANON_KEY = supabaseAnonKey;
 
 // Note: The service_role key should never be exposed in client-side code
 // It should only be used in secure server environments
