@@ -186,7 +186,7 @@ const LandingPage: React.FC = () => {
             Home
           </Link>
           <Link 
-            to="/app"
+            to="/app" 
             className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
             onClick={() => document.getElementById('mobileMenu')?.classList.add('hidden')}
           >
@@ -363,10 +363,10 @@ const LandingPage: React.FC = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {/* Step 1 */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
               transition={{ duration: 0.5 }}
               className="text-center"
             >
@@ -384,7 +384,7 @@ const LandingPage: React.FC = () => {
                     onLoad={() => console.log('Tutorial video 1 loaded')}
                     onError={() => console.log('Tutorial video 1 failed to load')}
                   />
-                </div>
+                  </div>
               </div>
               <h3 className="text-xl font-bold text-white font-heading mb-2">1. Upload Your Image</h3>
               <p className="text-primary-200/80 font-light">
@@ -414,8 +414,8 @@ const LandingPage: React.FC = () => {
                     onLoad={() => console.log('Tutorial video 2 loaded')}
                     onError={() => console.log('Tutorial video 2 failed to load')}
                   />
+                  </div>
                 </div>
-              </div>
               <h3 className="text-xl font-bold text-white font-heading mb-2">2. Adjust Settings</h3>
               <p className="text-primary-200/80 font-light">
                 Fine-tune opacity, scale, and position for perfect alignment
@@ -450,7 +450,7 @@ const LandingPage: React.FC = () => {
               <p className="text-primary-200/80 font-light">
                 Begin drawing with the overlay as your guide - see your progress in real-time
               </p>
-            </motion.div>
+              </motion.div>
           </div>
           
           <motion.div 

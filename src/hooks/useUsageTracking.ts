@@ -181,7 +181,7 @@ export const useUsageTracking = () => {
         ? Math.round(currentData.sessionDurations.reduce((sum, duration) => sum + duration, 0) / currentData.sessionDurations.length)
         : 0,
     });
-    
+
     // Check if limit reached
     const limit = user ? (user.role === 'paid' ? Infinity : USAGE_LIMITS.free.sessionsPerDay) : USAGE_LIMITS.free.sessionsPerDay;
     setHasReachedLimit(currentData.sessions >= limit);
@@ -207,9 +207,9 @@ export const useUsageTracking = () => {
           }
         }
       });
-    } catch (error) {
+      } catch (error) {
       console.error('Error cleaning up old usage data:', error);
-    }
+      }
   }, []);
 
   // Initialize usage tracking

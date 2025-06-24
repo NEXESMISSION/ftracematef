@@ -14,14 +14,14 @@ function App() {
   return (
     <AuthProvider>
       <PaymentProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/signin" element={<SignInPage />} />
-            <Route path="/create-account" element={<CreateAccountPage />} />
-            <Route path="/payment" element={<PaymentPage />} />
-            <Route path="/app" element={<AppMainPage />} />
-            {/* Multiple paths for tracing page to ensure it's accessible */}
+      <Router>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+                    <Route path="/signin" element={<SignInPage />} />
+          <Route path="/create-account" element={<CreateAccountPage />} />
+          <Route path="/payment" element={<PaymentPage />} />
+          <Route path="/app" element={<AppMainPage />} />
+          {/* Multiple paths for tracing page to ensure it's accessible */}
             <Route path="/tracing" element={
               <PaymentGate>
                 <TracingPage />
@@ -32,8 +32,8 @@ function App() {
                 <TracingPage />
               </PaymentGate>
             } />
-          </Routes>
-        </Router>
+        </Routes>
+      </Router>
       </PaymentProvider>
     </AuthProvider>
   );

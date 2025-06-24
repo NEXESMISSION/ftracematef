@@ -6,7 +6,7 @@ import { useUsageTracking } from '../hooks/useUsageTracking';
 import CameraPermissionManager from '../components/CameraPermissionManager';
 import ImageUploader from '../components/ImageUploader';
 import UsageStatus from '../components/UsageStatus';
-import { PaymentGate } from '../components/PaymentGate';
+import PaymentGate from '../components/PaymentGate';
 
 const AppMainPage: React.FC = () => {
   const { user, userRole, signOut } = useAuth();
@@ -401,9 +401,9 @@ const AppMainPage: React.FC = () => {
               {user ? (
                 <>
                   {userRole === 'paid' ? (
-                    <div className="text-sm px-3 py-1 rounded-full bg-primary-500/20 border border-primary-500/30 text-primary-300">
-                      Premium Plan
-                    </div>
+                  <div className="text-sm px-3 py-1 rounded-full bg-primary-500/20 border border-primary-500/30 text-primary-300">
+                    Premium Plan
+                  </div>
                   ) : (
                     <div className="text-sm px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-300">
                       Free Plan

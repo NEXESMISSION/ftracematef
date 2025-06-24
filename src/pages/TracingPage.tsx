@@ -1000,7 +1000,7 @@ const TracingPage: React.FC = () => {
           {cooldownTime > 0 ? (
             <span className="text-amber-400">
               ⏰ Next session in: {Math.floor(cooldownTime / 3600)}:{(Math.floor(cooldownTime / 60) % 60).toString().padStart(2, '0')}:{(cooldownTime % 60).toString().padStart(2, '0')}
-            </span>
+          </span>
           ) : (
             <span className={remainingTime <= 10 ? 'text-red-500 animate-pulse' : remainingTime <= 30 ? 'text-yellow-400' : 'text-green-400'}>
               ⏱️ {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')}
