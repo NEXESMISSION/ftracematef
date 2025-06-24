@@ -1,275 +1,223 @@
-# TraceMate
+# TraceMate - AI-Powered Image Tracing Tool for Artists & Beginners
 
-A mobile-first React + TypeScript drawing-overlay tool for tracing images.
+[![TraceMate](https://img.shields.io/badge/TraceMate-Image%20Tracing%20Tool-blue)](https://tracemate.art)
+[![Free Plan](https://img.shields.io/badge/Free%20Plan-3%20Sessions%20Daily-green)](https://tracemate.art)
+[![Premium](https://img.shields.io/badge/Premium-Unlimited%20Access-purple)](https://tracemate.art/payment)
 
-## Overview
+## 🎨 Transform Any Image Into a Traceable Overlay
 
-TraceMate allows users to upload an image, overlay it on a live camera feed, and trace it in real time. It's perfect for:
+**TraceMate** is the ultimate AI-powered image tracing tool that transforms any image into a traceable overlay on your camera feed. Perfect for artists, beginners, and kids learning to draw. Upload any image, overlay it on your camera, and trace in real-time with precision and ease.
 
-- Kids learning to draw
-- Beginners practicing tracing
-- Hobbyists looking for a fun sketch tool
-- Social sharers who want interesting content
+### ✨ Key Features
 
-## Features
+- **📱 Mobile-First Design** - Works perfectly on smartphones and tablets
+- **🖼️ Image Overlay Technology** - Upload any image and overlay it on camera feed
+- **⚙️ Adjustable Settings** - Control opacity, scale, and rotation for perfect alignment
+- **📷 Camera Controls** - Switch between front and back cameras
+- **🎯 Real-Time Tracing** - See your reference image while drawing
+- **💳 Flexible Plans** - Free plan with 3 sessions/day, premium unlimited access
+- **🔒 Secure Authentication** - Supabase-powered user management
+- **💳 Payment Integration** - Stripe-powered subscription management
 
-- **Image Overlay**: Upload any image and overlay it on your camera feed
-- **Adjustable Settings**: Control opacity, scale, and rotation of the overlay
-- **Camera Controls**: Switch between front and back cameras
-- **Responsive Design**: Works on mobile and desktop devices
-- **Payment-Gated Access**: Users must pay before accessing premium features
-- **Secure Authentication**: Supabase-powered user management
-- **Payment Integration**: Stripe-powered subscription management
+### 🎯 Perfect For
 
-## Access Control
+- **Artists** - Professional illustrators and designers
+- **Beginners** - Anyone learning to draw and improve skills
+- **Students** - Art students practicing techniques and proportions
+- **Kids** - Children learning to draw with guided tracing
+- **Hobbyists** - Casual artists looking to enhance their skills
 
-TraceMate implements a strict payment-gated access system:
+## 🚀 Quick Start
 
 ### Free Plan (No Account Required)
-- **Limited Access**: 3 sessions per day, 2 minutes per session
-- **Basic Features**: Basic image adjustments only
-- **No Account**: Can use without signing up
+- **3 sessions per day** - Perfect for daily practice
+- **2 minutes per session** - Enough time to complete most drawings
+- **Basic features** - Image overlay and camera controls
+- **No signup required** - Start tracing immediately
 
-### Premium Plans (Account + Payment Required)
-- **Monthly Plan ($6/month)**: Unlimited sessions and time
-- **Lifetime Plan ($15/once)**: Pay once, use forever
-- **Premium Features**: Advanced controls, priority support
+### Premium Plans
+- **Monthly Plan ($6/month)** - Unlimited sessions and time
+- **Lifetime Plan ($15/once)** - Pay once, use forever
+- **Advanced features** - Priority support and early access
 
-### Access Flow
-1. **Free Usage**: Users can try 3 sessions per day without any account
-2. **Account Creation**: Users create an account but get no immediate access
-3. **Payment Required**: Must choose and pay for a plan before accessing features
-4. **Email Verification**: Must verify email before payment
-5. **Premium Access**: Only after successful payment can users access the app
+## 🛠️ Technology Stack
 
-## Tech Stack
-
-- **Frontend**: React, TypeScript, Tailwind CSS, Framer Motion
+- **Frontend**: React 18, TypeScript, Tailwind CSS, Framer Motion
 - **Backend**: Supabase (Auth, Database, Storage)
 - **Authentication**: Supabase Auth with Row Level Security
-- **Styling**: Tailwind CSS for responsive design
-- **Animation**: Framer Motion for smooth transitions and animations
-- **Payment**: Stripe for subscription management
+- **Payments**: Stripe for subscription management
+- **Deployment**: Vercel for fast global CDN
+- **SEO**: Optimized for Google and search engines
 
-## Getting Started
+## 📱 How It Works
+
+1. **Upload Image** - Select any image from your device
+2. **Adjust Settings** - Set opacity, scale, and position
+3. **Start Tracing** - Overlay appears on your camera feed
+4. **Draw Away** - Trace directly on paper while seeing the reference
+5. **Share Results** - Show off your amazing artwork!
+
+## 🎨 Use Cases
+
+### For Artists
+- **Concept Art** - Quick sketches and idea development
+- **Portrait Practice** - Improve facial proportions and features
+- **Landscape Drawing** - Master perspective and composition
+- **Still Life** - Perfect object placement and shading
+
+### For Beginners
+- **Learning Proportions** - Understand human anatomy and object relationships
+- **Building Confidence** - Create impressive artwork from day one
+- **Skill Development** - Practice specific techniques with guidance
+- **Art Education** - Supplement traditional drawing lessons
+
+### For Kids
+- **Fun Learning** - Make drawing exciting and accessible
+- **Skill Building** - Develop hand-eye coordination
+- **Creative Expression** - Encourage artistic development
+- **Educational Tool** - Learn while having fun
+
+## 🔧 Installation & Setup
 
 ### Prerequisites
-
 - Node.js (v18 or higher)
 - npm or yarn
 - Supabase account and project
 - Stripe account (for payments)
 
-### Installation
+### Quick Setup
+```bash
+# Clone the repository
+git clone https://github.com/NEXESMISSION/ftracematef.git
+cd ftracematef
 
-1. Clone the repository
-   ```bash
-   git clone https://github.com/yourusername/tracemate.git
-   cd tracemate
-   ```
+# Install dependencies
+npm install
 
-2. Install dependencies
-   ```bash
-   npm install
-   ```
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your Supabase and Stripe credentials
 
-3. **Set up environment variables (IMPORTANT: Keep these secure!)**
-   
-   Create a `.env` file in the root directory with your credentials:
-   ```env
-   VITE_SUPABASE_URL=https://your-project-id.supabase.co
-   VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-   ```
-   
-   **⚠️ Security Notes:**
-   - Never commit your `.env` file to version control
-   - The `.env` file is already in `.gitignore` to prevent accidental commits
-   - Only use the `anon` key in the frontend - never expose the `service_role` key
-   - Your Supabase project should have Row Level Security (RLS) enabled
-
-4. Start the development server
-   ```bash
-   npm run dev
-   ```
-
-5. Open your browser and navigate to `http://localhost:3000`
-
-## Database Setup
-
-Before running the app, you need to set up your Supabase database:
-
-1. Go to your Supabase project dashboard
-2. Navigate to the SQL Editor
-3. Run the complete SQL script from `database-setup.sql`
-4. This will create all necessary tables, functions, triggers, and RLS policies
-5. The script includes:
-   - User management tables
-   - Subscription tracking
-   - Payment history
-   - Usage tracking
-   - Row Level Security policies
-   - Database functions for access control
-
-## Email Verification Setup
-
-To enable email verification for new accounts:
-
-1. **Go to your Supabase dashboard**
-2. **Navigate to Authentication → Settings**
-3. **Enable "Enable email confirmations"**
-4. **Configure your email provider (SMTP settings) or use Supabase's built-in email service**
-5. **Set the Site URL to your domain (e.g., `https://yourdomain.com` for production or `http://localhost:3000` for development)**
-6. **Customize the email template if needed**
-
-**Note:** Email verification is required for new accounts. Users will receive a verification email and must click the link before they can sign in and make payments.
-
-## Payment Flow
-
-The application implements a strict payment-gated access system:
-
-1. **User creates account** → Redirected to payment page
-2. **User signs in** → If no active subscription, redirected to payment page
-3. **User selects plan** → Monthly ($6) or Lifetime ($15)
-4. **Payment processing** → Mock payment for development, Stripe for production
-5. **Subscription activated** → User role updated to 'paid'
-6. **Access granted** → User can now access the app features
-
-## Deployment
-
-### Vercel (Recommended)
-
-1. Install Vercel CLI:
-   ```bash
-   npm i -g vercel
-   ```
-
-2. Deploy to Vercel:
-   ```bash
-   vercel
-   ```
-
-3. Set environment variables in Vercel dashboard:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-
-### Other Platforms
-
-The app is configured for Vercel deployment but can be deployed to any platform that supports Vite builds.
-
-## Security Best Practices
+# Start development server
+npm run dev
+```
 
 ### Environment Variables
-- ✅ Keep `.env` file in `.gitignore`
-- ✅ Use only the `anon` key in frontend code
-- ✅ Never hardcode API keys in source files
-- ❌ Never commit API keys to version control
-- ❌ Never share your `service_role` key
+```env
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
 
-### Supabase Configuration
-- Enable Row Level Security (RLS) on all tables
-- Set up proper RLS policies for your use case
-- Use the `anon` key for client-side operations
-- Use the `service_role` key only in secure server environments
+## 📊 SEO & Performance
+
+### Search Engine Optimization
+- **Meta Tags** - Comprehensive SEO meta tags for all pages
+- **Structured Data** - JSON-LD schema markup for rich snippets
+- **Sitemap** - XML sitemap for search engine crawling
+- **Robots.txt** - Proper crawling instructions
+- **Open Graph** - Social media sharing optimization
+- **Twitter Cards** - Twitter sharing optimization
+
+### Performance Features
+- **Lazy Loading** - Images and components load on demand
+- **Code Splitting** - Automatic bundle optimization
+- **CDN Delivery** - Global content delivery network
+- **Mobile Optimized** - Responsive design for all devices
+- **PWA Ready** - Progressive Web App capabilities
+
+## 🌐 Deployment
+
+### Vercel (Recommended)
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy to Vercel
+vercel --prod
+```
+
+### Custom Domain Setup
+1. Add domain in Vercel dashboard
+2. Configure DNS records in your domain provider
+3. Wait for DNS propagation (5-10 minutes)
+4. Your site is live at your custom domain!
+
+## 📈 Analytics & Tracking
+
+### Google Analytics
+- **User Behavior** - Track how users interact with your app
+- **Conversion Tracking** - Monitor payment conversions
+- **Performance Metrics** - Page load times and user engagement
+- **SEO Insights** - Search traffic and keyword performance
+
+### Custom Events
+- **App Usage** - Track feature usage and user engagement
+- **Payment Events** - Monitor subscription conversions
+- **User Journey** - Understand user flow and drop-off points
+
+## 🔒 Security
+
+### Data Protection
+- **Row Level Security** - Database-level access control
+- **Environment Variables** - Secure credential management
+- **HTTPS Only** - Encrypted data transmission
+- **No Data Storage** - Images processed locally, not stored
 
 ### Payment Security
-- All payment processing happens through Stripe
-- No payment data is stored in the application
-- Subscription status is verified on every access
-- Users cannot bypass payment requirements
+- **Stripe Integration** - PCI-compliant payment processing
+- **No Card Storage** - Payment data handled by Stripe
+- **Secure Authentication** - Supabase Auth with email verification
 
-## Project Structure
+## 🤝 Contributing
 
-```
-tracemate/
-├── public/                # Static assets
-├── src/
-│   ├── components/        # Reusable components
-│   │   ├── PaymentGate.tsx # Payment access control
-│   │   └── ...
-│   ├── config/            # Configuration files
-│   ├── contexts/          # React contexts
-│   │   ├── AuthContext.tsx # Authentication & subscription management
-│   │   └── PaymentContext.tsx # Payment flow management
-│   ├── hooks/             # Custom hooks
-│   ├── pages/             # Page components
-│   │   ├── CreateAccountPage.tsx # Account creation (redirects to payment)
-│   │   ├── SignInPage.tsx # Sign in (checks subscription)
-│   │   ├── PaymentPage.tsx # Plan selection & payment
-│   │   └── AppMainPage.tsx # Main app (payment-gated)
-│   ├── services/          # API services
-│   ├── types/             # TypeScript type definitions
-│   ├── utils/             # Utility functions
-│   ├── App.tsx            # Main App component with PaymentGate
-│   ├── index.css          # Global styles
-│   └── main.tsx           # Entry point
-├── scripts/               # Build and utility scripts
-├── .env                   # Environment variables (not in version control)
-├── database-setup.sql     # Complete database setup
-├── index.html             # HTML template
-├── package.json           # Dependencies and scripts
-├── tailwind.config.js     # Tailwind CSS configuration
-├── tsconfig.json          # TypeScript configuration
-├── vercel.json            # Vercel deployment configuration
-└── vite.config.ts         # Vite configuration
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Setup
+```bash
+# Fork the repository
+# Clone your fork
+git clone https://github.com/yourusername/ftracematef.git
+
+# Create feature branch
+git checkout -b feature/amazing-feature
+
+# Make changes and commit
+git commit -m "Add amazing feature"
+
+# Push to your fork
+git push origin feature/amazing-feature
+
+# Create Pull Request
 ```
 
-## Usage
+## 📄 License
 
-### Free Users (No Account)
-- Access to basic tracing features
-- Limited to 3 sessions per day
-- 2 minutes per session
-- No sign-in required
-- Usage tracked via browser storage
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### Premium Users (Account + Payment)
-- Unlimited tracing time
-- Unlimited sessions
-- Advanced features
-- Priority support
-- Must have active subscription
+## 🆘 Support
 
-## Payment Process
+### Getting Help
+- **Documentation** - Check our comprehensive docs
+- **FAQ** - Common questions and answers
+- **Community** - Join our Discord server
+- **Email Support** - Contact us directly
 
-TraceMate uses Stripe for secure payment processing:
+### Bug Reports
+Please use our [Issue Tracker](https://github.com/NEXESMISSION/ftracematef/issues) to report bugs or request features.
 
-1. **Account Creation**: User creates account (no immediate access)
-2. **Email Verification**: User must verify email
-3. **Plan Selection**: Choose Monthly ($6) or Lifetime ($15)
-4. **Payment**: Complete payment through Stripe
-5. **Access Granted**: Immediate access to premium features
-6. **Subscription Management**: Manage through account
+## 🌟 Star History
 
-## Development
+[![Star History Chart](https://api.star-history.com/svg?repos=NEXESMISSION/ftracematef&type=Date)](https://star-history.com/#NEXESMISSION/ftracematef&Date)
 
-### Available Scripts
+## 📞 Contact
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
-- `npm run check-env` - Verify environment variables
-- `npm run security-check` - Run security checks
+- **Website**: [https://tracemate.art](https://tracemate.art)
+- **Email**: support@tracemate.art
+- **Twitter**: [@tracemate](https://twitter.com/tracemate)
+- **GitHub**: [NEXESMISSION/ftracematef](https://github.com/NEXESMISSION/ftracematef)
 
-### Code Quality
+---
 
-- TypeScript for type safety
-- ESLint for code linting
-- Prettier for code formatting
-- Tailwind CSS for styling
+**Made with ❤️ for artists everywhere**
 
-### Testing Payment Flow
-
-1. Create a new account
-2. Verify email
-3. Select a plan
-4. Complete mock payment
-5. Verify access to app features
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For support, please contact us through the app or create an issue on GitHub.
+*Transform your drawing skills with TraceMate - the AI-powered image tracing tool that makes every artist a master.*

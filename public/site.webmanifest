@@ -1,0 +1,27 @@
+{
+  "name": "TraceMate - AI-Powered Image Tracing Tool",
+  "short_name": "TraceMate",
+  "description": "Transform any image into a traceable overlay. Perfect for artists, beginners, and kids learning to draw.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e293b",
+  "theme_color": "#1e293b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/assests/logo/logo-dark-bg.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assests/logo/logo-dark-bg.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["art", "education", "productivity"],
+  "lang": "en",
+  "dir": "ltr"
+} 

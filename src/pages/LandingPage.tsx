@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,10 +15,10 @@ declare global {
 
 // Define the taglines for the hero section
 const taglines = [
-  "Transform Your Drawing Skills",
-  "Trace Like a Pro",
-  "Perfect Your Art",
-  "Master Any Drawing"
+  "Transform Your Drawing Skills with AI-Powered Tracing",
+  "Trace Like a Pro - Perfect Your Art Today",
+  "Master Any Drawing with Smart Image Overlay",
+  "Learn to Draw Faster with Real-Time Tracing"
 ];
 
 // Define the testimonials
@@ -27,44 +26,48 @@ const testimonials = [
   {
     name: "Sarah J.",
     role: "Hobby Artist",
-    content: "TraceMate has completely changed how I approach drawing. I can now create pieces I never thought possible!",
+    content: "TraceMate has completely changed how I approach drawing. I can now create pieces I never thought possible! The image overlay feature is incredible.",
     avatar: "/assests/testimonials/avatar1.jpg"
   },
   {
     name: "Michael T.",
     role: "Art Student",
-    content: "As a student, TraceMate helps me practice techniques and improve my skills faster than traditional methods.",
+    content: "As a student, TraceMate helps me practice techniques and improve my skills faster than traditional methods. Perfect for learning perspective and proportions.",
     avatar: "/assests/testimonials/avatar2.jpg"
   },
   {
     name: "Elena R.",
     role: "Professional Illustrator",
-    content: "I use TraceMate for quick sketches and concept art. It's become an essential part of my creative workflow.",
+    content: "I use TraceMate for quick sketches and concept art. It's become an essential part of my creative workflow. The camera overlay is genius!",
     avatar: "/assests/testimonials/avatar3.jpg"
   }
 ];
 
-// Define the FAQs
+// Define the FAQs with SEO-optimized content
 const faqs = [
   {
-    question: "How does TraceMate work?",
-    answer: "TraceMate uses your device's camera to overlay a reference image on your view. You can then trace directly on your paper while seeing the reference image through your screen."
+    question: "How does TraceMate work for image tracing?",
+    answer: "TraceMate uses your device's camera to overlay a reference image on your view. You can then trace directly on your paper while seeing the reference image through your screen. Simply upload any image, adjust opacity and scale, and start tracing!"
   },
   {
-    question: "Do I need special equipment?",
-    answer: "No special equipment needed! Just your smartphone or tablet, and your regular drawing supplies."
+    question: "Do I need special equipment for drawing with TraceMate?",
+    answer: "No special equipment needed! Just your smartphone or tablet, and your regular drawing supplies. TraceMate works with any device that has a camera."
   },
   {
-    question: "Can I use my own images?",
-    answer: "Absolutely! You can upload any image from your device to use as a reference."
+    question: "Can I use my own images for tracing practice?",
+    answer: "Absolutely! You can upload any image from your device to use as a reference. Perfect for tracing photos, artwork, or any image you want to practice drawing."
   },
   {
-    question: "Is TraceMate suitable for beginners?",
-    answer: "Yes! TraceMate is perfect for artists of all skill levels, from complete beginners to professionals."
+    question: "Is TraceMate suitable for beginners learning to draw?",
+    answer: "Yes! TraceMate is perfect for artists of all skill levels, from complete beginners to professionals. It's especially great for learning proportions, perspective, and drawing techniques."
   },
   {
-    question: "Do I need to upload my image each time?",
-    answer: "Yes, TraceMate is designed for one-time image tracing. You'll need to upload your image each time you use the app."
+    question: "How many times can I use TraceMate for drawing practice?",
+    answer: "Free users get 3 sessions per day with 2 minutes each. Premium users get unlimited sessions and time. Perfect for daily drawing practice!"
+  },
+  {
+    question: "Can I switch between front and back cameras while tracing?",
+    answer: "Yes! TraceMate allows you to switch between cameras, so you can use whichever camera works best for your drawing setup and lighting conditions."
   }
 ];
 
