@@ -1,17 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import OptimizedVideoPlayer from '../components/OptimizedVideoPlayer';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/Button';
-
-// Add TypeScript declaration for YouTube API
-declare global {
-  interface Window {
-    YT: any;
-    onYouTubeIframeAPIReady: () => void;
-  }
-}
+import OptimizedVideo from '../components/OptimizedVideo';
+import VideoPreloader from '../components/VideoPreloader';
 
 // Define the taglines for the hero section
 const taglines = [
@@ -43,45 +36,28 @@ const testimonials = [
   }
 ];
 
-// Define the FAQs with SEO-optimized content
-const faqs = [
-  {
-    question: "How does TraceMate work for image tracing?",
-    answer: "TraceMate uses your device's camera to overlay a reference image on your view. You can then trace directly on your paper while seeing the reference image through your screen. Simply upload any image, adjust opacity and scale, and start tracing!"
-  },
-  {
-    question: "Do I need special equipment for drawing with TraceMate?",
-    answer: "No special equipment needed! Just your smartphone or tablet, and your regular drawing supplies. TraceMate works with any device that has a camera."
-  },
-  {
-    question: "Can I use my own images for tracing practice?",
-    answer: "Absolutely! You can upload any image from your device to use as a reference. Perfect for tracing photos, artwork, or any image you want to practice drawing."
-  },
-  {
-    question: "Is TraceMate suitable for beginners learning to draw?",
-    answer: "Yes! TraceMate is perfect for artists of all skill levels, from complete beginners to professionals. It's especially great for learning proportions, perspective, and drawing techniques."
-  },
-  {
-    question: "How many times can I use TraceMate for drawing practice?",
-    answer: "Free users get 3 sessions per day with 2 minutes each. Premium users get unlimited sessions and time. Perfect for daily drawing practice!"
-  },
-  {
-    question: "Can I switch between front and back cameras while tracing?",
-    answer: "Yes! TraceMate allows you to switch between cameras, so you can use whichever camera works best for your drawing setup and lighting conditions."
-  }
-];
-
 const LandingPage: React.FC = () => {
   const { user, signOut } = useAuth();
   const [currentTagline, setCurrentTagline] = useState(0);
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
+  const [videosLoaded, setVideosLoaded] = useState(false);
+  const [videoLoadProgress, setVideoLoadProgress] = useState(0);
   
   // Refs for scroll animations
-  const videosRef = useRef<HTMLDivElement>(null);
   const beforeAfterRef = useRef<HTMLDivElement>(null);
-  const featuresRef = useRef<HTMLDivElement>(null);
   const testimonialsRef = useRef<HTMLDivElement>(null);
-  const faqRef = useRef<HTMLDivElement>(null);
+
+  // Videos to preload
+  const videosToPreload = [
+    '/assets/main-optimized.mp4',
+    '/assets/main.mp4', // fallback
+    '/assets/vedios of how it works/optimized/1-optimized.mp4',
+    '/assets/vedios of how it works/optimized/2-optimized.mp4',
+    '/assets/vedios of how it works/optimized/3-optimized.mp4',
+    '/assets/vedios of how it works/1.mp4', // fallback
+    '/assets/vedios of how it works/2.mp4', // fallback
+    '/assets/vedios of how it works/3.mp4'  // fallback
+  ];
 
   // Rotate through taglines
   useEffect(() => {
@@ -108,66 +84,38 @@ const LandingPage: React.FC = () => {
     }
   };
 
-  // Handle scrolling to tutorials section
-  const scrollToTutorials = () => {
-    videosRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  // YouTube API loading and quality enhancement
-  useEffect(() => {
-    // Load YouTube API if not already loaded
-    if (!window.YT) {
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
-
-      // Function called when YouTube API is ready
-      window.onYouTubeIframeAPIReady = initializeYouTubeVideos;
-    } else {
-      // If API is already loaded, initialize videos directly
-      initializeYouTubeVideos();
-    }
-
-    // Initialize videos and set up quality enhancement
-    function initializeYouTubeVideos() {
-      // Enhanced logic for quality progression will be set up in timeouts
-      // Start with low quality (small) in the iframe src, then progressively enhance
-      const tutorials = [
-        { title: 'Upload & Align', videoId: '_yJX6y4A6J0', desc: 'Upload your reference image and align it with your camera view for perfect tracing.' },
-        { title: 'Trace & Create', videoId: 'cZyyaP_FkB8', desc: 'Use the overlay to trace your image with precision and create amazing artwork.' },
-        { title: 'Share & Enjoy', videoId: 'mQ1zbSHoUn4', desc: 'Share your creations with friends and enjoy the satisfaction of your new skills.' }
-      ];
-
-      tutorials.forEach((_, index) => {
-        // Set a timeout to enhance video quality after they've had time to load
-        setTimeout(() => {
-          const iframe = document.getElementById(`youtube-video-${index}`) as HTMLIFrameElement;
-          if (iframe && iframe.src) {
-            // Replace small quality with HD quality
-            let newSrc = iframe.src.replace('vq=small', 'vq=hd720');
-            iframe.src = newSrc;
-            
-            // After another delay, further enhance to highest quality
-            setTimeout(() => {
-              if (iframe && iframe.src) {
-                newSrc = iframe.src.replace('vq=hd720', 'vq=hd1080');
-                iframe.src = newSrc;
-              }
-            }, 5000); // 5 seconds later, upgrade to 1080p
-          }
-        }, 2000 + (index * 500)); // Stagger the initial quality upgrade
-      });
-    }
-
-    return () => {
-      // Cleanup function
-      window.onYouTubeIframeAPIReady = () => {};
-    };
-  }, []);
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-dark-400 to-dark-600 text-white font-sans">
+      {/* Video Preloader - invisible component that preloads videos */}
+      <VideoPreloader
+        videos={videosToPreload}
+        onProgress={(loaded, total) => {
+          setVideoLoadProgress((loaded / total) * 100);
+        }}
+        onComplete={() => {
+          setVideosLoaded(true);
+        }}
+      />
+      
+      {/* Loading Overlay */}
+      {!videosLoaded && (
+        <div className="fixed inset-0 z-[9999] bg-dark-600 flex items-center justify-center">
+          <div className="text-center">
+            <div className="mb-4">
+              <img src="/assests/logo/logo-dark-bg.png" alt="TraceMate Logo" className="h-16 mx-auto mb-4" />
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto"></div>
+            </div>
+            <p className="text-primary-200 text-sm">Loading videos... {Math.round(videoLoadProgress)}%</p>
+            <div className="w-64 bg-gray-700 rounded-full h-2 mt-2 mx-auto">
+              <div 
+                className="bg-gradient-to-r from-primary-500 to-primary-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${videoLoadProgress}%` }}
+              ></div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Navigation Bar */}
       <nav className="fixed top-0 left-0 w-full z-50 bg-dark-500/80 backdrop-blur-md border-b border-primary-500/20">
         <div className="container mx-auto px-4 py-3">
@@ -186,9 +134,9 @@ const LandingPage: React.FC = () => {
                 <Link to="/app" className="text-white hover:text-primary-100 transition-colors font-medium">
                   App
                 </Link>
-                <button onClick={() => scrollToSection(videosRef)} className="text-white hover:text-primary-100 transition-colors font-medium">How It Works</button>
-                <button onClick={() => scrollToSection(featuresRef)} className="text-white hover:text-primary-100 transition-colors font-medium">Features</button>
-                <button onClick={() => scrollToSection(faqRef)} className="text-white hover:text-primary-100 transition-colors font-medium">FAQ</button>
+                <a href="#how-it-works" className="text-white hover:text-primary-100 transition-colors font-medium">
+                  How It Works
+                </a>
                 <Link to="/payment" className="text-white hover:text-primary-100 transition-colors font-medium">Pricing</Link>
               </div>
             </div>
@@ -238,39 +186,19 @@ const LandingPage: React.FC = () => {
             Home
           </Link>
           <Link 
-            to="/app" 
+            to="/app"
             className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
             onClick={() => document.getElementById('mobileMenu')?.classList.add('hidden')}
           >
             App
           </Link>
-          <button 
-            onClick={() => {
-              scrollToSection(videosRef);
-              document.getElementById('mobileMenu')?.classList.add('hidden');
-            }} 
+          <a 
+            href="#how-it-works"
             className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
+            onClick={() => document.getElementById('mobileMenu')?.classList.add('hidden')}
           >
             How It Works
-          </button>
-          <button 
-            onClick={() => {
-              scrollToSection(featuresRef);
-              document.getElementById('mobileMenu')?.classList.add('hidden');
-            }} 
-            className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
-          >
-            Features
-          </button>
-          <button 
-            onClick={() => {
-              scrollToSection(faqRef);
-              document.getElementById('mobileMenu')?.classList.add('hidden');
-            }} 
-            className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
-          >
-            FAQ
-          </button>
+          </a>
           <Link 
             to="/payment"
             className="text-white hover:text-primary-100 transition-colors font-medium py-3 px-4 rounded-lg bg-dark-400/30 border border-primary-500/10 text-center text-lg"
@@ -296,28 +224,19 @@ const LandingPage: React.FC = () => {
       {/* Hero Section */}
       <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-dark-600">
         <div className="absolute inset-0 z-0">
-          {/* Video Background - Direct video element for maximum compatibility */}
-          <video
+          {/* Optimized Video Background */}
+          <OptimizedVideo
+            src="/assets/main-optimized.mp4"
+            fallbackSrc="/assets/main.mp4"
             className="absolute inset-0 w-full h-full object-cover"
             autoPlay
             muted
             loop
             playsInline
-            data-play="auto"
-            controlsList="nodownload noplaybackrate nofullscreen"
-            ref={(el) => {
-              if (el) {
-                el.setAttribute('webkit-playsinline', 'true');
-                el.setAttribute('x5-playsinline', 'true');
-                el.setAttribute('x5-video-player-type', 'h5');
-                el.setAttribute('x5-video-player-fullscreen', 'true');
-              }
-            }}
-          >
-            <source src="/assests/main.mp4" type="video/mp4" />
-            <source src="/assets/main.mp4" type="video/mp4" />
-            Your browser does not support HTML video.
-          </video>
+            preload="metadata"
+            onLoad={() => console.log('Hero video loaded successfully')}
+            onError={() => console.log('Hero video failed to load, using fallback')}
+          />
           <div className="absolute inset-0 bg-black/80"></div>
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary-600/20 via-transparent to-transparent opacity-70"></div>
           <div className="absolute top-[10%] right-[10%] w-[40%] h-[40%] rounded-full bg-primary-500/10 blur-[100px]"></div>
@@ -411,7 +330,7 @@ const LandingPage: React.FC = () => {
                       </div>
                       
                       <div className="mt-4 text-center text-primary-200/60 text-sm">
-                        No credit card required • Free 5-minute sessions daily
+                        No credit card required • Free 2-minute sessions daily
                       </div>
                     </div>
                   )}
@@ -422,10 +341,9 @@ const LandingPage: React.FC = () => {
         </div>
       </div>
       
-      {/* How It Works Videos Section */}
-      <div ref={videosRef} className="py-20 relative overflow-hidden">
-        <div className="absolute top-[10%] left-[10%] w-[40%] h-[40%] rounded-full bg-primary-500/10 blur-[100px]"></div>
-        <div className="absolute bottom-[10%] right-[10%] w-[30%] h-[30%] rounded-full bg-primary-500/10 blur-[100px]"></div>
+      {/* How It Works Section */}
+      <div id="how-it-works" className="py-20 relative overflow-hidden bg-dark-500/50">
+        <div className="absolute -top-[10%] left-[10%] w-[30%] h-[30%] rounded-full bg-primary-500/10 blur-[100px]"></div>
         
         <div className="container mx-auto px-4 relative z-10">
           <motion.div 
@@ -439,66 +357,125 @@ const LandingPage: React.FC = () => {
               How TraceMate Works
             </h2>
             <p className="text-xl text-primary-200 max-w-3xl mx-auto font-light">
-              See TraceMate in action with these helpful tutorial videos
+              See how easy it is to transform any image into a traceable overlay
             </p>
           </motion.div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              { title: 'Upload & Align', videoId: '_yJX6y4A6J0', desc: 'Upload your reference image and align it with your camera view for perfect tracing.' },
-              { title: 'Trace & Create', videoId: 'cZyyaP_FkB8', desc: 'Use the overlay to trace your image with precision and create amazing artwork.' },
-              { title: 'Share & Enjoy', videoId: 'mQ1zbSHoUn4', desc: 'Share your creations with friends and enjoy the satisfaction of your new skills.' }
-            ].map((item, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="bg-dark-300/70 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300"
-              >
-                <div className="w-full md:h-[500px] lg:h-[600px] aspect-[3/4] md:aspect-auto relative overflow-hidden">
-                  {/* YouTube Embed with protection overlays */}
-                  <div 
-                    className="w-full h-full absolute inset-0 pointer-events-none select-none"
-                    style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
-                  >
-                    <iframe
-                      src={`https://www.youtube.com/embed/${item.videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${item.videoId}&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&disablekb=1&vq=hd1080`}
-                      title={item.title}
-                      frameBorder="0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      className="w-full h-full absolute inset-0 pointer-events-none" 
-                      id={`youtube-video-${index}`}
-                      style={{
-                        pointerEvents: 'none',
-                        objectFit: 'cover',
-                        width: '100%',
-                        height: '100%',
-                        transform: 'scale(1.8)', /* Scale up more to completely remove all black borders */
-                      }}
-                    ></iframe>
-                  </div>
-                  
-                  {/* Protection overlay to prevent interaction */}
-                  <div 
-                    className="absolute inset-0 z-20" 
-                    style={{ 
-                      background: 'transparent', 
-                      pointerEvents: 'auto',
-                      userSelect: 'none',
-                      WebkitUserSelect: 'none',
-                      MozUserSelect: 'none'
-                    }}>
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {/* Step 1 */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="text-center"
+            >
+              <div className="bg-dark-300/50 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300 mb-6">
+                <div className="aspect-video relative">
+                  <OptimizedVideo
+                    src="/assets/vedios of how it works/optimized/1-optimized.mp4"
+                    fallbackSrc="/assets/vedios of how it works/1.mp4"
+                    className="w-full h-full"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="metadata"
+                    onLoad={() => console.log('Tutorial video 1 loaded')}
+                    onError={() => console.log('Tutorial video 1 failed to load')}
+                  />
                 </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-bold font-heading text-white text-center">{item.title}</h3>
+              </div>
+              <h3 className="text-xl font-bold text-white font-heading mb-2">1. Upload Your Image</h3>
+              <p className="text-primary-200/80 font-light">
+                Select any image from your device - photos, drawings, or reference images
+              </p>
+            </motion.div>
+            
+            {/* Step 2 */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="text-center"
+            >
+              <div className="bg-dark-300/50 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300 mb-6">
+                <div className="aspect-video relative">
+                  <OptimizedVideo
+                    src="/assets/vedios of how it works/optimized/2-optimized.mp4"
+                    fallbackSrc="/assets/vedios of how it works/2.mp4"
+                    className="w-full h-full"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="metadata"
+                    onLoad={() => console.log('Tutorial video 2 loaded')}
+                    onError={() => console.log('Tutorial video 2 failed to load')}
+                  />
                 </div>
-              </motion.div>
-            ))}
+              </div>
+              <h3 className="text-xl font-bold text-white font-heading mb-2">2. Adjust Settings</h3>
+              <p className="text-primary-200/80 font-light">
+                Fine-tune opacity, scale, and position for perfect alignment
+              </p>
+            </motion.div>
+            
+            {/* Step 3 */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="text-center"
+            >
+              <div className="bg-dark-300/50 backdrop-blur-sm border border-primary-500/20 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300 mb-6">
+                <div className="aspect-video relative">
+                  <OptimizedVideo
+                    src="/assets/vedios of how it works/optimized/3-optimized.mp4"
+                    fallbackSrc="/assets/vedios of how it works/3.mp4"
+                    className="w-full h-full"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="metadata"
+                    onLoad={() => console.log('Tutorial video 3 loaded')}
+                    onError={() => console.log('Tutorial video 3 failed to load')}
+                  />
+                </div>
+              </div>
+              <h3 className="text-xl font-bold text-white font-heading mb-2">3. Start Tracing</h3>
+              <p className="text-primary-200/80 font-light">
+                Begin drawing with the overlay as your guide - see your progress in real-time
+              </p>
+            </motion.div>
           </div>
+          
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.6 }}
+            className="text-center mt-12"
+          >
+            <div className="bg-dark-300/30 backdrop-blur-sm border border-primary-500/10 rounded-xl p-6 max-w-2xl mx-auto">
+              <h3 className="text-xl font-heading mb-2 text-white">Ready to Get Started?</h3>
+              <p className="text-primary-200/80 font-light mb-4">
+                Join thousands of artists who use TraceMate to improve their drawing skills
+              </p>
+              <button 
+                onClick={() => window.location.href = '/app'}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium py-3 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 mx-auto"
+              >
+                <span>Try It Free</span>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </button>
+            </div>
+          </motion.div>
         </div>
       </div>
       
@@ -622,13 +599,13 @@ const LandingPage: React.FC = () => {
                     <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                     </svg>
-                    <span className="text-white">1-minute sessions</span>
+                    <span className="text-white">2-minute sessions</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                     </svg>
-                    <span className="text-white">5 sessions per day</span>
+                    <span className="text-white">3 sessions per day</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -733,49 +710,49 @@ const LandingPage: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.4 }}
-              className="bg-dark-300/50 backdrop-blur-sm border border-primary-500/40 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/20 transition-all duration-300 flex flex-col h-full relative"
+              className="bg-gradient-to-br from-amber-900/30 to-orange-800/30 backdrop-blur-sm border border-amber-500/40 rounded-xl overflow-hidden shadow-lg hover:shadow-amber-500/20 transition-all duration-300 flex flex-col h-full relative"
             >
-              <div className="absolute top-0 right-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium py-1 px-4 rounded-bl-lg">
+              <div className="absolute top-0 right-0 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-medium py-1 px-4 rounded-bl-lg">
                 Best Value
               </div>
               
-              <div className="p-8 border-b border-primary-500/20 text-center">
+              <div className="p-8 border-b border-amber-500/20 text-center">
                 <h3 className="text-2xl font-bold text-white font-heading mb-2">Lifetime Access</h3>
                 <div className="flex items-center justify-center gap-1">
-                  <span className="text-4xl font-bold text-white">$15</span>
-                  <span className="text-primary-200/70 font-light">/once</span>
+                  <span className="text-4xl font-bold text-amber-300">$15</span>
+                  <span className="text-amber-200/70 font-light">/once</span>
                 </div>
-                <p className="mt-4 text-primary-200/80 font-light">Pay once, use forever</p>
+                <p className="mt-4 text-amber-200/80 font-light">Pay once, use forever</p>
               </div>
               
               <div className="p-8 flex-grow">
                 <ul className="space-y-4">
                   <li className="flex items-start gap-3">
-                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-6 h-6 text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                     </svg>
                     <span className="text-white">Everything in Monthly plan</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-6 h-6 text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                     </svg>
                     <span className="text-white">Never pay again</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-6 h-6 text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                     </svg>
                     <span className="text-white">All premium features included</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-6 h-6 text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                     </svg>
                     <span className="text-white">Premium support</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-6 h-6 text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                     </svg>
                     <span className="text-white">Early access to new features</span>
@@ -786,7 +763,7 @@ const LandingPage: React.FC = () => {
               <div className="p-8 pt-0">
                 <button 
                   onClick={() => window.location.href = '/payment'}
-                  className="w-full py-3 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                  className="w-full py-3 px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
                 >
                   <span>Get Lifetime Access</span>
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -874,81 +851,6 @@ const LandingPage: React.FC = () => {
               ))}
             </div>
           </div>
-        </div>
-      </div>
-      
-      {/* FAQ Section */}
-      <div ref={faqRef} className="py-20 relative overflow-hidden bg-gradient-to-b from-dark-500 to-dark-600">
-        <div className="absolute -bottom-[10%] -left-[10%] w-[40%] h-[40%] rounded-full bg-primary-500/10 blur-[100px]"></div>
-        
-        <div className="container mx-auto px-4 relative z-10">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-12"
-          >
-            <span className="px-4 py-1 text-sm rounded-full bg-primary-500/20 border border-primary-500/30 text-white backdrop-blur-sm font-medium">
-              Got Questions?
-            </span>
-            <h2 className="text-4xl font-bold font-heading mt-6 mb-4 text-white">
-              Frequently Asked Questions
-            </h2>
-            <p className="text-xl text-white max-w-3xl mx-auto font-light">
-              Find answers to common questions about TraceMate
-            </p>
-          </motion.div>
-          
-          <div className="flex flex-wrap justify-center">
-            <div className="w-full md:w-8/12 space-y-6">
-              {faqs.map((faq, index) => (
-                <motion.div 
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  className="bg-dark-300/70 backdrop-blur-sm border border-primary-500/30 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/10 transition-all duration-300"
-                >
-                  <details className="group">
-                    <summary className="flex justify-between items-center font-medium cursor-pointer list-none p-6 text-white">
-                      <span className="text-lg font-heading">{faq.question}</span>
-                      <span className="transition duration-300 group-open:rotate-180 bg-primary-500/20 p-2 rounded-full">
-                        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                      </span>
-                    </summary>
-                    <div className="p-6 border-t border-primary-500/20 bg-dark-400/70">
-                      <p className="text-white font-light">{faq.answer}</p>
-                    </div>
-                  </details>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-          
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="text-center mt-16"
-          >
-            <Button 
-              to="/app" 
-              variant="blue" 
-              size="md" 
-              icon={
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                </svg>
-              }
-            >
-              Get Started Now
-            </Button>
-          </motion.div>
         </div>
       </div>
       

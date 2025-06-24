@@ -29,16 +29,70 @@
 
 ## 🚀 Quick Start
 
-### Free Plan (No Account Required)
-- **3 sessions per day** - Perfect for daily practice
-- **2 minutes per session** - Enough time to complete most drawings
-- **Basic features** - Image overlay and camera controls
-- **No signup required** - Start tracing immediately
+1. **Clone the repository:**
+   ```bash
+   git clone <your-repo-url>
+   cd tracemate
+   ```
 
-### Premium Plans
-- **Monthly Plan ($6/month)** - Unlimited sessions and time
-- **Lifetime Plan ($15/once)** - Pay once, use forever
-- **Advanced features** - Priority support and early access
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables:**
+   ```bash
+   cp .env.example .env.local
+   # Fill in your Supabase and Stripe credentials
+   ```
+
+4. **Optimize videos for deployment (IMPORTANT):**
+   ```bash
+   npm run video-guide
+   # Follow the instructions to compress your videos
+   ```
+
+5. **Start development server:**
+   ```bash
+   npm run dev
+   ```
+
+## 🎬 Video Optimization
+
+**IMPORTANT**: Before deploying, optimize your videos for faster loading:
+
+- **Current hero video**: 18.77MB (too large)
+- **Target size**: 3-5MB (80% reduction)
+- **Tutorial videos**: Need compression to 500KB-1MB each
+
+### Quick Optimization Steps:
+
+1. **Run the optimization guide:**
+   ```bash
+   npm run video-guide
+   ```
+
+2. **Use online tools to compress:**
+   - [Online Video Converter](https://www.onlinevideoconverter.com/)
+   - [YouCompress](https://www.youcompress.com/)
+
+3. **Target settings:**
+   - Resolution: 720p max
+   - Bitrate: 1-2 Mbps for hero, 500Kbps for tutorials
+   - Codec: H.264
+   - Audio: AAC, 96-128kbps
+
+4. **File structure after optimization:**
+   ```
+   public/assets/
+   ├── main-optimized.mp4 (3-5MB)
+   └── vedios of how it works/optimized/
+       ├── 1-optimized.mp4 (500KB-1MB)
+       ├── 2-optimized.mp4 (500KB-1MB)
+       └── 3-optimized.mp4 (500KB-1MB)
+   ```
+
+**Performance Impact**: Video optimization can improve page load time by 70-80%!
 
 ## 🛠️ Technology Stack
 

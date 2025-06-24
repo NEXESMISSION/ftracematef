@@ -6,9 +6,12 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "check-env": "node scripts/check-env.js",
-    "security-check": "npm run check-env"
+    "security-check": "npm run check-env",
+    "optimize-videos": "node scripts/optimize-videos.js",
+    "video-guide": "node scripts/simple-video-optimizer.js",
+    "optimize-tutorials": "node scripts/optimize-tutorial-videos.js"
   },
   "keywords": [],
   "author": "",

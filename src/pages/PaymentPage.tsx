@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePayment } from '../contexts/PaymentContext';
 import { mockPaymentProcess, STRIPE_PLANS } from '../services/stripeService';
 import { supabase } from '../services/supabaseClient';
-import UsageTest from '../components/UsageTest';
 
 const PaymentPage: React.FC = () => {
   const { user, signOut, refreshUserRole } = useAuth();
@@ -13,17 +12,22 @@ const PaymentPage: React.FC = () => {
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [hasProcessedPayment, setHasProcessedPayment] = useState(false);
 
   // Handle plan selection and redirect to auth if needed
   const handlePlanSelection = (plan: 'monthly' | 'lifetime') => {
+    console.log('Plan selected:', plan, 'User logged in:', !!user);
+    
     setSelectedPlan(plan);
-    setIsPaymentFlow(true);
     
     if (!user) {
-      // User is not logged in, redirect to sign-in
+      // User is not logged in, set payment flow and redirect to sign-in
+      setIsPaymentFlow(true);
       navigate('/signin');
     } else {
-      // User is logged in, proceed to Stripe payment
+      // User is logged in, set payment flow and proceed to payment
+      setIsPaymentFlow(true);
+      setHasProcessedPayment(false); // Reset flag for new payment
       handleStripePayment(plan);
     }
   };
@@ -63,19 +67,36 @@ const PaymentPage: React.FC = () => {
 
         console.log('Inserting subscription data:', subscriptionData);
         
+        // First, try to insert the subscription
         const { error: subscriptionError } = await supabase
           .from('user_subscriptions')
           .insert(subscriptionData);
 
         if (subscriptionError) {
           console.error('Error saving subscription:', subscriptionError);
-          setPaymentError('Payment successful but failed to update subscription. Please contact support.');
-          return;
+          
+          // Check if it's a duplicate key error (subscription already exists)
+          if (subscriptionError.code === '23505') {
+            // Update existing subscription instead
+            const { error: updateError } = await supabase
+              .from('user_subscriptions')
+              .update(subscriptionData)
+              .eq('user_id', user.id);
+              
+            if (updateError) {
+              console.error('Error updating subscription:', updateError);
+              setPaymentError('Payment successful but failed to update subscription. Please contact support.');
+              return;
+            }
+          } else {
+            setPaymentError('Payment successful but failed to update subscription. Please contact support.');
+            return;
+          }
         }
 
         console.log('Subscription saved successfully, updating user role...');
 
-        // Also update the user's role directly in the users table
+        // Update the user's role directly in the users table
         const { error: userUpdateError } = await supabase
           .from('users')
           .update({ role: 'paid' })
@@ -100,14 +121,17 @@ const PaymentPage: React.FC = () => {
         
         // Clear payment flow and redirect to app
         clearSelectedPlan();
+        setHasProcessedPayment(false); // Reset flag for future payments
         navigate('/app');
       } else {
         console.error('Payment failed:', result.error);
         setPaymentError(result.error || 'Payment failed');
+        setHasProcessedPayment(false); // Reset flag on failure
       }
     } catch (error) {
       console.error('Payment error:', error);
       setPaymentError('Payment failed. Please try again.');
+      setHasProcessedPayment(false); // Reset flag on error
     } finally {
       setIsProcessing(false);
     }
@@ -115,11 +139,64 @@ const PaymentPage: React.FC = () => {
 
   // Check if user just completed authentication and should proceed to payment
   useEffect(() => {
-    if (user && isPaymentFlow && selectedPlan && !isProcessing) {
-      // User just logged in and has a selected plan, proceed to payment
-      handleStripePayment(selectedPlan);
+    // Only trigger payment if:
+    // 1. User is logged in
+    // 2. We're in payment flow
+    // 3. A plan is selected
+    // 4. Not currently processing
+    // 5. Haven't already processed this payment
+    // 6. User explicitly chose a plan (not just visiting the page)
+    if (user && isPaymentFlow && selectedPlan && !isProcessing && !hasProcessedPayment) {
+      // Add a small delay to ensure user role is properly loaded
+      const timer = setTimeout(() => {
+        console.log('Auto-triggering payment for user:', user.email, 'plan:', selectedPlan);
+        setHasProcessedPayment(true); // Mark as processed to prevent multiple attempts
+        handleStripePayment(selectedPlan);
+      }, 500);
+      
+      return () => clearTimeout(timer);
     }
-  }, [user, isPaymentFlow, selectedPlan, isProcessing]);
+  }, [user, isPaymentFlow, selectedPlan, isProcessing, hasProcessedPayment]);
+
+  // Manual reset function for stuck payments
+  const resetPaymentState = () => {
+    setIsProcessing(false);
+    setPaymentError(null);
+    setHasProcessedPayment(false);
+    clearSelectedPlan();
+    console.log('Payment state reset manually');
+  };
+
+  // Add timeout for payment processing
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    if (isProcessing) {
+      // Set a 30-second timeout for payment processing
+      timeoutId = setTimeout(() => {
+        console.log('Payment processing timeout - resetting state');
+        setPaymentError('Payment processing timed out. Please try again.');
+        resetPaymentState();
+      }, 30000); // 30 seconds
+    }
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [isProcessing]);
+
+  // Cleanup payment state when component unmounts
+  useEffect(() => {
+    return () => {
+      // Reset payment state when leaving the page
+      if (!isProcessing) {
+        clearSelectedPlan();
+        setHasProcessedPayment(false);
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-dark-400 to-dark-600 text-white font-sans relative overflow-hidden">
@@ -157,12 +234,9 @@ const PaymentPage: React.FC = () => {
                 <Link to="/app" className="text-white hover:text-blue-300 transition-colors font-medium">
                   App
                 </Link>
-                {/* Only show Pricing link if user is not signed in */}
-                {!user && (
-                  <Link to="/payment" className="text-white hover:text-blue-300 transition-colors font-medium">
-                    Pricing
-                  </Link>
-                )}
+                <Link to="/payment" className="text-white hover:text-blue-300 transition-colors font-medium">
+                  Pricing
+                </Link>
               </div>
               
               {user && (
@@ -245,7 +319,7 @@ const PaymentPage: React.FC = () => {
       <div className="pt-24 pb-16 px-4 container mx-auto max-w-6xl relative z-10">
         {/* Payment Processing Overlay */}
         {isProcessing && (
-          <motion.div
+        <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center"
@@ -253,9 +327,17 @@ const PaymentPage: React.FC = () => {
             <div className="bg-dark-400/90 border border-primary-500/30 rounded-xl p-8 max-w-md mx-4 text-center">
               <div className="animate-spin w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full mx-auto mb-4"></div>
               <h3 className="text-xl font-bold text-white mb-2">Processing Payment</h3>
-              <p className="text-primary-200/80">Please wait while we process your payment...</p>
+              <p className="text-primary-200/80 mb-6">Please wait while we process your payment...</p>
+              
+              {/* Reset button for stuck payments */}
+              <button
+                onClick={resetPaymentState}
+                className="text-sm text-gray-400 hover:text-white underline"
+              >
+                Payment stuck? Click here to reset
+              </button>
             </div>
-          </motion.div>
+              </motion.div>
         )}
 
         {/* Payment Error Display */}
@@ -282,15 +364,38 @@ const PaymentPage: React.FC = () => {
           </motion.div>
         )}
 
+        {/* Current Subscription Status */}
+        {user && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-blue-900/40 border border-blue-500/50 text-blue-200 rounded-lg backdrop-blur-sm"
+          >
+            <div className="flex items-start gap-3">
+              <svg className="w-6 h-6 text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <span className="font-medium">Current Status:</span> {user.role === 'paid' ? 'Premium User' : 'Free User'}
+                {user.role === 'paid' && (
+                  <p className="text-sm text-blue-300 mt-1">
+                    You have unlimited access to all features!
+                  </p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Pricing Section */}
         <div className="py-20 relative overflow-hidden">
           <div className="absolute -top-[10%] right-[10%] w-[40%] h-[40%] rounded-full bg-primary-500/10 blur-[100px]"></div>
           <div className="absolute -bottom-[10%] left-[10%] w-[30%] h-[30%] rounded-full bg-primary-500/10 blur-[100px]"></div>
           
           <div className="container mx-auto px-4 relative z-10">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
               className="text-center mb-16"
             >
@@ -336,13 +441,13 @@ const PaymentPage: React.FC = () => {
                     <li className="flex items-start gap-3">
                       <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                      </svg>
+                </svg>
                       <span className="text-white">Basic image adjustments</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                      </svg>
+                </svg>
                       <span className="text-white">No account required</span>
                     </li>
                   </ul>
@@ -356,15 +461,15 @@ const PaymentPage: React.FC = () => {
                     <span>Try For Free</span>
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                    </svg>
+                </svg>
                   </button>
-                </div>
-              </motion.div>
-              
+          </div>
+        </motion.div>
+
               {/* Monthly Plan */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.2 }}
                 className="bg-dark-300/50 backdrop-blur-sm border border-primary-500/40 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/20 transition-all duration-300 flex flex-col h-full relative"
               >
@@ -414,17 +519,24 @@ const PaymentPage: React.FC = () => {
                       <span className="text-white">Priority support</span>
                     </li>
                   </ul>
-                </div>
-                
+              </div>
+              
                 <div className="p-8 pt-0">
                   <button 
                     onClick={() => handlePlanSelection('monthly')}
-                    className="w-full py-3 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                    disabled={user?.role === 'paid'}
+                    className={`w-full py-3 px-6 font-medium rounded-lg shadow-lg transition-all duration-300 flex items-center justify-center gap-2 ${
+                      user?.role === 'paid' 
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                        : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white hover:shadow-xl'
+                    }`}
                   >
-                    <span>Get Monthly</span>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                    </svg>
+                    <span>{user?.role === 'paid' ? 'Already Subscribed' : 'Get Monthly'}</span>
+                    {user?.role !== 'paid' && (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    )}
                   </button>
                 </div>
               </motion.div>
@@ -434,49 +546,49 @@ const PaymentPage: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.4 }}
-                className="bg-dark-300/50 backdrop-blur-sm border border-primary-500/40 rounded-xl overflow-hidden shadow-lg hover:shadow-primary-500/20 transition-all duration-300 flex flex-col h-full relative"
+                className="bg-gradient-to-br from-amber-900/30 to-orange-800/30 backdrop-blur-sm border border-amber-500/40 rounded-xl overflow-hidden shadow-lg hover:shadow-amber-500/20 transition-all duration-300 flex flex-col h-full relative"
               >
-                <div className="absolute top-0 right-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium py-1 px-4 rounded-bl-lg">
+                <div className="absolute top-0 right-0 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-medium py-1 px-4 rounded-bl-lg">
                   Best Value
                 </div>
                 
-                <div className="p-8 border-b border-primary-500/20 text-center">
+                <div className="p-8 border-b border-amber-500/20 text-center">
                   <h3 className="text-2xl font-bold text-white font-heading mb-2">Lifetime Access</h3>
                   <div className="flex items-center justify-center gap-1">
-                    <span className="text-4xl font-bold text-white">$15</span>
-                    <span className="text-primary-200/70 font-light">/once</span>
+                    <span className="text-4xl font-bold text-amber-300">$15</span>
+                    <span className="text-amber-200/70 font-light">/once</span>
                   </div>
-                  <p className="mt-4 text-primary-200/80 font-light">Pay once, use forever</p>
-                </div>
-                
+                  <p className="mt-4 text-amber-200/80 font-light">Pay once, use forever</p>
+              </div>
+              
                 <div className="p-8 flex-grow">
                   <ul className="space-y-4">
                     <li className="flex items-start gap-3">
-                      <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-6 h-6 text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                       </svg>
                       <span className="text-white">Everything in Monthly plan</span>
                     </li>
                     <li className="flex items-start gap-3">
-                      <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-6 h-6 text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                       </svg>
                       <span className="text-white">Never pay again</span>
                     </li>
                     <li className="flex items-start gap-3">
-                      <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-6 h-6 text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                       </svg>
                       <span className="text-white">All premium features included</span>
                     </li>
                     <li className="flex items-start gap-3">
-                      <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-6 h-6 text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                       </svg>
                       <span className="text-white">Premium support</span>
                     </li>
                     <li className="flex items-start gap-3">
-                      <svg className="w-6 h-6 text-primary-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-6 h-6 text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                       </svg>
                       <span className="text-white">Early access to new features</span>
@@ -487,16 +599,23 @@ const PaymentPage: React.FC = () => {
                 <div className="p-8 pt-0">
                   <button 
                     onClick={() => handlePlanSelection('lifetime')}
-                    className="w-full py-3 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                    disabled={user?.role === 'paid'}
+                    className={`w-full py-3 px-6 font-medium rounded-lg shadow-lg transition-all duration-300 flex items-center justify-center gap-2 ${
+                      user?.role === 'paid' 
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                        : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white hover:shadow-xl'
+                    }`}
                   >
-                    <span>Get Lifetime Access</span>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                    </svg>
+                    <span>{user?.role === 'paid' ? 'Already Subscribed' : 'Get Lifetime Access'}</span>
+                    {user?.role !== 'paid' && (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    )}
                   </button>
                 </div>
               </motion.div>
-            </div>
+              </div>
             
             <div className="mt-12 text-center">
               <p className="text-primary-200/70 max-w-2xl mx-auto font-light">
@@ -506,9 +625,6 @@ const PaymentPage: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Debug Panel */}
-      <UsageTest />
     </div>
   );
 };

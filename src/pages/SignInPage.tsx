@@ -74,7 +74,7 @@ const SignInPage: React.FC = () => {
             if (userRole === 'paid') {
               // User has active subscription, go to app
               console.log('User has paid subscription, redirecting to app');
-              navigate('/app');
+      navigate('/app');
             } else {
               // User doesn't have active subscription, redirect to payment
               console.log('User has no active subscription, redirecting to payment');

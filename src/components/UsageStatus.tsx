@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { useUsageTracking } from '../hooks/useUsageTracking';
@@ -13,6 +13,36 @@ const UsageStatus: React.FC<UsageStatusProps> = ({
 }) => {
   const { user, userRole } = useAuth();
   const { usageStats, hasReachedLimit } = useUsageTracking();
+  const [cooldownTime, setCooldownTime] = useState(0);
+
+  // Check for 24-hour cooldown
+  useEffect(() => {
+    if (!user) {
+      const checkCooldown = () => {
+        const lastSessionTime = localStorage.getItem('lastSessionTime');
+        const now = new Date().getTime();
+        const cooldownPeriod = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+        
+        if (lastSessionTime) {
+          const timeSinceLastSession = now - parseInt(lastSessionTime);
+          const remainingCooldown = Math.max(0, cooldownPeriod - timeSinceLastSession);
+          
+          if (remainingCooldown > 0) {
+            setCooldownTime(Math.ceil(remainingCooldown / 1000));
+          } else {
+            setCooldownTime(0);
+          }
+        } else {
+          setCooldownTime(0);
+        }
+      };
+
+      checkCooldown();
+      const interval = setInterval(checkCooldown, 1000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [user]);
 
   return (
     <div className={className}>
@@ -67,6 +97,11 @@ const UsageStatus: React.FC<UsageStatusProps> = ({
             <div className="text-gray-600 dark:text-gray-400 mb-4">
               {USAGE_LIMITS.free.sessionDurationSecs / 60} minutes per session
             </div>
+            {cooldownTime > 0 && (
+              <div className="text-amber-600 dark:text-amber-400 mb-2 font-medium">
+                ⏰ Cooldown: {Math.floor(cooldownTime / 3600)}:{(Math.floor(cooldownTime / 60) % 60).toString().padStart(2, '0')}:{(cooldownTime % 60).toString().padStart(2, '0')}
+              </div>
+            )}
             <div className="text-blue-500 mb-2">
               Sign in for unlimited access
             </div>

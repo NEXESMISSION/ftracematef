@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import CameraPermissionManager from '../components/CameraPermissionManager';
 import ImageUploader from '../components/ImageUploader';
 import UsageStatus from '../components/UsageStatus';
-import UsageTest from '../components/UsageTest';
+import { PaymentGate } from '../components/PaymentGate';
 
 const AppMainPage: React.FC = () => {
   const { user, userRole, signOut } = useAuth();
@@ -214,6 +214,27 @@ const AppMainPage: React.FC = () => {
     console.log('Selected image:', selectedImage.name, 'Size:', selectedImage.size, 'bytes');
     console.log('Preview URL exists:', !!previewUrl);
     console.log('User role:', userRole, 'User signed in:', !!user);
+    
+    // Check for 24-hour cooldown for non-logged in users
+    if (!user) {
+      const lastSessionTime = localStorage.getItem('lastSessionTime');
+      const now = new Date().getTime();
+      const cooldownPeriod = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+      
+      if (lastSessionTime) {
+        const timeSinceLastSession = now - parseInt(lastSessionTime);
+        const remainingCooldown = Math.max(0, cooldownPeriod - timeSinceLastSession);
+        
+        if (remainingCooldown > 0) {
+          const hours = Math.floor(remainingCooldown / (60 * 60 * 1000));
+          const minutes = Math.floor((remainingCooldown % (60 * 60 * 1000)) / (60 * 1000));
+          const seconds = Math.floor((remainingCooldown % (60 * 1000)) / 1000);
+          
+          setError(`Session cooldown active. You can start a new session in ${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}. Upgrade to premium for unlimited access!`);
+          return;
+        }
+      }
+    }
     
     // Validate the image first
     const isValid = await validateImage(selectedImage);
@@ -570,9 +591,6 @@ const AppMainPage: React.FC = () => {
           </p>
         </div>
       </footer>
-
-      {/* Usage Test Component (for development) */}
-      <UsageTest />
     </div>
   );
 };

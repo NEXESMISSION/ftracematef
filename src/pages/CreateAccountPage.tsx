@@ -218,15 +218,15 @@ const CreateAccountPage: React.FC = () => {
                     Email Address
                   </label>
                   <div className="relative">
-                    <input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                       className="w-full px-4 py-3 bg-dark-400/50 border border-blue-500/30 rounded-lg shadow-inner text-white placeholder-blue-300/50 focus:outline-none focus:border-blue-400/70 focus:ring-1 focus:ring-blue-400/70 backdrop-blur-sm"
-                      placeholder="you@example.com"
+                    placeholder="you@example.com"
                       required
-                    />
+                  />
                     <div className="absolute inset-0 rounded-lg pointer-events-none border border-blue-500/10 border-t-blue-500/30 border-l-blue-500/30"></div>
                   </div>
                 </div>
@@ -235,15 +235,15 @@ const CreateAccountPage: React.FC = () => {
                     Password
                   </label>
                   <div className="relative">
-                    <input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                       className="w-full px-4 py-3 bg-dark-400/50 border border-blue-500/30 rounded-lg shadow-inner text-white placeholder-blue-300/50 focus:outline-none focus:border-blue-400/70 focus:ring-1 focus:ring-blue-400/70 backdrop-blur-sm"
-                      placeholder="••••••••"
+                    placeholder="••••••••"
                       required
-                    />
+                  />
                     <div className="absolute inset-0 rounded-lg pointer-events-none border border-blue-500/10 border-t-blue-500/30 border-l-blue-500/30"></div>
                   </div>
                 </div>
@@ -252,31 +252,31 @@ const CreateAccountPage: React.FC = () => {
                     Confirm Password
                   </label>
                   <div className="relative">
-                    <input
-                      id="confirm-password"
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                  <input
+                    id="confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                       className="w-full px-4 py-3 bg-dark-400/50 border border-blue-500/30 rounded-lg shadow-inner text-white placeholder-blue-300/50 focus:outline-none focus:border-blue-400/70 focus:ring-1 focus:ring-blue-400/70 backdrop-blur-sm"
-                      placeholder="••••••••"
+                    placeholder="••••••••"
                       required
-                    />
+                  />
                     <div className="absolute inset-0 rounded-lg pointer-events-none border border-blue-500/10 border-t-blue-500/30 border-l-blue-500/30"></div>
                   </div>
                 </div>
                 <button 
                   type="submit" 
-                  disabled={formIsLoading || !networkStatus.online || networkStatus.supabaseReachable === false}
+                                    disabled={formIsLoading || !networkStatus.online || networkStatus.supabaseReachable === false}
                   className={`w-full flex justify-center py-3 px-4 rounded-lg text-white font-medium relative overflow-hidden group ${formIsLoading || !networkStatus.online || networkStatus.supabaseReachable === false ? 'opacity-70 cursor-not-allowed' : ''}`}
                 >
                   <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 transition-all duration-300"></span>
                   <span className="relative flex items-center justify-center gap-2">
-                    {formIsLoading ? (
+                                    {formIsLoading ? (
                       <>
-                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
                         Creating Account...
                       </>
                     ) : (

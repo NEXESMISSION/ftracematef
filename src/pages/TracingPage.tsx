@@ -24,9 +24,11 @@ const TracingPage: React.FC = () => {
   const [showTimeAlert, setShowTimeAlert] = useState(false);
   const [alertShown, setAlertShown] = useState(false); // Track if alert has been shown
   const [redirectCountdown, setRedirectCountdown] = useState(20);
-  const [remainingTime, setRemainingTime] = useState(60); // 60 seconds countdown
+  const [remainingTime, setRemainingTime] = useState(120); // 2 minutes countdown (120 seconds)
+  const [cooldownTime, setCooldownTime] = useState(0); // 24-hour cooldown timer
   const redirectTimerRef = useRef<number | null>(null);
   const countdownTimerRef = useRef<number | null>(null); // Reference for countdown timer
+  const cooldownTimerRef = useRef<number | null>(null); // Reference for cooldown timer
   
   // Image settings with position
   const [imageSettings, setImageSettings] = useState<ImageSettings>({
@@ -566,16 +568,53 @@ const TracingPage: React.FC = () => {
     // Only apply time limit for users who are not logged in
     if (isLoggedIn) return;
     
+    // Check for 24-hour cooldown
+    const lastSessionTime = localStorage.getItem('lastSessionTime');
+    const now = new Date().getTime();
+    const cooldownPeriod = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    
+    if (lastSessionTime) {
+      const timeSinceLastSession = now - parseInt(lastSessionTime);
+      const remainingCooldown = Math.max(0, cooldownPeriod - timeSinceLastSession);
+      
+      if (remainingCooldown > 0) {
+        // Still in cooldown period
+        setCooldownTime(Math.ceil(remainingCooldown / 1000));
+        
+        // Start cooldown countdown
+        cooldownTimerRef.current = window.setInterval(() => {
+          setCooldownTime(prev => {
+            if (prev <= 1) {
+              // Cooldown finished
+              if (cooldownTimerRef.current) {
+                window.clearInterval(cooldownTimerRef.current);
+              }
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+        
+        return;
+      }
+    }
+    
+    // Reset remaining time to 2 minutes (120 seconds) when starting a new session
+    setRemainingTime(120);
+    setAlertShown(false);
+    setShowTimeAlert(false);
+    setRedirectCountdown(20);
+    
     // Start our own countdown timer
     const startTime = new Date().getTime();
-    const sessionLimit = 60 * 1000; // 1 minute in milliseconds
+    const sessionLimit = 120 * 1000; // 2 minutes in milliseconds
     
     // Clear any existing timer
     if (countdownTimerRef.current) {
       window.clearInterval(countdownTimerRef.current);
     }
     
-    // Start a new countdown timer
+    // Start a new countdown timer immediately
     countdownTimerRef.current = window.setInterval(() => {
       const now = new Date().getTime();
       const elapsed = now - startTime;
@@ -589,6 +628,9 @@ const TracingPage: React.FC = () => {
       if (remainingSecs <= 0 && !alertShown && !showTimeAlert) {
         setShowTimeAlert(true);
         setAlertShown(true); // Mark alert as shown so it doesn't show again
+        
+        // Store the session end time for 24-hour cooldown
+        localStorage.setItem('lastSessionTime', new Date().getTime().toString());
       }
       
       // When time is up
@@ -624,6 +666,9 @@ const TracingPage: React.FC = () => {
       }
       if (redirectTimerRef.current) {
         window.clearInterval(redirectTimerRef.current);
+      }
+      if (cooldownTimerRef.current) {
+        window.clearInterval(cooldownTimerRef.current);
       }
     };
   }, [isLoggedIn, navigate]);
@@ -714,6 +759,53 @@ const TracingPage: React.FC = () => {
   
   return (
     <div className="h-screen w-screen relative bg-gray-900 overflow-hidden touch-none">
+      {/* Cooldown Screen - Show when in 24-hour cooldown */}
+      {!isLoggedIn && cooldownTime > 0 && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-90">
+          <div className="bg-gray-900 text-white rounded-xl p-8 max-w-md mx-4 z-10 relative shadow-2xl border border-gray-700">
+            <div className="flex items-center mb-6">
+              <svg className="w-10 h-10 text-amber-500 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h3 className="text-2xl font-bold text-white">Session Cooldown</h3>
+            </div>
+            
+            <div className="mb-6 p-4 bg-amber-900/30 border border-amber-500/30 rounded-lg">
+              <p className="text-amber-400 font-medium text-center mb-3">
+                ⏰ 24-Hour Cooldown Active
+              </p>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-amber-300 mb-2">
+                  {Math.floor(cooldownTime / 3600)}:{(Math.floor(cooldownTime / 60) % 60).toString().padStart(2, '0')}:{(cooldownTime % 60).toString().padStart(2, '0')}
+                </div>
+                <p className="text-amber-300 text-sm">
+                  Until your next free session
+                </p>
+              </div>
+            </div>
+            
+            <p className="mb-6 text-gray-300 text-center">
+              You've used your free session for today. Free users get 3 sessions per day with a 24-hour cooldown between sessions.
+            </p>
+            
+            <div className="flex flex-col space-y-3">
+              <button 
+                onClick={() => navigate('/payment')}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-lg hover:from-blue-500 hover:to-purple-500 transition-colors duration-200 font-medium"
+              >
+                🚀 Upgrade to Premium - No Limits!
+              </button>
+              <button 
+                onClick={() => navigate('/app')}
+                className="w-full bg-gray-700 text-white py-3 px-4 rounded-lg hover:bg-gray-600 transition-colors duration-200"
+              >
+                Back to App
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Camera video - Main camera view */}
       {isCameraActive && (
         <div className="absolute inset-0 z-0 bg-black w-full h-full">
@@ -904,10 +996,16 @@ const TracingPage: React.FC = () => {
       
       {/* Timer moved to top center with compact width */}
       {!isLoggedIn && (
-        <div className="absolute top-4 left-0 right-0 text-center text-white bg-black bg-opacity-70 py-1.5 z-30 mx-auto max-w-fit rounded-full px-3 font-medium text-sm">
-          <span className={remainingTime <= 10 ? 'text-red-500 font-bold' : ''}>
-            {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')}
-          </span>
+        <div className="absolute top-4 left-0 right-0 text-center text-white bg-black bg-opacity-80 py-2 z-30 mx-auto max-w-fit rounded-full px-4 font-bold text-base shadow-lg border border-gray-600">
+          {cooldownTime > 0 ? (
+            <span className="text-amber-400">
+              ⏰ Next session in: {Math.floor(cooldownTime / 3600)}:{(Math.floor(cooldownTime / 60) % 60).toString().padStart(2, '0')}:{(cooldownTime % 60).toString().padStart(2, '0')}
+            </span>
+          ) : (
+            <span className={remainingTime <= 10 ? 'text-red-500 animate-pulse' : remainingTime <= 30 ? 'text-yellow-400' : 'text-green-400'}>
+              ⏱️ {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')}
+            </span>
+          )}
         </div>
       )}
       
@@ -920,30 +1018,38 @@ const TracingPage: React.FC = () => {
               <svg className="w-8 h-8 text-amber-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <h3 className="text-xl font-bold text-white">Session Time Limit Reached</h3>
+              <h3 className="text-xl font-bold text-white">⏰ Session Ended</h3>
             </div>
-            <p className="mb-6 text-gray-300">
-              Your free session of 1 minute has ended. Upgrade to premium for unlimited tracing time with no restrictions.
+            <p className="mb-4 text-gray-300">
+              Your <span className="text-amber-400 font-bold">2-minute free session</span> has ended. You can use <span className="text-blue-400 font-bold">3 free sessions per day</span> with a 24-hour cooldown between sessions.
             </p>
-            {remainingTime <= 0 && (
+            <div className="mb-6 p-4 bg-amber-900/30 border border-amber-500/30 rounded-lg">
+              <p className="text-amber-400 font-medium text-center mb-2">
+                🔄 24-Hour Cooldown Active
+              </p>
+              <p className="text-amber-300 text-sm text-center">
+                Your next free session will be available in 24 hours, or upgrade to premium for unlimited access!
+              </p>
+            </div>
+            {redirectCountdown > 0 && (
               <div className="mb-6 p-3 bg-gray-800 rounded-lg">
                 <p className="text-amber-400 font-medium text-center">
                   Redirecting to app page in {redirectCountdown} seconds...
                 </p>
               </div>
             )}
-            <div className="flex justify-between space-x-4">
-              <button 
-                onClick={() => navigate('/app')}
-                className="flex-1 bg-gray-700 text-white py-3 px-4 rounded-lg hover:bg-gray-600 transition-colors duration-200"
-              >
-                Back to App
-              </button>
+            <div className="flex flex-col space-y-3">
               <button 
                 onClick={() => navigate('/payment')}
-                className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 text-white py-3 px-4 rounded-lg hover:from-amber-600 hover:to-amber-700 transition-colors duration-200 font-medium"
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-lg hover:from-blue-500 hover:to-purple-500 transition-colors duration-200 font-medium"
               >
-                Upgrade Now
+                🚀 Upgrade to Premium - Unlimited Access
+              </button>
+              <button 
+                onClick={() => navigate('/app')}
+                className="w-full bg-gray-700 text-white py-3 px-4 rounded-lg hover:bg-gray-600 transition-colors duration-200"
+              >
+                Back to App
               </button>
             </div>
           </div>
