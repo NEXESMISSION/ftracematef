@@ -1,0 +1,6 @@
+# Allow all crawlers access to everything
+User-agent: *
+Allow: /
+
+# Location of the sitemap file
+Sitemap: https://tracemate.art/sitemap.xml

@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Set character encoding early -->
+    <meta charset="UTF-8">
+    <!-- Improve page load speed with browser hints -->
+    <meta http-equiv="x-dns-prefetch-control" content="on">
+    <link rel="dns-prefetch" href="//fonts.googleapis.com">
+    <link rel="dns-prefetch" href="//cdnjs.cloudflare.com">
+    <link rel="preload" href="logo-dark-bg.png" as="image">
+    <link rel="preload" href="flip-horizontal-icon.svg" as="image">
+    <!-- Cache control for better performance -->
+    <meta http-equiv="Cache-Control" content="max-age=31536000">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    
+    <!-- Enhanced SEO Meta Tags -->
+    <title>TraceMate - Free AR Tracing Tool | Best Da Vinci Eye Alternative</title>
+    <meta name="description" content="TraceMate is the #1 free tracing tool with AR capabilities. Superior alternative to Da Vinci Eye, AR Sketch, Papercopy Tracer, and Trace Anything. Download now!">
+    <meta name="keywords" content="TraceMate, free tracing tool, AR tracing app, Da Vinci Eye alternative, Draw Sketch & Trace, AR Sketch - Trace Anything, Sketchbook, Papercopy - Tracer, AR Art Projector, tracing app, drawing reference tool, art projection app">
+    <meta name="author" content="TraceMate">
+    
+    <!-- Open Graph / Facebook Meta Tags for Link Previews -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tracemate.art/">
+    <meta property="og:title" content="TraceMate - #1 Free AR Tracing Tool | Better than Da Vinci Eye">
+    <meta property="og:description" content="The #1 free AR tracing tool for artists and creative professionals. Superior to Da Vinci Eye, AR Sketch, Papercopy Tracer and other apps.">
+    <meta property="og:image" content="logo-dark-bg.png">
+    
+    <!-- Twitter Card Meta Tags for Link Previews -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://tracemate.art/">
+    <meta property="twitter:title" content="TraceMate - #1 Free AR Tracing Tool | Better than Da Vinci Eye">
+    <meta property="twitter:description" content="The #1 free AR tracing tool for artists and creative professionals. Superior to Da Vinci Eye, AR Sketch, Papercopy Tracer and other apps.">
+    <meta property="twitter:image" content="logo-dark-bg.png">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="logo-dark-bg.png">
+    <link rel="apple-touch-icon" href="logo-dark-bg.png">
+    
+    <!-- Optimized font loading for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <!-- Font Awesome with performance optimizations -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" media="print" onload="this.media='all'" />
+    <!-- Load critical CSS first, defer non-critical resources -->
+    <script src="https://cdn.tailwindcss.com" defer></script>
+    
+    <!-- Structured Data for SEO (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "TraceMate",
+      "applicationCategory": "MultimediaApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "description": "TraceMate is the #1 free AR tracing tool for artists. Superior alternative to Da Vinci Eye, AR Sketch, Papercopy Tracer, and Trace Anything apps.",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "ratingCount": "125"
+      },
+      "keywords": "TraceMate, free tracing tool, AR apps, Da Vinci Eye alternative, Draw Sketch & Trace, AR Sketch - Trace Anything, Sketchbook, Papercopy - Tracer, AR Art Projector, drawing tool, art tracing app, projection app"
+    }
+    </script>
+    <style>
+        /* Custom font */
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Prevent scrolling */
+        }
+        
+        /* Dark Theme UI */
+        .dark-ui {
+            background-color: rgba(23, 23, 23, 0.8); /* Dark, semi-transparent */
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Video Background Styles */
+        #camera-feed {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            z-index: -1;
+            object-fit: cover;
+            transition: transform 0.4s ease;
+            /* Default state is not flipped */
+            transform: scaleX(1);
+        }
+        
+        /* Class to mirror the video feed when toggled */
+        #camera-feed.mirrored {
+            transform: scaleX(-1);
+        }
+        
+        /* Draggable Image */
+        #manipulated-image {
+            position: absolute;
+            cursor: grab;
+            user-select: none;
+            will-change: transform; /* Performance optimization for animations */
+            border: 2px dashed rgba(255, 255, 255, 0.5);
+            border-radius: 8px;
+            visibility: hidden;
+        }
+        #manipulated-image:active {
+            cursor: grabbing;
+        }
+
+        /* Slider Controls & Camera List */
+        .collapsible-panel {
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.4s ease-in-out;
+        }
+
+        /* Active Control Button Style */
+        .control-button.active {
+            background-color: #4f46e5;
+            color: white;
+            border-color: #4f46e5;
+        }
+        
+        /* Custom slider track and thumb for dark theme */
+        input[type=range] {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 100%;
+          height: 8px;
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 8px;
+          outline: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 20px;
+          height: 20px;
+          background: #a78bfa;
+          cursor: pointer;
+          border-radius: 50%;
+          border: 2px solid white;
+        }
+
+        input[type=range]::-moz-range-thumb {
+          width: 20px;
+          height: 20px;
+          background: #a78bfa;
+          cursor: pointer;
+          border-radius: 50%;
+           border: 2px solid white;
+        }
+    </style>
+</head>
+<body class="bg-black">
+    <!-- Camera Feed Background -->
+    <video autoplay muted playsinline id="camera-feed"></video>
+
+    <!-- Logo in Top Left with Hidden SEO Headings -->
+    <div class="fixed top-4 left-4 z-30">
+        <img src="logo-dark-bg.png" alt="TraceMate Logo" class="h-10">
+        <!-- Hidden headings for SEO -->
+        <div class="sr-only">
+            <h1>TraceMate - #1 Free AR Tracing Tool for Artists</h1>
+            <h2>Best Da Vinci Eye Alternative for AR Drawing & Tracing</h2>
+            <h3>Better than AR Sketch, Papercopy Tracer & Trace Anything</h3>
+        </div>
+    </div>
+
+    <!-- Timer Display -->
+    <div id="timer-display" class="fixed top-4 left-1/2 -translate-x-1/2 z-30 text-white text-xl font-semibold dark-ui px-4 py-2 rounded-xl shadow-lg">10:00</div>
+
+    <!-- Quick Flip Button -->
+    <button id="quick-flip-button" class="fixed top-4 right-4 z-30 dark-ui w-10 h-10 rounded-full text-white opacity-75 hover:opacity-100 transition-opacity flex items-center justify-center">
+        <img src="flip-horizontal-icon.svg" alt="Flip Horizontal" class="w-6 h-6">
+    </button>
+
+    <!-- Draggable Image Mockup -->
+    <img id="manipulated-image" alt="Image Mockup">
+    <!-- Hidden file input for image import -->
+    <input type="file" id="image-importer" class="hidden" accept="image/*">
+
+    <!-- UI Controls -->
+    <div class="fixed bottom-0 left-0 right-0 p-4 z-20">
+        <div class="max-w-md mx-auto">
+            <!-- Combined Controls Container -->
+            <div class="dark-ui rounded-2xl shadow-lg overflow-hidden">
+                <!-- Collapsible Slider Panel -->
+                <div id="slider-panel" class="collapsible-panel relative">
+                     <button id="close-controls-button" class="absolute top-3 right-3 p-1 text-gray-400 hover:text-white transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    <div class="p-4 pt-10 space-y-4">
+                        <!-- Control Buttons -->
+                        <div id="control-buttons" class="grid grid-cols-4 gap-2">
+                            <button class="control-button text-sm font-medium text-gray-300 rounded-lg py-2 border border-gray-600 hover:bg-gray-700/50 transition-colors" data-control="opacity">Opacity</button>
+                            <button class="control-button text-sm font-medium text-gray-300 rounded-lg py-2 border border-gray-600 hover:bg-gray-700/50 transition-colors" data-control="scale">Scale</button>
+                            <button class="control-button text-sm font-medium text-gray-300 rounded-lg py-2 border border-gray-600 hover:bg-gray-700/50 transition-colors" data-control="rotation">Rotation</button>
+                            <button id="reset-button" class="text-sm font-semibold text-violet-300 rounded-lg py-2 border border-violet-800 bg-violet-900/40 hover:bg-violet-900/70 transition-colors">Reset</button>
+                        </div>
+                        <!-- Universal Slider -->
+                        <div class="pt-2 pb-1">
+                            <input id="universal-slider" type="range" class="w-full">
+                        </div>
+                    </div>
+                </div>
+                 <!-- Collapsible Camera List Panel -->
+                <div id="camera-list-panel" class="collapsible-panel">
+                    <div id="camera-list" class="p-2 space-y-1">
+                        <!-- Camera buttons will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex">
+                    <button id="toggle-controls-button" class="w-full py-3 px-6 flex items-center justify-center hover:bg-gray-700/30 transition-colors">
+                        <svg class="w-6 h-6 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    </button>
+                    <div class="border-l border-gray-600/50"></div>
+                    <button id="flip-camera-button" class="w-full py-3 px-6 flex items-center justify-center text-gray-200 hover:bg-gray-700/30 transition-colors font-medium text-sm">
+                         Cameras
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Donation Alert Modal -->
+    <div id="donation-alert-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="dark-ui rounded-2xl shadow-lg p-8 text-center max-w-sm mx-4">
+            <h2 class="text-2xl font-bold text-white mb-2">Support TraceMate!</h2>
+            <p class="text-gray-300 mb-6">If TraceMate has helped your creative projects, consider supporting development!</p>
+            <div class="space-y-3">
+                <a href="https://checkout.dodopayments.com/buy/pdt_Kr1Kuv6BglauL1CnDXvGe?quantity=1" target="_blank" class="block w-full bg-indigo-600 text-white font-semibold py-2.5 px-4 rounded-lg hover:bg-indigo-700 transition-colors">
+                    Donate Now
+                </a>
+                <button id="close-donation-modal" class="w-full bg-gray-700/50 text-gray-200 font-semibold py-2.5 px-4 rounded-lg hover:bg-gray-700/80 transition-colors">
+                    Maybe Later
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Session Pop-up Modal -->
+    <div id="session-ended-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden">
+        <div class="dark-ui rounded-2xl shadow-lg p-8 text-center max-w-sm mx-4">
+            <h2 class="text-2xl font-bold text-white mb-2">Session Ended</h2>
+            <p class="text-gray-300 mb-6">Your free session has ended. Subscribe for unlimited access.</p>
+            <div class="space-y-3">
+                <a href="/pricing.html" class="block w-full bg-indigo-600 text-white font-semibold py-2.5 px-4 rounded-lg hover:bg-indigo-700 transition-colors">
+                    Subscribe Now
+                </a>
+                <button id="close-modal-button" class="w-full bg-gray-700/50 text-gray-200 font-semibold py-2.5 px-4 rounded-lg hover:bg-gray-700/80 transition-colors">
+                    Maybe Later
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const cameraFeed = document.getElementById('camera-feed');
+            const image = document.getElementById('manipulated-image');
+            const imageImporter = document.getElementById('image-importer');
+            const quickFlipButton = document.getElementById('quick-flip-button');
+            const toggleButton = document.getElementById('toggle-controls-button');
+            const closeControlsButton = document.getElementById('close-controls-button');
+            const sliderPanel = document.getElementById('slider-panel');
+            const controlButtonsContainer = document.getElementById('control-buttons');
+            const universalSlider = document.getElementById('universal-slider');
+            const resetButton = document.getElementById('reset-button');
+            const flipCameraButton = document.getElementById('flip-camera-button');
+            const cameraListPanel = document.getElementById('camera-list-panel');
+            const cameraListDiv = document.getElementById('camera-list');
+            const timerDisplay = document.getElementById('timer-display');
+            const sessionModal = document.getElementById('session-ended-modal');
+            const closeModalButton = document.getElementById('close-modal-button');
+
+            const initialImageState = { opacity: 1, scale: 1, rotation: 0 };
+            let imageState = { ...initialImageState };
+            
+            // State variables for interactions
+            let activeControl = 'opacity', isPointerDown = false, isDragging = false, lastTap = 0;
+            let initialDragX, initialDragY, startDragX, startDragY;
+            let initialPinchDistance = null, initialScale = 1, initialRotationAngle = null, initialRotation = 0, initialMidpoint = null;
+            let timerInterval = null;
+            let donationTimerInterval = null;
+            let donationTimeLeft = 600; // 10 minutes in seconds
+            
+            // --- Core Update Function ---
+            const updateImageTransform = () => {
+                image.style.transform = `translate(${imageState.posX}px, ${imageState.posY}px) rotate(${imageState.rotation}deg) scale(${imageState.scale})`;
+                image.style.opacity = imageState.opacity;
+            };
+
+            const centerImage = () => {
+                imageState.posX = (window.innerWidth - image.offsetWidth) / 2;
+                imageState.posY = (window.innerHeight - image.offsetHeight) / 2;
+                updateImageTransform(); // Apply the new position immediately
+            };
+
+            const getDistance = (touches) => Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
+            const getAngle = (touches) => Math.atan2(touches[1].clientY - touches[0].clientY, touches[1].clientX - touches[0].clientX) * 180 / Math.PI;
+            const getMidpoint = (touches) => ({ x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 });
+            
+            // Camera permission handling
+            let hasGrantedPermission = localStorage.getItem('tracemateCameraPermission') === 'granted';
+            
+            // Create a camera permission modal
+            let cameraPermissionModal = document.createElement('div');
+            cameraPermissionModal.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden";
+            cameraPermissionModal.id = "camera-permission-modal";
+            cameraPermissionModal.innerHTML = `
+                <div class="dark-ui rounded-2xl shadow-lg p-8 text-center max-w-sm mx-4">
+                    <h2 class="text-2xl font-bold text-white mb-2">Camera Access Required</h2>
+                    <p class="text-gray-300 mb-6">TraceMate needs access to your camera. Please allow camera access in your browser settings and then try again.</p>
+                    <div class="space-y-3">
+                        <button id="retry-camera-button" class="block w-full bg-indigo-600 text-white font-semibold py-2.5 px-4 rounded-lg hover:bg-indigo-700 transition-colors">
+                            Try Again
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(cameraPermissionModal);
+            
+            const showCameraPermissionModal = () => {
+                document.getElementById('camera-permission-modal').classList.remove('hidden');
+            };
+            
+            // Add retry button listener
+            document.addEventListener('DOMContentLoaded', () => {
+                document.getElementById('retry-camera-button').addEventListener('click', () => {
+                    document.getElementById('camera-permission-modal').classList.add('hidden');
+                    startCamera(); // Try again
+                });
+            });
+            
+            const startCamera = async (deviceId = null) => {
+                if (cameraFeed.srcObject) {
+                    cameraFeed.srcObject.getTracks().forEach(track => track.stop());
+                }
+                const constraints = { video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'user' } };
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    cameraFeed.srcObject = stream;
+                    
+                    // Store that permission has been granted
+                    if (!hasGrantedPermission) {
+                        localStorage.setItem('tracemateCameraPermission', 'granted');
+                        hasGrantedPermission = true;
+                    }
+                } catch (error) {
+                    console.error("Error accessing camera:", error);
+                    // Show a more helpful message with instructions
+                    if (error.name === 'NotAllowedError') {
+                        showCameraPermissionModal();
+                    } else {
+                        alert("Camera error: " + error.message);
+                    }
+                }
+            };
+            
+            const setupSliderForControl = (controlName, updateValue = true) => {
+                activeControl = controlName;
+                document.querySelectorAll('.control-button').forEach(btn => btn.classList.toggle('active', btn.dataset.control === controlName));
+                if (updateValue) {
+                    switch (controlName) {
+                        case 'opacity': universalSlider.min = 0; universalSlider.max = 1; universalSlider.step = 0.01; universalSlider.value = imageState.opacity; break;
+                        case 'scale': universalSlider.min = 0.1; universalSlider.max = 7; universalSlider.step = 0.01; universalSlider.value = imageState.scale; break;
+                        case 'rotation': universalSlider.min = -360; universalSlider.max = 360; universalSlider.step = 1; universalSlider.value = imageState.rotation; break;
+                    }
+                }
+            };
+
+            const syncSlider = () => universalSlider.value = imageState[activeControl];
+
+            const togglePanel = (panel) => {
+                const otherPanel = panel === sliderPanel ? cameraListPanel : sliderPanel;
+                otherPanel.style.maxHeight = null; // Close other panel
+                panel.style.maxHeight = panel.style.maxHeight ? null : panel.scrollHeight + "px";
+            };
+
+            const startTimer = () => {
+                clearInterval(timerInterval);
+                let timeLeft = 600; // 10 minutes
+                timerDisplay.textContent = "10:00";
+                timerInterval = setInterval(() => {
+                    if (timeLeft <= 0) {
+                        clearInterval(timerInterval);
+                        timerDisplay.textContent = "0:00";
+                        sessionModal.classList.remove('hidden'); // Show the modal
+                        return;
+                    }
+                    timeLeft--;
+                    const minutes = Math.floor(timeLeft / 60);
+                    const seconds = timeLeft % 60;
+                    timerDisplay.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                }, 1000);
+            };
+
+            // --- Event Listeners ---
+            quickFlipButton.addEventListener('click', () => {
+                cameraFeed.classList.toggle('mirrored');
+            });
+
+            controlButtonsContainer.addEventListener('click', (e) => {
+                if (e.target.dataset.control) setupSliderForControl(e.target.dataset.control);
+            });
+
+            universalSlider.addEventListener('input', (e) => imageState[activeControl] = parseFloat(e.target.value));
+            
+            resetButton.addEventListener('click', () => {
+                imageState = { ...initialImageState, posX: imageState.posX, posY: imageState.posY };
+                centerImage();
+                setupSliderForControl('opacity');
+                startTimer();
+                sessionModal.classList.add('hidden');
+            });
+            
+            toggleButton.addEventListener('click', () => togglePanel(sliderPanel));
+            closeControlsButton.addEventListener('click', () => sliderPanel.style.maxHeight = null);
+
+            flipCameraButton.addEventListener('click', async () => {
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                    cameraListDiv.innerHTML = '';
+                    
+                    if(videoDevices.length > 1) {
+                        videoDevices.forEach((device, index) => {
+                            const button = document.createElement('button');
+                            button.textContent = device.label || `Camera ${index + 1}`;
+                            button.className = 'w-full text-left p-2 text-gray-300 hover:bg-gray-700/50 rounded-md transition-colors text-sm';
+                            button.onclick = () => {
+                                startCamera(device.deviceId);
+                                cameraListPanel.style.maxHeight = null; // Close list after selection
+                            };
+                            cameraListDiv.appendChild(button);
+                        });
+                    } else {
+                         cameraListDiv.innerHTML = '<p class="text-gray-400 text-sm p-2">No other cameras found.</p>';
+                    }
+                    togglePanel(cameraListPanel);
+                } catch (error) {
+                     console.error("Error enumerating devices:", error);
+                }
+            });
+
+            const onPointerDown = (e) => {
+                e.preventDefault();
+                isPointerDown = true;
+                isDragging = false; // Reset dragging flag on new interaction
+                initialDragX = imageState.posX;
+                initialDragY = imageState.posY;
+                if (e.touches && e.touches.length > 1) {
+                    initialPinchDistance = getDistance(e.touches);
+                    initialRotationAngle = getAngle(e.touches);
+                    initialMidpoint = getMidpoint(e.touches);
+                    initialScale = imageState.scale;
+                    initialRotation = imageState.rotation;
+                } else {
+                    startDragX = e.clientX || e.touches[0].clientX;
+                    startDragY = e.clientY || e.touches[0].clientY;
+                }
+            };
+
+            const onPointerMove = (e) => {
+                if (!isPointerDown) return;
+                e.preventDefault();
+                
+                // If not already dragging, check if movement exceeds a threshold to prevent accidental drags on tap
+                if (!isDragging && Math.hypot((e.clientX || e.touches[0].clientX) - startDragX, (e.clientY || e.touches[0].clientY) - startDragY) > 5) {
+                    isDragging = true;
+                }
+
+                if (e.touches && e.touches.length > 1) {
+                    isDragging = true; // Pinching is always a drag
+                    const currentPinchDistance = getDistance(e.touches);
+                    const currentRotationAngle = getAngle(e.touches);
+                    const currentMidpoint = getMidpoint(e.touches);
+                    imageState.scale = initialScale * (currentPinchDistance / initialPinchDistance);
+                    imageState.rotation = initialRotation + (currentRotationAngle - initialRotationAngle);
+                    imageState.posX = initialDragX + (currentMidpoint.x - initialMidpoint.x);
+                    imageState.posY = initialDragY + (currentMidpoint.y - initialMidpoint.y);
+                } else if (isPointerDown) {
+                    const currentX = e.clientX || e.touches[0].clientX;
+                    const currentY = e.clientY || e.touches[0].clientY;
+                    imageState.posX = initialDragX + (currentX - startDragX);
+                    imageState.posY = initialDragY + (currentY - startDragY);
+                }
+            };
+
+            const onPointerUp = (e) => {
+                // Check for double tap/click only if the user wasn't dragging
+                if (!isDragging) {
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - lastTap;
+                    if (tapLength < 300 && tapLength > 0) {
+                        imageImporter.click();
+                        lastTap = 0; // Reset to prevent triple tap issues
+                    } else {
+                        lastTap = currentTime;
+                    }
+                }
+
+                if (e.touches && e.touches.length > 0) {
+                     onPointerDown(e);
+                     return;
+                }
+                isPointerDown = false;
+            };
+
+            image.addEventListener('mousedown', onPointerDown);
+            image.addEventListener('touchstart', onPointerDown, { passive: false });
+            window.addEventListener('mousemove', onPointerMove);
+            window.addEventListener('touchmove', onPointerMove, { passive: false });
+            image.addEventListener('mouseup', onPointerUp);
+            image.addEventListener('touchend', onPointerUp);
+
+            imageImporter.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => image.src = event.target.result;
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // --- Initial Setup ---
+            setupSliderForControl('opacity');
+            // Check if we have already been granted permission before
+            if (hasGrantedPermission) {
+                console.log('Camera permission previously granted');
+            }
+            startCamera();
+            cameraFeed.classList.add('mirrored'); // Start with mirrored view by default
+
+            image.onload = () => {
+                centerImage();
+                image.style.visibility = 'visible';
+            };
+            image.src = "https://placehold.co/200x300/a78bfa/171717?text=Double+Tap\nTo+Change";
+            
+            closeModalButton.addEventListener('click', () => {
+                sessionModal.classList.add('hidden');
+                startTimer();
+            });
+
+            // Donation alert functionality
+            const donationModal = document.getElementById('donation-alert-modal');
+            const closeDonationButton = document.getElementById('close-donation-modal');
+            
+            // Start donation timer when modal is closed
+            closeDonationButton.addEventListener('click', () => {
+                donationModal.classList.add('hidden');
+                startDonationTimer();
+            });
+            
+            // Function to start the donation reminder timer
+            const startDonationTimer = () => {
+                clearInterval(donationTimerInterval);
+                donationTimeLeft = 600; // Reset to 10 minutes
+                donationTimerInterval = setInterval(() => {
+                    if (donationTimeLeft <= 0) {
+                        clearInterval(donationTimerInterval);
+                        donationModal.classList.remove('hidden'); // Show the donation modal again
+                        return;
+                    }
+                    donationTimeLeft--;
+                }, 1000);
+            };
+
+            startTimer();
+
+            function animationLoop() {
+                updateImageTransform();
+                syncSlider();
+                requestAnimationFrame(animationLoop);
+            }
+            requestAnimationFrame(animationLoop);
+        });
+    </script>
+
+    <!-- Enhanced Footer with targeted SEO keywords -->
+    <footer class="fixed bottom-0 left-0 w-full text-xs text-gray-500 opacity-10 p-2 z-10">
+        <div class="container mx-auto">
+            <p>TraceMate - The #1 Free AR Tracing Tool for Artists and Creatives</p>
+            <p><strong>Superior Alternative to:</strong> Da Vinci Eye | AR Sketch - Trace Anything | Sketchbook | Papercopy - Tracer | AR Art Projector</p>
+            <p><strong>Perfect for:</strong> Digital art tracing | Live image manipulation | Augmented reality drawing | Art projection | Creative reference tool | Professional illustrations | Educational art | Animation reference</p>
+            <!-- Semantic markup for better indexing -->
+            <div itemscope itemtype="http://schema.org/WebApplication">
+                <meta itemprop="name" content="TraceMate">
+                <meta itemprop="applicationCategory" content="Multimedia Application">
+                <meta itemprop="operatingSystem" content="Web Browser">
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Sitemap reference for search engines -->
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="sitemap.xml">
+</body>
+</html>
