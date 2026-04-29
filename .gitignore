@@ -1,0 +1,18 @@
+node_modules
+dist
+dist-ssr
+*.local
+.vite
+.DS_Store
+.env
+.env.local
+*.log
+
+# OS / editor cruft
+Thumbs.db
+.idea
+.vscode
+
+# WebP test output (regeneratable, large)
+public/_webp-test
+
