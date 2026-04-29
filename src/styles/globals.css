@@ -848,6 +848,268 @@ main, header, section, footer { position: relative; z-index: 1; }
   flex-wrap: wrap;
 }
 
+/* ============ Pricing Plans (3 tiers: monthly / 3-month / lifetime) ============ */
+.pricing-plans {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(16px, 2vw, 28px);
+  max-width: 1080px;
+  margin: 0 auto;
+  align-items: stretch;
+}
+
+.pricing-plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border: 1.5px solid rgba(43, 33, 24, 0.10);
+  border-radius: 22px;
+  padding: 28px 24px 24px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 14px 30px -14px rgba(43, 33, 24, 0.14);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.pricing-plan:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 22px 40px -14px rgba(43, 33, 24, 0.20);
+}
+
+.pricing-plan-name {
+  font-family: 'Caveat', cursive;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
+  margin-bottom: 14px;
+}
+
+.pricing-plan-price {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+.pricing-plan-price .num {
+  font-family: 'Nunito', sans-serif;
+  font-size: 56px;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+}
+.pricing-plan-price .num .currency {
+  font-size: 28px;
+  vertical-align: top;
+  margin-right: 1px;
+  color: var(--ink-soft);
+}
+.pricing-plan-price .strike {
+  position: relative;
+  font-family: 'Nunito', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink-muted);
+}
+.pricing-plan-price .strike::after {
+  content: "";
+  position: absolute;
+  left: -3px; right: -3px; top: 55%;
+  height: 2px;
+  background: var(--coral);
+  transform: rotate(-8deg);
+  border-radius: 2px;
+}
+
+.pricing-plan-period {
+  font-family: 'Caveat', cursive;
+  font-size: 18px;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+  line-height: 1;
+}
+
+.pricing-plan-badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--coral);
+  background: rgba(232, 122, 122, 0.10);
+  border: 1px dashed var(--coral-soft);
+  padding: 4px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+
+.pricing-plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  flex: 1;
+}
+.pricing-plan-features li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.35;
+}
+.pc-check {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: rgba(232, 122, 122, 0.16);
+  color: var(--coral);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.pricing-plan-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 14px 22px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--cream);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  margin-top: auto;
+}
+.pricing-plan-cta:hover {
+  transform: translateY(-2px);
+  background: #1a1410;
+  box-shadow: 0 10px 22px -8px rgba(43, 33, 24, 0.4);
+}
+
+/* ============ GOLD: lifetime tier ============ */
+.pricing-plan-gold {
+  background:
+    linear-gradient(135deg, #fff7d4 0%, #ffe69b 50%, #ffd166 100%);
+  border: 2px solid #d99e2a;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 0 0 4px rgba(217, 158, 42, 0.10),
+    0 18px 40px -14px rgba(217, 158, 42, 0.45);
+  transform: scale(1.02);
+}
+.pricing-plan-gold:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 0 0 4px rgba(217, 158, 42, 0.15),
+    0 26px 48px -14px rgba(217, 158, 42, 0.55);
+}
+
+.pricing-plan-gold .pricing-plan-name { color: #5c3d10; }
+.pricing-plan-gold .pricing-plan-price .num { color: #5c3d10; }
+.pricing-plan-gold .pricing-plan-price .num .currency { color: #8a5e1a; }
+.pricing-plan-gold .pricing-plan-price .strike { color: rgba(92, 61, 16, 0.55); }
+.pricing-plan-gold .pricing-plan-price .strike::after { background: #c2861a; }
+.pricing-plan-gold .pricing-plan-period { color: #8a5e1a; }
+.pricing-plan-gold .pricing-plan-badge {
+  color: #5c3d10;
+  background: rgba(255, 255, 255, 0.55);
+  border-color: #d99e2a;
+}
+.pricing-plan-gold .pricing-plan-features li { color: #2d1d05; }
+.pricing-plan-gold .pc-check {
+  background: rgba(92, 61, 16, 0.12);
+  color: #8a5e1a;
+}
+
+.pricing-plan-cta-gold {
+  background: linear-gradient(135deg, #2b2118 0%, #4a3a26 100%);
+  color: #ffd66b;
+  border: 1.5px solid #d99e2a;
+  box-shadow: 0 4px 0 #8a5e1a;
+}
+.pricing-plan-cta-gold:hover {
+  background: linear-gradient(135deg, #1a1410 0%, #3a2c1a 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #8a5e1a, 0 14px 24px -8px rgba(217, 158, 42, 0.45);
+}
+
+/* "Limited — only 10 spots" badge above the gold card */
+.pricing-plan-limited {
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-1deg);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--coral);
+  color: #fff;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 12px rgba(232, 122, 122, 0.35), 0 2px 0 rgba(43, 33, 24, 0.15);
+  white-space: nowrap;
+  z-index: 2;
+}
+.pulse-dot {
+  width: 7px; height: 7px;
+  background: #fff;
+  border-radius: 50%;
+  animation: pricingPulse 1.4s ease-in-out infinite;
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+}
+@keyframes pricingPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+  70%  { box-shadow: 0 0 0 8px rgba(255, 255, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+.pricing-foot {
+  text-align: center;
+  margin-top: 28px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  letter-spacing: 0.01em;
+}
+.pricing-foot .reassure-bullet { color: var(--coral); }
+
+/* Responsive */
+@media (max-width: 880px) {
+  .pricing-plans {
+    grid-template-columns: 1fr;
+    max-width: 440px;
+  }
+  .pricing-plan-gold { transform: none; }
+  .pricing-plan-gold:hover { transform: translateY(-4px); }
+}
+
+@media (max-width: 560px) {
+  .pricing-plan { padding: 24px 22px 22px; }
+  .pricing-plan-price .num { font-size: 48px; }
+  .pricing-plan-price .num .currency { font-size: 24px; }
+  .pricing-plan-limited {
+    font-size: 10px;
+    padding: 6px 12px;
+  }
+}
+
 .pricing-ticket {
   position: relative;
   width: 360px;
@@ -1755,13 +2017,24 @@ main, header, section, footer { position: relative; z-index: 1; }
   .how-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px 10px;
-    max-width: 300px;
+    gap: 18px 14px;
+    max-width: 380px;
     margin: 0 auto;
+    align-items: stretch;
   }
   .how-grid > .step-arrow { display: none; }
-  .how-card { display: flex; justify-content: center; }
-  .how-card img { max-width: 130px; width: 100%; }
+  .how-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+  .how-card img {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
+  }
 
   .features { padding-top: 60px; padding-bottom: 60px; }
   .features-grid { grid-template-columns: 1fr; gap: 32px; }
@@ -1815,7 +2088,7 @@ main, header, section, footer { position: relative; z-index: 1; }
 
   .marquee-content { font-size: 24px; gap: 24px; padding-right: 24px; }
 
-  .how-grid { gap: 12px 8px; max-width: 300px; }
+  .how-grid { gap: 14px 12px; max-width: 320px; }
   .how-card img { max-width: 105px; }
 
   .gallery-grid {
