@@ -70,6 +70,6 @@ app/
 - **CTAs** that say "Try it Now" / "Get the app →" use `<Link to="/login">`
   for client-side navigation — no full page reload.
 - To wire up real auth, replace the `// TODO` block in `pages/Login.jsx`
-  with your provider (Supabase / Clerk / Firebase / etc.).
+  with your auth provider of choice.
 - To enable the demo video, replace `'YOUR_VIDEO_ID'` in `Hero.jsx` with
   your real YouTube video ID.
