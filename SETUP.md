@@ -95,15 +95,17 @@ paywall, renewal, and failure flows without involving Dodo. Two env vars
 control it:
 
 ```bash
-# Backend gate (real security boundary):
+# Backend gate (real security boundary — also requires DODO_ENVIRONMENT to NOT
+# be live_mode AND ENABLE_DEV_MUTATE=true on the project):
 supabase secrets set ADMIN_EMAILS=you@example.com,teammate@example.com
+supabase secrets set ENABLE_DEV_MUTATE=true
 supabase functions deploy dev-mutate-subscription
 
-# Frontend gate (just hides the UI for non-admins):
-# Add VITE_ADMIN_EMAILS=you@example.com,teammate@example.com to:
-#   - app/.env.local             (local dev)
-#   - Vercel → Settings → Environment Variables (production)
-# Mirror the same list in both — the panel only renders when the email matches.
+# Frontend gate (UI only — the panel only renders when profile.is_admin = true).
+# Grant via SQL Editor (or psql):
+#   select public.set_admin_by_email('you@example.com', true);
+#   select public.set_admin_by_email('teammate@example.com', true);
+# To revoke later, pass `false` instead.
 ```
 
 Mutations are scoped to the caller's own user_id; admins can't reach other

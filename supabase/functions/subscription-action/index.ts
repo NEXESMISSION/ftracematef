@@ -23,7 +23,7 @@
 
 import DodoPayments from 'npm:dodopayments@1';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { corsHeaders } from '../_shared/cors.ts';
+import { corsHeadersFor } from '../_shared/cors.ts';
 
 const PLAN_TO_PRODUCT_ENV: Record<string, string> = {
   monthly:   'DODO_PRODUCT_MONTHLY',
@@ -31,7 +31,14 @@ const PLAN_TO_PRODUCT_ENV: Record<string, string> = {
 };
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const cors = corsHeadersFor(req);
+  const json = (payload: unknown, status = 200) =>
+    new Response(JSON.stringify(payload), {
+      status,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST')    return json({ error: 'Method not allowed' }, 405);
 
   // 1. Auth
@@ -44,8 +51,9 @@ Deno.serve(async (req) => {
     { global: { headers: { Authorization: authHeader } } },
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return json({ error: 'Not authenticated' }, 401);
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userData?.user) return json({ error: 'Not authenticated' }, 401);
+  const user = userData.user;
 
   // Rate limit: 10 actions per 60 seconds per user. The cancel/undo-cancel
   // pair makes a tight loop trivial without this — protects Dodo's API
@@ -119,6 +127,19 @@ Deno.serve(async (req) => {
         const newProductId = Deno.env.get(PLAN_TO_PRODUCT_ENV[targetPlan]);
         if (!newProductId) return json({ error: 'Server misconfigured: missing product env var' }, 500);
 
+        // Tighter rate limit specifically for change-plan: each call creates a
+        // real prorated charge/credit at Dodo. Allowing the generic 10/min cap
+        // would let a user toggle monthly↔quarterly dozens of times a day and
+        // accumulate small rounding artefacts on every flip. Cap at 2/day.
+        const { data: planAllowed } = await supabase.rpc('check_rate_limit', {
+          bucket_key:     `sub-change-plan:${user.id}`,
+          max_count:      2,
+          window_seconds: 86_400,
+        });
+        if (planAllowed === false) {
+          return json({ error: 'You can only change plans a couple of times per day. Try again tomorrow, or contact support.' }, 429);
+        }
+
         // changePlan returns 202-style result with status/invoice_id/payment_id
         const result = await client.subscriptions.changePlan(sub.dodo_subscription_id, {
           product_id: newProductId,
@@ -139,10 +160,3 @@ Deno.serve(async (req) => {
     return json({ error: 'Could not update your subscription. Please try again, or contact support if it persists.' }, 502);
   }
 });
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}

@@ -17,6 +17,10 @@
 //   DODO_WEBHOOK_SECRET       — the signing secret from the Dodo dashboard
 //   DODO_ENVIRONMENT          — "test_mode" | "live_mode"
 //   DODO_PRODUCT_*            — product IDs so we can map to plan names
+//   DODO_PRICE_MONTHLY_CENTS  — expected price in cents for amount validation
+//   DODO_PRICE_QUARTERLY_CENTS
+//   DODO_PRICE_LIFETIME_CENTS
+//   DODO_EXPECTED_CURRENCY    — uppercased ISO 4217 (default "USD")
 // (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are auto-provided)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -47,6 +51,89 @@ const PLAN_FROM_PRODUCT: Record<string, string> = {};
   if (monthly)   PLAN_FROM_PRODUCT[monthly]   = 'monthly';
   if (quarterly) PLAN_FROM_PRODUCT[quarterly] = 'quarterly';
   if (lifetime)  PLAN_FROM_PRODUCT[lifetime]  = 'lifetime';
+}
+
+// Plan → expected amount in cents for amount/currency validation. Reading
+// from env keeps the webhook authoritative on what each plan should cost,
+// independent of whatever a stray event claims. When set, an event whose
+// amount disagrees is rejected and the user's plan stays put — so a tampered
+// or replayed event carrying the wrong product_id can't silently upgrade.
+//
+// Env var is *optional* per-plan: unset → log a warning and skip the check
+// (existing deployments don't break the moment they pull this code), set
+// → strict. Operators should set all three on first deploy of this code.
+const EXPECTED_AMOUNT_CENTS: Record<string, number | null> = {
+  monthly:   parseEnvInt('DODO_PRICE_MONTHLY_CENTS'),
+  quarterly: parseEnvInt('DODO_PRICE_QUARTERLY_CENTS'),
+  lifetime:  parseEnvInt('DODO_PRICE_LIFETIME_CENTS'),
+};
+const EXPECTED_CURRENCY = (Deno.env.get('DODO_EXPECTED_CURRENCY') ?? 'USD').toUpperCase();
+
+function parseEnvInt(name: string): number | null {
+  const raw = Deno.env.get(name);
+  if (!raw) return null;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// Throws if `amount` / `currency` don't match what we expect for `plan`.
+// Pre-tax amounts can be slightly less than the headline price in regions
+// that add tax on top, so we treat the env value as a *minimum*.
+function assertExpectedAmount(plan: string, amountCents: unknown, currency: unknown) {
+  const expectedCents = EXPECTED_AMOUNT_CENTS[plan];
+  if (expectedCents == null) {
+    console.warn(`[webhook] No DODO_PRICE_${plan.toUpperCase()}_CENTS set — amount validation skipped`);
+  } else {
+    const got = typeof amountCents === 'number' ? amountCents : Number(amountCents);
+    if (!Number.isFinite(got) || got < expectedCents) {
+      throw new Error(
+        `Amount validation failed for plan ${plan}: got ${amountCents}, expected >= ${expectedCents}`,
+      );
+    }
+  }
+  if (currency != null) {
+    const got = String(currency).toUpperCase();
+    if (got !== EXPECTED_CURRENCY) {
+      throw new Error(
+        `Currency validation failed for plan ${plan}: got ${got}, expected ${EXPECTED_CURRENCY}`,
+      );
+    }
+  }
+}
+
+// Reject events whose `customer_id` doesn't match a customer we've already
+// linked to this profile. Once a profile has a `dodo_customer_id`, every
+// subsequent event for that user MUST carry the same id — otherwise we're
+// being asked to act on behalf of a different paying customer (most likely a
+// replay/forged-metadata attempt). The first event ever for a user has no
+// recorded customer_id, so we accept and persist it; from that point forward
+// the binding is enforced.
+async function bindAndCheckCustomer(
+  supabase: any,
+  userId: string,
+  eventCustomerId: string | null | undefined,
+) {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('dodo_customer_id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  const existing = profile?.dodo_customer_id ?? null;
+  if (existing && eventCustomerId && existing !== eventCustomerId) {
+    throw new Error(
+      `Customer mismatch for user ${userId}: profile=${existing} event=${eventCustomerId}`,
+    );
+  }
+  if (!existing && eventCustomerId) {
+    // First-time linkage. Use `is null` as the WHERE so a concurrent webhook
+    // for the same user can't overwrite an already-set value.
+    await supabase
+      .from('profiles')
+      .update({ dodo_customer_id: eventCustomerId })
+      .eq('id', userId)
+      .is('dodo_customer_id', null);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -123,10 +210,27 @@ Deno.serve(async (req) => {
     if (existing?.processed) {
       return new Response(JSON.stringify({ received: true, deduped: true }), { status: 200 });
     }
-    // Row exists but not yet processed → another worker is in flight or it
-    // failed previously. Tell Dodo to retry; only one of us will own the
-    // claim once the prior in-flight finishes (success or marks attempts).
-    return new Response('In-flight, retry later', { status: 409 });
+    // Row exists but not yet processed. Two reasons we get here:
+    //   (a) A previous attempt ran but threw — `attempts` was bumped, no other
+    //       worker is in flight. We MUST re-process this retry so transient
+    //       failures (e.g. a Dodo refund call that timed out) get another go.
+    //       Without this, a payment that was charged but failed to refund
+    //       sits stuck forever: every retry hits the duplicate guard and
+    //       returns 409 without ever reattempting.
+    //   (b) A truly concurrent invocation is in flight right now. Returning
+    //       409 here prevents the double-process. We can't perfectly tell
+    //       (a) from (b) — but in practice Dodo retries are spaced minutes
+    //       apart, so an `attempts >= 1` row is far more likely to be (a).
+    //       Downstream operations are individually idempotent (lifetime grant
+    //       keyed on payment_id, Dodo refund keyed on payment_id), so even in
+    //       the rare overlap of (a) and (b) we can't double-charge or
+    //       double-grant — at worst we do the same idempotent work twice.
+    if ((existing?.attempts ?? 0) === 0) {
+      return new Response('In-flight, retry later', { status: 409 });
+    }
+    // Re-claim by re-using the existing row. Treat it as "logged" for the
+    // post-process write so we update `processed` / `attempts` correctly.
+    logged = { id: existing!.id, attempts: existing!.attempts ?? 0 };
   }
 
   // ── 4. Process by event type ─────────────────────────────────────────
@@ -171,19 +275,29 @@ async function processEvent(event: any, supabase: any) {
     data.payment?.metadata?.supabase_user_id;
 
   if (!userId) {
+    // For non-paying events (e.g. subscription.updated emitted on a record we
+    // can't link to a user) silent-skip is fine — no money is at stake.
+    // For payment.succeeded, however, the customer paid us money and we
+    // can't grant entitlements without knowing who they are. Throw so the
+    // event is recorded in webhook_events.error_message — ops needs to see
+    // this and refund/repair manually.
+    if (type === 'payment.succeeded') {
+      const paymentId = data.payment_id ?? data.id ?? '<unknown>';
+      throw new Error(
+        `payment.succeeded missing supabase_user_id metadata for payment ${paymentId} — manual refund required`,
+      );
+    }
     console.warn(`No supabase_user_id in metadata for event ${type} — skipping`);
     return;
   }
 
-  // Save the Dodo customer id on the profile (first time we see one)
-  const customerId = data.customer?.customer_id ?? data.customer_id;
-  if (customerId) {
-    await supabase
-      .from('profiles')
-      .update({ dodo_customer_id: customerId })
-      .eq('id', userId)
-      .is('dodo_customer_id', null);
-  }
+  // Bind / verify the Dodo customer id on the profile. After the first
+  // event we've seen for this user, every subsequent event must carry the
+  // same customer_id — a mismatched one is treated as a forged or
+  // misrouted event and the handler throws (event ends up in
+  // webhook_events.error_message for ops review, not silently honored).
+  const customerId = data.customer?.customer_id ?? data.customer_id ?? null;
+  await bindAndCheckCustomer(supabase, userId, customerId);
 
   switch (type) {
     case 'subscription.active':
@@ -217,35 +331,17 @@ async function processEvent(event: any, supabase: any) {
         throw new Error('payment.succeeded missing payment_id — refusing to grant Lifetime without idempotency key');
       }
 
-      // Idempotency: don't insert twice for the same payment.
-      const { data: existing } = await supabase
-        .from('subscriptions')
-        .select('id')
-        .eq('dodo_payment_id', paymentId)
-        .maybeSingle();
-      if (existing) return;
+      // Validate the amount/currency against what we expect for Lifetime.
+      // Without this, a `payment.succeeded` event whose product_id maps to
+      // Lifetime but whose total_amount is $0 or in a different currency
+      // would still grant Lifetime. Throw → event lands in
+      // webhook_events.error_message and ops investigates / refunds manually.
+      const lifetimeAmount   = data.total_amount ?? data.amount ?? null;
+      const lifetimeCurrency = data.currency ?? null;
+      assertExpectedAmount('lifetime', lifetimeAmount, lifetimeCurrency);
 
-      // Re-check the lifetime cap at commit-time, not at checkout-time. The
-      // checkout guard in create-checkout is best-effort — many users can pass
-      // it concurrently with seatsLeft > 0. Here is the only place we hold the
-      // serializable view of "active lifetime rows" before inserting.
-      const { data: seatsRow } = await supabase.rpc('lifetime_seats_left');
-      const seatsLeft = typeof seatsRow === 'number' ? seatsRow : seatsRow?.[0] ?? 0;
-      if (seatsLeft <= 0) {
-        // Refund + cancel at Dodo so the customer isn't charged for nothing.
-        try {
-          if (paymentId) await refundDodoPayment(paymentId);
-        } catch (err) {
-          console.error('Lifetime oversold but refund failed:', err);
-        }
-        throw new Error(
-          `Lifetime cap reached: refunded payment ${paymentId} for user ${userId}`,
-        );
-      }
-
-      // Find any active recurring sub the user has at Dodo. We need to cancel
-      // it remotely so the customer's card stops getting charged after they
-      // upgrade to Lifetime — otherwise it's a refund/chargeback magnet.
+      // Capture any active recurring sub BEFORE the SQL function cancels it
+      // locally — we still need its dodo_subscription_id to cancel remotely.
       const { data: priorActive } = await supabase
         .from('subscriptions')
         .select('id, dodo_subscription_id')
@@ -254,35 +350,62 @@ async function processEvent(event: any, supabase: any) {
         .not('dodo_subscription_id', 'is', null)
         .maybeSingle();
 
+      // Atomic seats-check + cancel-prior + insert under an advisory lock,
+      // wrapped in a single Postgres function. Returns one of:
+      //   { status: 'duplicate' }     — same payment_id already provisioned
+      //   { status: 'cap_reached' }   — lifetime cap full at commit-time
+      //   { status: 'granted', ... }  — row inserted
+      const { data: result, error: rpcErr } = await supabase.rpc(
+        'grant_lifetime_subscription',
+        {
+          p_user_id:      userId,
+          p_payment_id:   paymentId,
+          p_amount_cents: data.total_amount ?? data.amount ?? null,
+          p_currency:     data.currency ?? 'USD',
+        },
+      );
+      if (rpcErr) {
+        throw new Error(`grant_lifetime_subscription failed: ${rpcErr.message}`);
+      }
+
+      if (result?.status === 'duplicate') return;
+
+      if (result?.status === 'cap_reached') {
+        // Refund at Dodo so the customer isn't charged for nothing. The refund
+        // call is itself idempotent on Dodo's side keyed by payment_id, so
+        // retries are safe. Return normally — we processed the event by issuing
+        // a refund; throwing would leave the audit row stuck unprocessed and
+        // burn Dodo's retry budget.
+        try {
+          await refundDodoPayment(paymentId);
+        } catch (err) {
+          // If the refund itself fails, throw — Dodo should retry the event so
+          // ops gets another chance to refund automatically.
+          console.error('Lifetime oversold but refund failed:', err);
+          throw new Error(
+            `Lifetime cap reached but automatic refund failed for payment ${paymentId}: ${(err as Error)?.message ?? err}`,
+          );
+        }
+        console.warn(
+          `Lifetime cap reached: refunded payment ${paymentId} for user ${userId}`,
+        );
+        return;
+      }
+
+      // Granted. Cancel any prior recurring sub remotely at Dodo so the card
+      // stops getting charged after the upgrade. Best-effort: log and continue
+      // on failure — the local cancel was already done atomically by the SQL
+      // function, and ops can clean up the Dodo side from the audit log.
       if (priorActive?.dodo_subscription_id) {
         try {
           await cancelDodoSubscription(priorActive.dodo_subscription_id);
         } catch (err) {
-          // Log but don't fail the webhook — the local cancel below still runs,
-          // and operations can clean up the Dodo side from the audit log.
           console.error(
             `Failed to cancel Dodo sub ${priorActive.dodo_subscription_id} on lifetime upgrade:`,
             err,
           );
         }
       }
-
-      // Cancel any active row locally, then insert lifetime row.
-      await supabase
-        .from('subscriptions')
-        .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
-        .eq('user_id', userId)
-        .eq('status', 'active');
-
-      await supabase.from('subscriptions').insert({
-        user_id: userId,
-        plan: 'lifetime',
-        status: 'active',
-        current_period_end: null,
-        dodo_payment_id: paymentId,
-        amount_cents: data.total_amount ?? data.amount ?? null,
-        currency: data.currency ?? 'USD',
-      });
       return;
     }
 
@@ -305,6 +428,18 @@ async function upsertActiveSubscription(data: any, userId: string, supabase: any
   const currency      = data.currency ?? 'USD';
   const status        = (data.status ?? 'active') as string;
   const cancelAtEnd   = !!data.cancel_at_next_billing_date;
+
+  // Validate the amount/currency against what we expect for this plan
+  // *before* writing anything. This is the only check that catches the
+  // "subscription.updated event flips the plan to Lifetime without the
+  // user paying the upgrade price" class of bug. Throwing here aborts the
+  // upsert and the event ends up in webhook_events.error_message.
+  // We only validate when there's actually an amount on the event — some
+  // subscription.* events (e.g. on a metadata-only update) may legitimately
+  // omit it.
+  if (amountCents != null) {
+    assertExpectedAmount(plan, amountCents, currency);
+  }
 
   // If we already track this exact Dodo subscription, update it in place —
   // BUT refuse to resurrect rows that have already reached a terminal state.

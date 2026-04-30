@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { startCheckout } from '../lib/checkout.js';
@@ -11,7 +11,13 @@ import { PLANS, PLAN_LABEL } from '../lib/plans.js';
 import { friendlyError } from '../lib/errors.js';
 import { getStats, formatDuration, formatRelative } from '../lib/traceStats.js';
 import { isAdminUser } from '../lib/admin.js';
-import DevPanel from '../components/DevPanel.jsx';
+import { canUseFreeTrial } from '../lib/freeTrial.js';
+import Alert from '../components/Alert.jsx';
+
+// DevPanel is admin-only and ships about ~3 KB of presets + dev UI. Lazy-load
+// it so the panel and its preset payload aren't in every visitor's bundle —
+// only admins (and only on the Account page) ever fetch the chunk.
+const DevPanel = lazy(() => import('../components/DevPanel.jsx'));
 
 const STATUS_TONE = {
   active:    { label: 'Active',     tone: 'good'    },
@@ -43,6 +49,7 @@ function SubscriptionCard({ subscription, refresh, onChangePlan, email }) {
   const [busy, setBusy] = useState(null);
   const [confirm, setConfirm] = useState(null); // 'cancel-end' | null
   const [error, setError] = useState(null);
+  const [portalAlert, setPortalAlert] = useState(null);
 
   const plan      = subscription?.plan ?? 'free';
   const status    = subscription?.status ?? 'active';
@@ -64,6 +71,17 @@ function SubscriptionCard({ subscription, refresh, onChangePlan, email }) {
       setError(friendlyError(e, 'Something went wrong.'));
     } finally {
       setBusy(null);
+    }
+  };
+
+  // Wrap the portal call so a thrown "No Dodo customer linked yet" (or any
+  // other backend error) becomes a friendly modal instead of an uncaught
+  // promise rejection in the console.
+  const handleOpenPortal = async () => {
+    try {
+      await openBillingPortal();
+    } catch (e) {
+      setPortalAlert(friendlyError(e, 'Could not open the billing portal.'));
     }
   };
 
@@ -116,7 +134,7 @@ function SubscriptionCard({ subscription, refresh, onChangePlan, email }) {
       {/* Actions */}
       {isFree ? null : isLifetime ? (
         <div className="profile-actions">
-          <button type="button" className="profile-btn" onClick={openBillingPortal}>
+          <button type="button" className="profile-btn" onClick={handleOpenPortal}>
             View invoice
           </button>
         </div>
@@ -137,7 +155,7 @@ function SubscriptionCard({ subscription, refresh, onChangePlan, email }) {
               <button type="button" className="profile-btn" onClick={onChangePlan} disabled={!!busy}>
                 Change plan
               </button>
-              <button type="button" className="profile-btn" onClick={openBillingPortal}>
+              <button type="button" className="profile-btn" onClick={handleOpenPortal}>
                 Manage billing
               </button>
               {willCancel ? (
@@ -158,6 +176,13 @@ function SubscriptionCard({ subscription, refresh, onChangePlan, email }) {
           )}
         </>
       )}
+
+      <Alert
+        open={!!portalAlert}
+        onClose={() => setPortalAlert(null)}
+        title="Billing portal isn't ready yet"
+        message={portalAlert}
+      />
     </section>
   );
 }
@@ -410,10 +435,18 @@ export default function Account() {
     );
   }
 
+  // Free users get one free studio session before the paywall. Compute it
+  // once per render — localStorage reads are cheap and the answer can change
+  // between renders (e.g. trial just expired in the background).
+  const trialAvailable = !isPaid && canUseFreeTrial(profile);
+  const canEnterStudio = isPaid || trialAvailable;
+
   // Friendly contextual sub-line under the greeting.
   let subLine;
-  if (!isPaid) {
+  if (!isPaid && !trialAvailable) {
     subLine = "Pick a plan to unlock the studio and start tracing.";
+  } else if (!isPaid && trialAvailable) {
+    subLine = "First tracing's on us — try the studio, then pick a plan to keep going.";
   } else if (!stats.sessions) {
     subLine = "Your studio's warm. Let's trace your first line.";
   } else if (stats.sessions === 1) {
@@ -454,21 +487,10 @@ export default function Account() {
           <p className="profile-hero-sub">{subLine}</p>
 
           <div className="profile-cta-row">
-            {isPaid ? (
-              <>
-                <Link to="/upload" className="profile-cta profile-cta-primary">
-                  <span className="profile-cta-icon" aria-hidden="true">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                      <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="2" />
-                      <path d="M8 6.5 V13.5 L14 10 Z" fill="currentColor" />
-                    </svg>
-                  </span>
-                  Open studio
-                </Link>
-                <Link to="/upload" className="profile-cta profile-cta-ghost">
-                  + Upload new image
-                </Link>
-              </>
+            {canEnterStudio ? (
+              <Link to="/upload" className="profile-cta profile-cta-primary">
+                + Upload new image
+              </Link>
             ) : (
               <Link to="/pricing" className="profile-cta profile-cta-primary">
                 Start tracing →
@@ -491,8 +513,12 @@ export default function Account() {
         {/* ── Receipts (collapsible) ── */}
         <ReceiptsCard />
 
-        {/* ── Dev self-test panel (admin emails only) ── */}
-        {isAdminUser(user) && <DevPanel />}
+        {/* ── Dev self-test panel (admins only — gated by profile.is_admin) ── */}
+        {isAdminUser(profile) && (
+          <Suspense fallback={null}>
+            <DevPanel />
+          </Suspense>
+        )}
 
         {/* ── Sign out ── */}
         <div className="profile-foot">

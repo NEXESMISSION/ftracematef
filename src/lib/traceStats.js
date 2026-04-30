@@ -1,7 +1,6 @@
-// Trace stats tracker — stored in localStorage, scoped per user when possible.
+// Trace stats tracker — stored in localStorage, scoped per user.
 // Schema: { totalSeconds, sessions, firstSessionAt, lastSessionAt }
 const KEY_PREFIX = 'tm:traceStats:';
-const ANON_KEY   = `${KEY_PREFIX}anon`;
 const MIN_SESSION_SECONDS = 5; // sessions shorter than this are ignored
 
 const empty = () => ({
@@ -12,12 +11,18 @@ const empty = () => ({
 });
 
 function keyFor(userId) {
-  return userId ? `${KEY_PREFIX}${userId}` : ANON_KEY;
+  // No fallback to a shared "anon" bucket — see addSession() for why. We
+  // return null when there's no user, and getStats short-circuits to an
+  // empty record. Reading this way is harmless; it's writing without a
+  // userId that would leak data across accounts on a shared device.
+  return userId ? `${KEY_PREFIX}${userId}` : null;
 }
 
 export function getStats(userId) {
   try {
-    const raw = window.localStorage.getItem(keyFor(userId));
+    const key = keyFor(userId);
+    if (!key) return empty();
+    const raw = window.localStorage.getItem(key);
     if (!raw) return empty();
     const parsed = JSON.parse(raw);
     return { ...empty(), ...parsed };
@@ -27,7 +32,15 @@ export function getStats(userId) {
 }
 
 export function addSession(userId, durationSec) {
+  // Refuse to write without a user id. Previously a falsy userId was
+  // bucketed into `tm:traceStats:anon` — that bucket survived sign-out and
+  // mixed with whichever user signed in next on the same device. Better to
+  // drop the session than to leak it across accounts. Trace.jsx is gated by
+  // RequirePaid, so this branch is only reachable in narrow races (session
+  // expiring mid-trace) where losing the count is the right trade-off.
+  if (!userId) return null;
   if (!Number.isFinite(durationSec) || durationSec < MIN_SESSION_SECONDS) return null;
+  const key = keyFor(userId);
   const now = new Date().toISOString();
   const stats = getStats(userId);
   const next = {
@@ -37,7 +50,7 @@ export function addSession(userId, durationSec) {
     lastSessionAt:   now,
   };
   try {
-    window.localStorage.setItem(keyFor(userId), JSON.stringify(next));
+    window.localStorage.setItem(key, JSON.stringify(next));
   } catch { /* quota / private mode — ignore */ }
   return next;
 }

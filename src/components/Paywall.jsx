@@ -17,7 +17,7 @@ const PLANS = ALL_PLANS.map((p) => ({
 }));
 
 /** Shown by <RequirePaid> when a logged-in user hasn't subscribed yet. */
-export default function Paywall() {
+export default function Paywall({ trialUsed = false }) {
   const { profile, user } = useAuth();
   const [busy, setBusy]                 = useState(null);
   const [error, setError]               = useState(null);
@@ -64,9 +64,19 @@ export default function Paywall() {
       </header>
 
       <main className="studio-paywall">
-        <p className="kicker hand">welcome, {greeting} ✦</p>
-        <h1>Pick a plan to step into the studio.</h1>
-        <p className="lead">All plans unlock full quality outlines, every tool, every device.</p>
+        <p className="kicker hand">
+          {trialUsed ? `that's a wrap, ${greeting} ✦` : `welcome, ${greeting} ✦`}
+        </p>
+        <h1>
+          {trialUsed
+            ? 'Your free tracing is used up — pick a plan to keep going.'
+            : 'Pick a plan to step into the studio.'}
+        </h1>
+        <p className="lead">
+          {trialUsed
+            ? 'You already used your one free studio session. Any plan unlocks unlimited tracing — full quality, every tool, every device.'
+            : 'All plans unlock full quality outlines, every tool, every device.'}
+        </p>
 
         {error && (
           <div className="paywall-error" role="alert">

@@ -9,10 +9,17 @@
 
 import DodoPayments from 'npm:dodopayments@1';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { corsHeaders } from '../_shared/cors.ts';
+import { corsHeadersFor } from '../_shared/cors.ts';
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const cors = corsHeadersFor(req);
+  const json = (payload: unknown, status = 200) =>
+    new Response(JSON.stringify(payload), {
+      status,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST' && req.method !== 'GET') {
     return json({ error: 'Method not allowed' }, 405);
   }
@@ -26,8 +33,22 @@ Deno.serve(async (req) => {
     { global: { headers: { Authorization: authHeader } } },
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return json({ error: 'Not authenticated' }, 401);
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userData?.user) return json({ error: 'Not authenticated' }, 401);
+  const user = userData.user;
+
+  // Rate limit: 30 calls/minute per user. The Account page calls this on
+  // mount and again whenever the user expands the receipts panel — 30/min
+  // covers normal usage by ~10x but caps a tab that's spamming the endpoint
+  // (each call hits Dodo's payments.list API, burning their quota too).
+  const { data: allowed } = await supabase.rpc('check_rate_limit', {
+    bucket_key:     `list-payments:${user.id}`,
+    max_count:      30,
+    window_seconds: 60,
+  });
+  if (allowed === false) {
+    return json({ error: 'Too many requests. Slow down and try again in a minute.' }, 429);
+  }
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -75,10 +96,3 @@ Deno.serve(async (req) => {
     return json({ error: 'Could not fetch payment history. Please try again later.' }, 502);
   }
 });
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}

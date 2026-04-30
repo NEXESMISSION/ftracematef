@@ -3,17 +3,27 @@
 // Lets an admin flip their own subscription row to any state, for end-to-end
 // testing of the paywall + renewal + failure flows without involving Dodo.
 //
-// SECURITY: gated by ADMIN_EMAILS (comma-separated). Only emails in that list
-// can call this. The mutation is always scoped to the caller's own user_id —
-// no admin can edit another user's row through this function.
+// SECURITY: defense-in-depth.
+//   1. DODO_ENVIRONMENT must NOT be "live_mode". This is a hard fence: even
+//      if a future operator accidentally sets ENABLE_DEV_MUTATE=true on the
+//      live project, the function still refuses to run while production
+//      payments are live. The two flags must disagree to enable mutation.
+//   2. ENABLE_DEV_MUTATE must be exactly "true". Default-deny in prod: a
+//      compromised admin Google account is useless against a function that
+//      isn't enabled. Set this only in test/staging projects.
+//   3. ADMIN_EMAILS allowlist (comma-separated) gates callers further.
+//   4. Lifetime grants here re-check the seat cap so this back-door can't
+//      push the count past the advertised limit.
 //
 // Required Edge Function secrets:
+//   DODO_ENVIRONMENT          — set to "live_mode" in prod to disable this fn
+//   ENABLE_DEV_MUTATE         — must equal "true" or every call returns 403
 //   ADMIN_EMAILS              — comma-separated allowlist of admin emails
 // (SUPABASE_URL + SUPABASE_ANON_KEY + SUPABASE_SERVICE_ROLE_KEY auto-provided)
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { corsHeaders } from '../_shared/cors.ts';
+import { corsHeadersFor } from '../_shared/cors.ts';
 import { isAdminEmail } from '../_shared/admin.ts';
 
 type Plan   = 'free' | 'monthly' | 'quarterly' | 'lifetime';
@@ -23,8 +33,33 @@ const VALID_PLANS:    Plan[]   = ['free', 'monthly', 'quarterly', 'lifetime'];
 const VALID_STATUSES: Status[] = ['active', 'on_hold', 'cancelled', 'expired', 'failed'];
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const cors = corsHeadersFor(req);
+  const json = (payload: unknown, status = 200) =>
+    new Response(JSON.stringify(payload), {
+      status,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST')    return json({ error: 'Method not allowed' }, 405);
+
+  // Hard fence #1: refuse to run when Dodo is in live_mode. This is the
+  // safety belt against a single misconfigured ENABLE_DEV_MUTATE flag on
+  // the production project — even if that flag is true, the function will
+  // not flip subscription state while real money is moving through Dodo.
+  // The only way to enable this function is to BOTH set ENABLE_DEV_MUTATE
+  // and run Dodo in test_mode; production setups can never satisfy both.
+  if (Deno.env.get('DODO_ENVIRONMENT') === 'live_mode') {
+    return json({ error: 'Dev mutate refused in live_mode' }, 403);
+  }
+
+  // Hard fence #2: if the function is shipped to a project where ENABLE_DEV_MUTATE
+  // isn't set to "true", every request 403s before it even reaches auth. Keep
+  // this off in production projects — leaving it on lets any admin email
+  // fabricate paid state without paying Dodo.
+  if (Deno.env.get('ENABLE_DEV_MUTATE') !== 'true') {
+    return json({ error: 'Dev mutate disabled' }, 403);
+  }
 
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) return json({ error: 'Missing Authorization header' }, 401);
@@ -35,8 +70,9 @@ Deno.serve(async (req) => {
     { global: { headers: { Authorization: authHeader } } },
   );
 
-  const { data: { user } } = await supabaseAuth.auth.getUser();
-  if (!user) return json({ error: 'Not authenticated' }, 401);
+  const { data: userData, error: userErr } = await supabaseAuth.auth.getUser();
+  if (userErr || !userData?.user) return json({ error: 'Not authenticated' }, 401);
+  const user = userData.user;
   if (!isAdminEmail(user.email)) return json({ error: 'Not authorized' }, 403);
 
   // Parse + validate the partial update.
@@ -96,6 +132,19 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } },
   );
 
+  // Honor the advertised lifetime cap even on this admin-only path. Without
+  // this, an admin granting themselves an active lifetime row could push the
+  // public seat count above the cap and falsify the "limited 10" claim.
+  const grantingActiveLifetime =
+    body.plan === 'lifetime' &&
+    (body.status === 'active' || body.status === undefined);
+  if (grantingActiveLifetime) {
+    const { data: seatsRow, error: seatsErr } = await admin.rpc('lifetime_seats_left');
+    if (seatsErr) return json({ error: `lifetime_seats_left failed: ${seatsErr.message}` }, 500);
+    const seatsLeft = typeof seatsRow === 'number' ? seatsRow : seatsRow?.[0] ?? 0;
+    if (seatsLeft <= 0) return json({ error: 'Lifetime cap reached' }, 409);
+  }
+
   // Mutation is scoped to the caller's own user_id — admins can't edit
   // other users' rows through this endpoint.
   // The unique-active partial index means we may need to deactivate any
@@ -132,10 +181,3 @@ Deno.serve(async (req) => {
 
   return json({ subscription: updated });
 });
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}

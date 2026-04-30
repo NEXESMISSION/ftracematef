@@ -40,6 +40,10 @@ export function friendlyError(err, fallback = 'Something went wrong.') {
   if (/Not authenticated/i.test(message)) return 'You need to sign in first.';
   if (/sold out/i.test(message))           return 'That plan is sold out.';
   if (/Invalid plan/i.test(message))       return 'That plan isn\'t available right now.';
+  // Dodo-portal call before any payment exists — most common reason a free
+  // user lands here is clicking "Manage billing" by accident on a stale tab.
+  if (/no dodo customer/i.test(message))
+    return "You haven't picked a plan yet, so there's no billing portal to open. Choose a plan first and we'll set everything up.";
 
   return message || fallback;
 }

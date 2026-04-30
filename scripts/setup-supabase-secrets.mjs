@@ -27,9 +27,20 @@ const REQUIRED = [
   'APP_URL',
 ];
 
-// Optional — only needed if you want the /account dev self-test panel.
-// Comma-separated emails. Mirror VITE_ADMIN_EMAILS in the frontend env.
-const OPTIONAL = ['ADMIN_EMAILS'];
+// Optional — set whenever defined, skipped silently otherwise.
+//   DODO_PRICE_*_CENTS / DODO_EXPECTED_CURRENCY: per-plan price guards used
+//     by dodo-webhook to validate amounts on incoming events.
+//   ADMIN_EMAILS / ENABLE_DEV_MUTATE: gates for the /account dev self-test
+//     panel. ENABLE_DEV_MUTATE must be exactly "true" AND DODO_ENVIRONMENT
+//     must NOT be "live_mode" — set on test/staging projects only.
+const OPTIONAL = [
+  'DODO_PRICE_MONTHLY_CENTS',
+  'DODO_PRICE_QUARTERLY_CENTS',
+  'DODO_PRICE_LIFETIME_CENTS',
+  'DODO_EXPECTED_CURRENCY',
+  'ADMIN_EMAILS',
+  'ENABLE_DEV_MUTATE',
+];
 
 function parseEnvFile(path) {
   if (!existsSync(path)) return {};

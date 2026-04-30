@@ -33,7 +33,6 @@ body:has(.trace-stage) {
   cursor: grab;
 }
 .trace-overlay-wrap:active { cursor: grabbing; }
-.trace-overlay-wrap.is-locked { cursor: default; pointer-events: none; }
 
 .trace-overlay-img {
   position: absolute;
@@ -115,6 +114,25 @@ body:has(.trace-stage) {
   text-align: center;
   z-index: 6;
 }
+.trace-error-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.trace-error-close:hover { background: rgba(43, 33, 24, 0.08); color: var(--ink); }
+.trace-error-close:active { transform: scale(0.92); }
 .trace-error strong {
   display: block;
   font-size: 18px;
@@ -135,162 +153,173 @@ body:has(.trace-stage) {
   left: 50%;
   transform: translateX(-50%);
   bottom: max(10px, env(safe-area-inset-bottom));
-  padding: 0 10px 10px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  padding: 0 14px 14px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 16px;
+  border-radius: 22px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   z-index: 5;
-  width: min(440px, calc(100vw - 20px));
-  transition: padding 0.2s ease, background 0.2s ease;
+  width: min(460px, calc(100vw - 20px));
+  transition: padding 0.2s ease, background 0.2s ease, width 0.2s ease;
 }
 .trace-controls.is-hidden {
   padding: 0;
   width: auto;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.55);
   border-radius: 999px;
 }
 
-/* Pull-tab handle — hide/show toggle */
+/* Big chevron handle — hide/show toggle */
 .trace-handle {
   align-self: center;
   width: 100%;
-  padding: 8px 0 6px;
+  height: 44px;
   background: transparent;
   border: 0;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: rgba(255, 255, 255, 0.85);
+  -webkit-tap-highlight-color: transparent;
 }
 .trace-controls.is-hidden .trace-handle {
-  width: 56px;
-  padding: 10px 0;
+  width: 64px;
+  height: 44px;
 }
-.trace-handle-bar {
+.trace-handle:hover { color: #fff; }
+.trace-handle:active .trace-handle-icon { transform: scale(0.9); }
+.trace-handle-icon {
   display: block;
-  width: 36px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.55);
-  transition: background 0.15s ease, width 0.15s ease;
+  transition: transform 0.18s ease;
 }
-.trace-handle:hover .trace-handle-bar { background: rgba(255, 255, 255, 0.85); }
-.trace-controls.is-hidden .trace-handle-bar { width: 28px; }
 
 .trace-controls-inner {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
+/* ----- Opacity slider — thicker, cleaner ----- */
 .trace-slider {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 2px;
+  gap: 12px;
+  padding: 4px 4px 6px;
 }
 .trace-slider input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   flex: 1;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.22);
-  border-radius: 999px;
+  height: 28px; /* big tap area, visible track is centered inside */
+  background: transparent;
   outline: none;
   min-width: 0;
+  cursor: pointer;
+  --tm-slider-fill: 50%;
+}
+/* WebKit track */
+.trace-slider input[type="range"]::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  background:
+    linear-gradient(to right, var(--coral) 0%, var(--coral) var(--tm-slider-fill), rgba(255, 255, 255, 0.22) var(--tm-slider-fill), rgba(255, 255, 255, 0.22) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 .trace-slider input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 26px;
+  height: 26px;
+  margin-top: -9px; /* (track 10 + border 2) / 2 - thumb 26 / 2 */
   border-radius: 50%;
-  background: var(--coral);
-  border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  background: #fff;
+  border: 2px solid var(--coral);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.trace-slider input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
+/* Firefox track */
+.trace-slider input[type="range"]::-moz-range-track {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.trace-slider input[type="range"]::-moz-range-progress {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--coral);
 }
 .trace-slider input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: var(--coral);
-  border: 2px solid #fff;
+  background: #fff;
+  border: 2px solid var(--coral);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   cursor: pointer;
 }
 .trace-slider-value {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   color: #fff;
-  min-width: 32px;
+  min-width: 42px;
   text-align: right;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
 
+/* ----- Action buttons ----- */
 .trace-toggles {
   display: flex;
-  gap: 5px;
+  gap: 8px;
   justify-content: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
-.trace-mini-btn {
-  width: 32px;
-  height: 32px;
+.trace-action-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 6px;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 9px;
-  color: #fff;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-}
-.trace-mini-btn:hover { background: rgba(255, 255, 255, 0.22); }
-.trace-mini-btn:active { transform: scale(0.92); }
-.trace-mini-btn.is-active {
-  background: var(--coral);
-  border-color: var(--coral);
-}
-
-/* Labeled text button — same height as mini, but auto-width with padding */
-.trace-text-btn {
-  height: 32px;
-  padding: 0 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
   color: #fff;
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  flex-shrink: 0;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
 }
-.trace-text-btn:hover { background: rgba(255, 255, 255, 0.22); }
-.trace-text-btn:active { transform: scale(0.94); }
-
-.trace-divider {
-  width: 1px;
-  align-self: stretch;
-  margin: 4px 3px;
-  background: rgba(255, 255, 255, 0.18);
+.trace-action-btn svg { display: block; }
+.trace-action-btn:hover { background: rgba(255, 255, 255, 0.22); }
+.trace-action-btn:active { transform: scale(0.96); }
+.trace-action-btn.is-active {
+  background: var(--coral);
+  border-color: var(--coral);
 }
 
 /* ----- Responsive ----- */
 @media (max-width: 480px) {
   .trace-overlay-img { max-width: 85vw; max-height: 75vh; }
   .trace-hint { font-size: 11px; top: 70px; }
+  .trace-action-btn { font-size: 11px; min-height: 60px; }
+  .trace-slider-value { font-size: 12px; min-width: 38px; }
+}
+@media (max-width: 360px) {
+  .trace-action-btn { padding: 6px 2px; }
+  .trace-toggles { gap: 6px; }
 }

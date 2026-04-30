@@ -39,6 +39,7 @@ select
 with required (table_name, column_name) as (values
   ('profiles', 'id'), ('profiles', 'email'), ('profiles', 'display_name'),
   ('profiles', 'avatar_url'), ('profiles', 'dodo_customer_id'),
+  ('profiles', 'free_trial_started_at'),
   ('profiles', 'created_at'), ('profiles', 'updated_at'),
   ('subscriptions', 'id'), ('subscriptions', 'user_id'),
   ('subscriptions', 'plan'), ('subscriptions', 'status'),
@@ -97,10 +98,13 @@ order by tgname;
 select proname,
   case when proname is not null then 'PASS' else 'FAIL' end as status
 from pg_proc
-where proname in ('handle_new_user', 'tg_set_updated_at', 'lifetime_seats_left')
+where proname in (
+    'handle_new_user', 'tg_set_updated_at', 'lifetime_seats_left',
+    'start_free_trial_if_unused'
+  )
   and pronamespace = 'public'::regnamespace
 order by proname;
--- Expect 3 rows.
+-- Expect 4 rows.
 
 -- ── 9. Indexes exist ─────────────────────────────────────────────────────────
 select indexname,

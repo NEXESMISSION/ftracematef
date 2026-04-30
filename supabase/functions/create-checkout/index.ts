@@ -21,7 +21,7 @@
 
 import DodoPayments from 'npm:dodopayments@1';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { corsHeaders } from '../_shared/cors.ts';
+import { corsHeadersFor } from '../_shared/cors.ts';
 
 const PLAN_TO_PRODUCT_ENV: Record<string, string> = {
   monthly:   'DODO_PRODUCT_MONTHLY',
@@ -30,7 +30,14 @@ const PLAN_TO_PRODUCT_ENV: Record<string, string> = {
 };
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const cors = corsHeadersFor(req);
+  const json = (payload: unknown, status = 200) =>
+    new Response(JSON.stringify(payload), {
+      status,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST')    return json({ error: 'Method not allowed' }, 405);
 
   // 1. Identify the caller via their Supabase JWT
@@ -43,8 +50,9 @@ Deno.serve(async (req) => {
     { global: { headers: { Authorization: authHeader } } },
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return json({ error: 'Not authenticated' }, 401);
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userData?.user) return json({ error: 'Not authenticated' }, 401);
+  const user = userData.user;
 
   // Defensive: rare Google accounts come through without an email. The Dodo
   // SDK requires one. Refuse early with a clear message rather than crashing
@@ -143,10 +151,3 @@ Deno.serve(async (req) => {
     return json({ error: 'Could not start checkout. Please try again in a moment.' }, 502);
   }
 });
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}

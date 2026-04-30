@@ -13,6 +13,24 @@ const META_KEY = 'tm:pending-image-meta';
 
 const MAX_BYTES = 4_500_000; // ~4.5MB after base64 inflation
 
+// Allowlist of raster image MIME types we accept. SVG is excluded on purpose:
+// `<img src="data:image/svg+xml,…<script>…">` doesn't fire script-execution in
+// modern browsers, but SVG can carry foreignObject/HTML and other surprises,
+// and the same data URL may be reused in non-img contexts later. Stick to
+// well-defined raster formats — that's all the AR overlay needs.
+export const ALLOWED_IMAGE_MIME = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/heic',
+  'image/heif',
+  'image/avif',
+  'image/bmp',
+]);
+
+const ALLOWED_DATA_PREFIXES = Array.from(ALLOWED_IMAGE_MIME).map(m => `data:${m};`);
+
 /** Convert a File to a base64 data URL. */
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -52,11 +70,13 @@ export function loadPendingImage() {
   try {
     const dataUrl = sessionStorage.getItem(KEY);
     if (!dataUrl) return null;
-    // Defensive: only return values that are clearly image data URLs. If a
-    // future XSS or extension wrote something else into our key, refuse to
-    // hand it to <img src="…"> downstream.
-    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
-      clearPendingImage();
+    // Defensive: only return values that are clearly raster image data URLs.
+    // If a future XSS, extension, or cross-tab race wrote something else into
+    // our key, refuse to hand it to <img src="…"> downstream — but DO NOT
+    // delete the key here. A stray bad write should not destroy a legitimate
+    // image the user already uploaded; the next savePendingImage() will
+    // overwrite it cleanly. Just refuse to return it.
+    if (typeof dataUrl !== 'string' || !ALLOWED_DATA_PREFIXES.some(p => dataUrl.startsWith(p))) {
       return null;
     }
     const metaRaw = sessionStorage.getItem(META_KEY);

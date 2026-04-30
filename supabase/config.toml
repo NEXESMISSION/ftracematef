@@ -71,6 +71,14 @@ verify_jwt = false
 [functions.dodo-webhook]
 verify_jwt = false
 
+# Dev-only test endpoint. Auth is enforced manually inside the function (admin
+# email allowlist + ENABLE_DEV_MUTATE flag). Declared explicitly so behavior
+# matches across local + deployed environments and is intentionally not part of
+# the standard `sb:deploy` script — deploy with `sb:deploy:dev-mutate` only on
+# staging projects.
+[functions.dev-mutate-subscription]
+verify_jwt = false
+
 [analytics]
 enabled = false
 port = 54327

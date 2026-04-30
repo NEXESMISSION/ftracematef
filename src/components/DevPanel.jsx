@@ -4,8 +4,10 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { unwrapFunctionError } from '../lib/errors.js';
 
 // Self-test panel for the paywall + renewal + failure flows. Visible only
-// for admin emails (frontend gate via VITE_ADMIN_EMAILS, real gate enforced
-// server-side in the dev-mutate-subscription edge function).
+// to users with `profiles.is_admin = true` (UI gate). The real security
+// boundary is server-side: dev-mutate-subscription requires both
+// ADMIN_EMAILS membership AND that DODO_ENVIRONMENT is not live_mode AND
+// ENABLE_DEV_MUTATE=true on the project.
 //
 // Each preset button POSTs a partial update; the realtime channel in
 // AuthProvider picks up the change and the rest of the UI reacts within ~1s.

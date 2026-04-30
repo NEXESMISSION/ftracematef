@@ -1069,7 +1069,7 @@
   .profile-stats { grid-template-columns: repeat(2, 1fr); gap: 16px; }
 }
 @media (max-width: 380px) {
-  .profile-stats { grid-template-columns: 1fr; }
+  .profile-stats { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .profile-stat-0, .profile-stat-1, .profile-stat-2, .profile-stat-3 { transform: rotate(0); }
 }
 

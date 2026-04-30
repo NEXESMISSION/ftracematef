@@ -63,7 +63,7 @@ export const PLANS = [
 export const PLAN_BY_ID = Object.fromEntries(PLANS.map((p) => [p.id, p]));
 
 export const PLAN_LABEL = {
-  free:      'Free',
+  free:      'Free tier',
   monthly:   'Monthly · $5/mo',
   quarterly: '3 Months · $10',
   lifetime:  'Lifetime · $15',

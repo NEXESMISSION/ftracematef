@@ -4,16 +4,27 @@ import { useLocalState } from '../lib/useLocalState.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { addSession } from '../lib/traceStats.js';
 import { loadPendingImage } from '../lib/pendingImage.js';
+import { markFreeTrialStarted } from '../lib/freeTrial.js';
 
 const INITIAL_TRANSFORM = { x: 0, y: 0, scale: 1, rotation: 0, flip: false };
 
 export default function Trace() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile, isPaid, refresh } = useAuth();
+
   // Prefer the freshly-passed blob URL from /upload (instant).
   // Fall back to the persisted base64 from sessionStorage (post-OAuth + post-payment).
-  const imageUrl = location.state?.imageUrl || loadPendingImage()?.dataUrl || null;
+  //
+  // CRITICAL: capture once on mount and freeze. Recomputing this every render
+  // races with the cleanup effect that revokes blob URLs — `location.state`
+  // can be cleared by React Router during the /checkout/success → /upload →
+  // /trace flow, flipping the dependency between a blob URL and a data URL,
+  // which causes the cleanup to revoke a blob the next render is still
+  // showing. Locking it on first render eliminates the race.
+  const [imageUrl] = useState(
+    () => location.state?.imageUrl || loadPendingImage()?.dataUrl || null,
+  );
 
   const videoRef    = useRef(null);
   const overlayRef  = useRef(null);
@@ -24,7 +35,6 @@ export default function Trace() {
   const [transform, setTransform]           = useState(INITIAL_TRANSFORM);
   // Persisted across sessions via localStorage so the studio remembers your setup.
   const [opacity, setOpacity]               = useLocalState('tm:opacity', 0.55);
-  const [locked, setLocked]                 = useLocalState('tm:locked',  false);
   const [facingMode, setFacingMode]         = useLocalState('tm:facingMode',  'environment'); // 'environment' | 'user'
   const [cameraError, setCameraError]       = useState('');
   const [showHint, setShowHint]             = useState(true);
@@ -36,6 +46,22 @@ export default function Trace() {
   useEffect(() => {
     if (!imageUrl) navigate('/upload', { replace: true });
   }, [imageUrl, navigate]);
+
+  // Free-tier users get one tracing session before the paywall. Stamp the
+  // trial start when they actually have an image to trace — guarding on
+  // imageUrl prevents a stale /trace visit (no image, immediately redirected
+  // to /upload) from silently burning the user's free trial.
+  // Idempotent server-side via start_free_trial_if_unused.
+  useEffect(() => {
+    if (!imageUrl) return;
+    if (!user?.id || isPaid) return;
+    if (profile?.free_trial_started_at) return; // already stamped, skip RPC
+    let cancelled = false;
+    markFreeTrialStarted()
+      .then(() => { if (!cancelled) refresh(); })
+      .catch((err) => console.warn('[trace] could not stamp free trial:', err));
+    return () => { cancelled = true; };
+  }, [imageUrl, user?.id, isPaid, profile?.free_trial_started_at, refresh]);
 
   // Revoke the object URL when leaving the trace page so we don't leak it.
   useEffect(() => {
@@ -161,7 +187,6 @@ export default function Trace() {
 
   // ===== Gesture handling: drag (1 pointer), pinch + rotate (2 pointers) =====
   const onPointerDown = useCallback((e) => {
-    if (locked) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -183,10 +208,9 @@ export default function Trace() {
         startTransform: { ...transform },
       };
     }
-  }, [locked, transform]);
+  }, [transform]);
 
   const onPointerMove = useCallback((e) => {
-    if (locked) return;
     if (!pointersRef.current.has(e.pointerId)) return;
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     setShowHint(false);
@@ -212,7 +236,7 @@ export default function Trace() {
       const rotation = g.startTransform.rotation + (angle - g.startAngle);
       setTransform({ ...g.startTransform, scale, rotation });
     }
-  }, [locked]);
+  }, []);
 
   const onPointerUp = useCallback((e) => {
     pointersRef.current.delete(e.pointerId);
@@ -232,7 +256,6 @@ export default function Trace() {
 
   // Wheel on desktop = zoom (Ctrl/⌘ + wheel rotates)
   const onWheel = useCallback((e) => {
-    if (locked) return;
     e.preventDefault();
     if (e.ctrlKey || e.metaKey) {
       const delta = e.deltaY * 0.5;
@@ -244,10 +267,9 @@ export default function Trace() {
         scale: Math.min(8, Math.max(0.2, t.scale * (1 + delta))),
       }));
     }
-  }, [locked]);
+  }, []);
 
   // ===== Quick actions =====
-  const resetTransform = () => setTransform(INITIAL_TRANSFORM);
   const recenter       = () => setTransform((t) => ({ ...t, x: 0, y: 0 }));
   const flipHorizontal = () => setTransform((t) => ({ ...t, flip: !t.flip }));
   const switchCamera   = () => setFacingMode((m) => (m === 'environment' ? 'user' : 'environment'));
@@ -274,7 +296,7 @@ export default function Trace() {
       <video ref={videoRef} className="trace-video" playsInline muted autoPlay />
 
       <div
-        className={`trace-overlay-wrap ${locked ? 'is-locked' : ''}`}
+        className="trace-overlay-wrap"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -311,6 +333,17 @@ export default function Trace() {
       {/* Camera error */}
       {cameraError && (
         <div className="trace-error">
+          <button
+            type="button"
+            className="trace-error-close"
+            onClick={() => setCameraError('')}
+            aria-label="Dismiss"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                 strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 4 L12 12 M12 4 L4 12" />
+            </svg>
+          </button>
           <strong>Camera unavailable</strong>
           <p>{cameraError}</p>
           <button type="button" className="upload-cta" onClick={exitTrace}>
@@ -321,7 +354,7 @@ export default function Trace() {
 
       {/* Bottom controls — collapsible compact dock */}
       <footer className={`trace-controls ${controlsHidden ? 'is-hidden' : ''}`}>
-        {/* Pull-tab handle — toggles hide/show */}
+        {/* Big chevron handle — toggles hide/show */}
         <button
           type="button"
           className="trace-handle"
@@ -329,7 +362,24 @@ export default function Trace() {
           aria-label={controlsHidden ? 'Show controls' : 'Hide controls'}
           aria-expanded={!controlsHidden}
         >
-          <span className="trace-handle-bar" />
+          <svg
+            className="trace-handle-icon"
+            width="22"
+            height="22"
+            viewBox="0 0 22 22"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            {controlsHidden ? (
+              <path d="M5 13 L11 7 L17 13" />
+            ) : (
+              <path d="M5 9 L11 15 L17 9" />
+            )}
+          </svg>
         </button>
 
         {!controlsHidden && (
@@ -344,6 +394,7 @@ export default function Trace() {
                 value={opacity}
                 onChange={(e) => setOpacity(parseFloat(e.target.value))}
                 aria-label="Opacity"
+                style={{ '--tm-slider-fill': `${(opacity - 0.05) / 0.95 * 100}%` }}
               />
               <span className="trace-slider-value">{Math.round(opacity * 100)}%</span>
             </div>
@@ -351,88 +402,62 @@ export default function Trace() {
             <div className="trace-toggles">
               <button
                 type="button"
-                className="trace-text-btn"
+                className="trace-action-btn"
                 onClick={flipHorizontal}
                 aria-label="Flip horizontally"
               >
-                Flip
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M10 3 V17" strokeDasharray="2 2" />
+                  <path d="M3 6 L8 6 L8 14 L3 14 Z" />
+                  <path d="M17 6 L12 6 L12 14 L17 14 Z" fill="currentColor" fillOpacity="0.25" />
+                </svg>
+                <span>Flip</span>
               </button>
 
               <button
                 type="button"
-                className="trace-text-btn"
+                className="trace-action-btn"
                 onClick={recenter}
                 aria-label="Center overlay"
               >
-                Center
-              </button>
-
-              <button
-                type="button"
-                className="trace-mini-btn"
-                onClick={resetTransform}
-                aria-label="Reset overlay"
-                title="Reset"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M2.5 8 a5.5 5.5 0 1 0 1.7 -3.9 M2.5 2.5 V5.2 H5.2" />
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="10" cy="10" r="6.5" />
+                  <circle cx="10" cy="10" r="1.4" fill="currentColor" />
+                  <path d="M10 1.5 V4 M10 16 V18.5 M1.5 10 H4 M16 10 H18.5" />
                 </svg>
-              </button>
-
-              <span className="trace-divider" aria-hidden="true" />
-
-              <button
-                type="button"
-                className={`trace-mini-btn ${locked ? 'is-active' : ''}`}
-                onClick={() => setLocked((v) => !v)}
-                aria-pressed={locked}
-                aria-label={locked ? 'Unlock overlay' : 'Lock overlay'}
-                title={locked ? 'Unlock' : 'Lock'}
-              >
-                {locked ? (
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
-                    <path d="M5.5 7 V5 a2.5 2.5 0 0 1 5 0 V7" />
-                  </svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
-                    <path d="M5.5 7 V5 a2.5 2.5 0 0 1 4.5 -1" />
-                  </svg>
-                )}
+                <span>Center</span>
               </button>
 
               <button
                 type="button"
-                className="trace-mini-btn"
+                className="trace-action-btn"
                 onClick={switchCamera}
                 aria-label="Switch camera"
-                title="Switch camera"
               >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M2.5 5.5 H5 L6.3 4 H9.7 L11 5.5 H13.5 a1 1 0 0 1 1 1 V12.5 a1 1 0 0 1 -1 1 H2.5 a1 1 0 0 1 -1 -1 V6.5 a1 1 0 0 1 1 -1 Z" />
-                  <path d="M8 8 a2 2 0 1 0 2 2" />
-                  <path d="M10 8.5 V7 H8.5" />
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 6.5 H6 L7.5 5 H12.5 L14 6.5 H17 a1 1 0 0 1 1 1 V15 a1 1 0 0 1 -1 1 H3 a1 1 0 0 1 -1 -1 V7.5 a1 1 0 0 1 1 -1 Z" />
+                  <path d="M10 9.5 a2 2 0 1 0 2 2" />
+                  <path d="M12 9.5 V8 H10.5" />
                 </svg>
+                <span>Camera</span>
               </button>
 
               {torchSupported && (
                 <button
                   type="button"
-                  className={`trace-mini-btn ${torchOn ? 'is-active' : ''}`}
+                  className={`trace-action-btn ${torchOn ? 'is-active' : ''}`}
                   onClick={toggleTorch}
                   aria-pressed={torchOn}
                   aria-label={torchOn ? 'Turn flash off' : 'Turn flash on'}
-                  title={torchOn ? 'Flash off' : 'Flash on'}
                 >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M10 1 L3.5 9 H8 L6.5 15 L12.5 7 H8 L10 1 Z" />
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 2 L4.5 11 H9.5 L8 18 L15.5 9 H10.5 L12 2 Z" />
                   </svg>
+                  <span>Flash</span>
                 </button>
               )}
             </div>
