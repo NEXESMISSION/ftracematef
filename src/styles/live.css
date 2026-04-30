@@ -393,6 +393,24 @@
   will-change: transform;
 }
 
+/* Viewer top bar lays out: back · pill · spacer · edit-btn */
+.live-viewer-topbar {
+  width: 100%;
+  padding-right: 14px;
+}
+.live-topbar-spacer { flex: 1; }
+.live-edit-btn { margin-left: 0; }
+.live-edit-btn.is-active {
+  background: var(--coral);
+  border-color: var(--coral);
+}
+
+/* Viewer's local trace overlay sits on top of the received video. */
+.live-viewer-overlay {
+  pointer-events: none;
+  z-index: 2;
+}
+
 .live-viewer-reset {
   position: absolute;
   bottom: max(20px, env(safe-area-inset-bottom));

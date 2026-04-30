@@ -5,6 +5,12 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { addSession } from '../lib/traceStats.js';
 import { loadPendingImage } from '../lib/pendingImage.js';
 import { markFreeTrialStarted } from '../lib/freeTrial.js';
+import {
+  cssMatrix3d,
+  identityCorners,
+  isIdentity,
+  screenDeltaToLocal,
+} from '../lib/perspectiveWarp.js';
 
 const INITIAL_TRANSFORM = { x: 0, y: 0, scale: 1, rotation: 0, flip: false };
 
@@ -44,6 +50,10 @@ export default function Trace() {
   const [flickerOn, setFlickerOn]           = useLocalState('tm:flickerOn', false);
   const [flickerSpeed, setFlickerSpeed]     = useLocalState('tm:flickerSpeed', 3);
   const [flickerOpacity, setFlickerOpacity] = useState(0);
+  const [warpMode, setWarpMode]             = useState(false);
+  const [corners, setCorners]               = useState(null);
+  const [baseSize, setBaseSize]             = useState(null);
+  const handleDragRef                       = useRef(null);
 
   // No image? Bounce back to upload.
   useEffect(() => {
@@ -135,6 +145,77 @@ export default function Trace() {
     const t = setTimeout(() => setShowHint(false), 4500);
     return () => clearTimeout(t);
   }, []);
+
+  // ===== Warp: measure rendered overlay size + seed identity corners =====
+  useEffect(() => {
+    const img = overlayRef.current;
+    if (!img) return;
+    const measure = () => {
+      const w = img.offsetWidth;
+      const h = img.offsetHeight;
+      if (w && h) {
+        setBaseSize((prev) => (prev?.w === w && prev?.h === h ? prev : { w, h }));
+      }
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(img);
+    img.addEventListener('load', measure);
+    return () => {
+      ro.disconnect();
+      img.removeEventListener('load', measure);
+    };
+  }, [imageUrl]);
+
+  useEffect(() => {
+    if (!baseSize) return;
+    setCorners((prev) => prev ?? identityCorners(baseSize.w, baseSize.h));
+  }, [baseSize]);
+
+  // ===== Warp handle drag (pointer events captured per-handle) =====
+  const onHandleDown = useCallback((key, e) => {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    handleDragRef.current = {
+      key,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startCorner: corners ? { ...corners[key] } : null,
+      startTransform: { ...transform },
+    };
+  }, [corners, transform]);
+
+  const onHandleMove = useCallback((e) => {
+    const d = handleDragRef.current;
+    if (!d || d.pointerId !== e.pointerId || !d.startCorner) return;
+    e.stopPropagation();
+    const dxScreen = e.clientX - d.startX;
+    const dyScreen = e.clientY - d.startY;
+    const local = screenDeltaToLocal(
+      dxScreen, dyScreen,
+      d.startTransform.scale, d.startTransform.rotation, d.startTransform.flip,
+    );
+    setCorners((cs) => cs && {
+      ...cs,
+      [d.key]: {
+        x: d.startCorner.x + local.x,
+        y: d.startCorner.y + local.y,
+      },
+    });
+  }, []);
+
+  const onHandleUp = useCallback((e) => {
+    const d = handleDragRef.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    e.stopPropagation();
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    handleDragRef.current = null;
+  }, []);
+
+  const resetWarp = useCallback(() => {
+    if (baseSize) setCorners(identityCorners(baseSize.w, baseSize.h));
+  }, [baseSize]);
 
   // Flicker: smoothly oscillate overlay opacity 0 → 1 → 0 while enabled.
   // flickerSpeed is a 1–10 dial; period in seconds = 6 / flickerSpeed.
@@ -303,16 +384,29 @@ export default function Trace() {
 
   if (!imageUrl) return null;
 
+  const warpMatrix =
+    corners && baseSize && !isIdentity(corners, baseSize.w, baseSize.h)
+      ? cssMatrix3d(baseSize.w, baseSize.h, corners)
+      : '';
+
   const overlayStyle = {
     transform:
       `translate(-50%, -50%) ` +
       `translate(${transform.x}px, ${transform.y}px) ` +
       `scale(${transform.flip ? -transform.scale : transform.scale}, ${transform.scale}) ` +
-      `rotate(${transform.rotation}deg)`,
+      `rotate(${transform.rotation}deg)` +
+      (warpMatrix ? ` ${warpMatrix}` : ''),
     opacity: flickerOn ? flickerOpacity : opacity,
     // Skip the 0.15s opacity easing while flickering — rAF already drives a smooth curve.
     transition: flickerOn ? 'transform 0.15s ease, filter 0.2s ease' : undefined,
   };
+
+  const handleWrapStyle = baseSize ? {
+    transform:
+      `translate(${transform.x}px, ${transform.y}px) ` +
+      `scale(${transform.flip ? -transform.scale : transform.scale}, ${transform.scale}) ` +
+      `rotate(${transform.rotation}deg)`,
+  } : null;
 
   return (
     <div className="trace-stage">
@@ -334,6 +428,24 @@ export default function Trace() {
           style={overlayStyle}
           draggable={false}
         />
+
+        {warpMode && corners && handleWrapStyle && (
+          <div className="warp-handles" style={handleWrapStyle}>
+            {(['tl', 'tr', 'br', 'bl']).map((key) => (
+              <button
+                key={key}
+                type="button"
+                className={`warp-handle warp-handle-${key}`}
+                style={{ left: `${corners[key].x}px`, top: `${corners[key].y}px` }}
+                onPointerDown={(e) => onHandleDown(key, e)}
+                onPointerMove={onHandleMove}
+                onPointerUp={onHandleUp}
+                onPointerCancel={onHandleUp}
+                aria-label={`Warp corner ${key}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Top bar — back button only */}
@@ -351,6 +463,12 @@ export default function Trace() {
         <div className="trace-hint">
           Drag to move · Pinch to zoom · Twist to rotate
         </div>
+      )}
+
+      {warpMode && baseSize && corners && !isIdentity(corners, baseSize.w, baseSize.h) && (
+        <button type="button" className="warp-reset" onClick={resetWarp}>
+          Reset warp
+        </button>
       )}
 
       {/* Camera error */}
@@ -469,6 +587,24 @@ export default function Trace() {
                   <path d="M17 6 L12 6 L12 14 L17 14 Z" fill="currentColor" fillOpacity="0.25" />
                 </svg>
                 <span>Flip</span>
+              </button>
+
+              <button
+                type="button"
+                className={`trace-action-btn ${warpMode ? 'is-active' : ''}`}
+                onClick={() => setWarpMode((v) => !v)}
+                aria-pressed={warpMode}
+                aria-label={warpMode ? 'Exit warp mode' : 'Enter warp mode'}
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                     strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3.5 4 L16 5 L17 16 L4.5 14.5 Z" />
+                  <circle cx="3.5" cy="4"   r="1.4" fill="currentColor" />
+                  <circle cx="16"  cy="5"   r="1.4" fill="currentColor" />
+                  <circle cx="17"  cy="16"  r="1.4" fill="currentColor" />
+                  <circle cx="4.5" cy="14.5" r="1.4" fill="currentColor" />
+                </svg>
+                <span>Warp</span>
               </button>
 
               <button
