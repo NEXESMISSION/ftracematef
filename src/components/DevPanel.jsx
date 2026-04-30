@@ -32,10 +32,12 @@ const PRESETS = [
     body: { status: 'expired' } },
   { id: 'renew',          label: 'Simulate renewal (+30d)',tone: 'plain',
     body: { status: 'active', period_end_offset_days: 30 } },
+  { id: 'reset-trial',    label: 'Reset trial usage',      tone: 'ghost',
+    body: { reset_free_trial: true } },
 ];
 
 export default function DevPanel() {
-  const { user, subscription, refresh, isPaid } = useAuth();
+  const { user, profile, subscription, refresh, isPaid } = useAuth();
   const [busy, setBusy]   = useState(null);
   const [error, setError] = useState(null);
   const [okMsg, setOkMsg] = useState(null);
@@ -73,6 +75,7 @@ export default function DevPanel() {
         <div><dt>plan</dt>           <dd>{subscription?.plan ?? '—'}</dd></div>
         <div><dt>status</dt>         <dd>{subscription?.status ?? '—'}</dd></div>
         <div><dt>period_end</dt>     <dd>{subscription?.current_period_end ?? '—'}</dd></div>
+        <div><dt>trial</dt>          <dd>{profile?.free_trial_started_at ? 'used' : 'available'}</dd></div>
         <div><dt>email</dt>          <dd className="dev-mono">{user?.email}</dd></div>
       </dl>
 

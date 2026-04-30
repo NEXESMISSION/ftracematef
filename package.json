@@ -14,15 +14,29 @@
     "sb:link": "supabase link --project-ref gihmcbggfpogmisxvqyf",
     "sb:secrets": "node scripts/setup-supabase-secrets.mjs",
     "sb:deploy": "supabase functions deploy create-checkout && supabase functions deploy create-portal-session && supabase functions deploy subscription-action && supabase functions deploy list-payments && supabase functions deploy dodo-webhook --no-verify-jwt",
-    "sb:deploy:dev-mutate": "supabase functions deploy dev-mutate-subscription"
+    "sb:deploy:dev-mutate": "supabase functions deploy dev-mutate-subscription",
+    "cap:assets": "node scripts/gen-cap-assets.mjs && capacitor-assets generate --android",
+    "android:keystore": "node scripts/android-keystore.mjs",
+    "cap:sync": "cap sync android",
+    "cap:open": "cap open android",
+    "android:debug": "cap sync android && cd android && set TEMP=C:\\gradle-tmp&& set TMP=C:\\gradle-tmp&& gradlew.bat assembleDebug",
+    "android:release": "cap sync android && cd android && set TEMP=C:\\gradle-tmp&& set TMP=C:\\gradle-tmp&& gradlew.bat assembleRelease",
+    "android:bundle": "cap sync android && cd android && set TEMP=C:\\gradle-tmp&& set TMP=C:\\gradle-tmp&& gradlew.bat bundleRelease"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/core": "^8.3.1",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capgo/capacitor-social-login": "^8.3.20",
     "@supabase/supabase-js": "^2.105.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.3.1",
     "@vitejs/plugin-react": "^4.3.1",
     "sharp": "^0.34.5",
     "supabase": "^2.95.6",

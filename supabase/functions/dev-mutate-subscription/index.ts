@@ -81,6 +81,7 @@ Deno.serve(async (req) => {
     status?: Status;
     period_end_offset_days?: number;        // shorthand: now + N days
     current_period_end?: string | null;     // explicit ISO timestamp (or null)
+    reset_free_trial?: boolean;             // null out profiles.free_trial_started_at
   } = {};
   try { body = await req.json(); } catch { /* ignored */ }
 
@@ -121,7 +122,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  if (Object.keys(update).length === 0) {
+  if (Object.keys(update).length === 0 && !body.reset_free_trial) {
     return json({ error: 'No fields to update' }, 400);
   }
 
@@ -131,6 +132,23 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     { auth: { persistSession: false } },
   );
+
+  // Profile-level mutation: reset the free-trial stamp. Admin-only convenience
+  // for testing the post-trial paywall flow without spinning up a fresh account.
+  // Allowed in combination with subscription mutations (e.g. "Reset to free +
+  // restore trial") or as a standalone call.
+  if (body.reset_free_trial) {
+    const { error: trialErr } = await admin
+      .from('profiles')
+      .update({ free_trial_started_at: null })
+      .eq('id', user.id);
+    if (trialErr) return json({ error: `reset_free_trial failed: ${trialErr.message}` }, 500);
+
+    // Standalone call — nothing else to do.
+    if (Object.keys(update).length === 0) {
+      return json({ free_trial_reset: true });
+    }
+  }
 
   // Honor the advertised lifetime cap even on this admin-only path. Without
   // this, an admin granting themselves an active lifetime row could push the

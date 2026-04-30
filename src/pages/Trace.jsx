@@ -17,7 +17,7 @@ const INITIAL_TRANSFORM = { x: 0, y: 0, scale: 1, rotation: 0, flip: false };
 export default function Trace() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile, isPaid, refresh } = useAuth();
+  const { user, profile, refresh } = useAuth();
 
   // Prefer the freshly-passed blob URL from /upload (instant).
   // Fall back to the persisted base64 from sessionStorage (post-OAuth + post-payment).
@@ -64,17 +64,21 @@ export default function Trace() {
   // trial start when they actually have an image to trace — guarding on
   // imageUrl prevents a stale /trace visit (no image, immediately redirected
   // to /upload) from silently burning the user's free trial.
-  // Idempotent server-side via start_free_trial_if_unused.
+  //
+  // Stamp regardless of paid status. A paid user "consumes" the column too;
+  // it's harmless while they're paid and prevents a paid → free transition
+  // (refund, expired sub, admin dev-mutate) from handing the same account a
+  // second free trial. Idempotent server-side via start_free_trial_if_unused.
   useEffect(() => {
     if (!imageUrl) return;
-    if (!user?.id || isPaid) return;
-    if (profile?.free_trial_started_at) return; // already stamped, skip RPC
+    if (!user?.id) return;
+    if (profile?.free_trial_started_at) return;
     let cancelled = false;
     markFreeTrialStarted()
       .then(() => { if (!cancelled) refresh(); })
       .catch((err) => console.warn('[trace] could not stamp free trial:', err));
     return () => { cancelled = true; };
-  }, [imageUrl, user?.id, isPaid, profile?.free_trial_started_at, refresh]);
+  }, [imageUrl, user?.id, profile?.free_trial_started_at, refresh]);
 
   // Revoke the object URL when leaving the trace page so we don't leak it.
   useEffect(() => {

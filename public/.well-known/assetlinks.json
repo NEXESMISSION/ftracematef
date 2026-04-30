@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "art.tracemate.app",
+      "sha256_cert_fingerprints": [
+        "B5:35:2A:B0:30:B2:A0:26:E7:59:F9:F0:46:46:79:0C:0E:9C:73:FA:73:9F:56:7E:FF:A3:D2:B5:01:C5:04:9C",
+        "PASTE_RELEASE_KEYSTORE_SHA256_HERE_AFTER_RUNNING_NPM_RUN_ANDROID_KEYSTORE"
+      ]
+    }
+  }
+]

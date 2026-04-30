@@ -40,6 +40,7 @@ const OPTIONAL = [
   'DODO_EXPECTED_CURRENCY',
   'ADMIN_EMAILS',
   'ENABLE_DEV_MUTATE',
+  'APP_URL_EXTRA_ORIGINS',
 ];
 
 function parseEnvFile(path) {

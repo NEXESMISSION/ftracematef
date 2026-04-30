@@ -538,7 +538,27 @@ async function markSubscriptionInactive(
       await supabase.from('subscriptions').update(update).eq('id', existing.id);
       return;
     }
+    // The event names a subscription_id we've never tracked. This happens
+    // when a brand-new subscription fails its very first charge — Dodo emits
+    // subscription.failed before (or out of order with) any subscription.*
+    // event that would have inserted it. In that case the user's *existing*
+    // active row (e.g. their signup-trigger free/active) is unrelated and
+    // must NOT be flipped to failed/cancelled — that would lock them out of
+    // free tier on a failed paid attempt. Insert a standalone audit row for
+    // the failed sub so we still have a record of the attempt, then return.
+    const productId  = data.product_id ?? data.product?.product_id;
+    const failedPlan = PLAN_FROM_PRODUCT[productId] ?? 'free';
+    await supabase.from('subscriptions').insert({
+      user_id: userId,
+      plan: failedPlan,
+      status: newStatus,
+      dodo_subscription_id: subId,
+      cancelled_at: eventType === 'subscription.cancelled' ? new Date().toISOString() : null,
+    });
+    return;
   }
+  // No subscription_id at all on the event — fall back to flipping whatever
+  // active row exists. (Pre-payment-flow legacy events; rare in practice.)
   await supabase
     .from('subscriptions')
     .update(update)

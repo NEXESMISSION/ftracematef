@@ -1,0 +1,33 @@
+{
+  "appId": "art.tracemate.app",
+  "appName": "TraceMate",
+  "webDir": "dist",
+  "server": {
+    "url": "https://www.tracemate.art",
+    "androidScheme": "https",
+    "cleartext": false
+  },
+  "android": {
+    "backgroundColor": "#FFF8EF",
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "launchAutoHide": true,
+      "launchFadeOutDuration": 250,
+      "backgroundColor": "#FFF8EFFF",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": false,
+      "splashImmersive": false
+    },
+    "SocialLogin": {
+      "google": {
+        "webClientId": "944673324350-2ai6vha5clek4ov6ob4t6sa6ctvg30im.apps.googleusercontent.com"
+      }
+    }
+  }
+}

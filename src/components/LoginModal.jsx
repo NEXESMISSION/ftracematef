@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
+import { isNative, nativeGoogleSignIn } from '../lib/native.js';
 
 /**
  * Lightweight login overlay used by /upload (and anywhere else we want a
@@ -31,6 +32,23 @@ export default function LoginModal({ open, onClose, intentLabel = 'Sign in to co
   const handleGoogle = async () => {
     setError(null);
     setBusy(true);
+
+    // Native APK path — system Google account picker, no redirect. On
+    // success Supabase fires onAuthStateChange and the parent component
+    // continues whatever flow it was in (e.g. /upload's auto-resume after
+    // sign-in).
+    if (isNative) {
+      try {
+        await nativeGoogleSignIn();
+        // Parent decides what to do next — we just close on success.
+        onClose?.();
+      } catch (e) {
+        setBusy(false);
+        setError(e?.message || 'Could not sign in.');
+      }
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback` },
@@ -76,7 +94,7 @@ export default function LoginModal({ open, onClose, intentLabel = 'Sign in to co
             <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" />
             <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" />
           </svg>
-          {busy ? 'Redirecting to Google…' : 'Continue with Google'}
+          {busy ? (isNative ? 'Signing in…' : 'Redirecting to Google…') : 'Continue with Google'}
         </button>
 
         {error && <p className="auth-error">{error}</p>}

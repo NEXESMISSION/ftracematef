@@ -84,16 +84,17 @@ export function AuthProvider({ children }) {
       if (!candidateSession) return null;
       try {
         const { data: { user: verifiedUser }, error } = await supabase.auth.getUser();
-        if (error || !verifiedUser) {
-          console.warn('[AuthProvider] stale session detected — user no longer exists. Clearing.');
-          // Local-only sign-out: don't make an API call (would fail anyway,
-          // since the user is gone). This wipes the token from localStorage.
+        // Only treat as a definitive ghost when the response is unambiguous:
+        // a user actually came back AND it didn't match the local session.
+        // Previously this branch fired on ANY error from getUser() — including
+        // transient 401s after an external redirect (Dodo checkout return,
+        // OAuth round-trip), which would silently sign the user out and
+        // bounce them to /login mid-flow. Trust the session by default; the
+        // *true* ghost case (user deleted, DB wiped) self-corrects on the
+        // next data fetch in loadUserData when the profile row turns up null.
+        if (!error && verifiedUser && verifiedUser.id !== candidateSession.user?.id) {
+          console.warn('[AuthProvider] session/user mismatch — clearing.');
           await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
-          // Also wipe per-user app state so the next signed-in user (or the
-          // same user re-signing-in) doesn't inherit leftovers. Includes the
-          // legacy `tm:traceStats:anon` key — older builds bucketed sessions
-          // there on a falsy userId, and that data must not survive into a
-          // freshly-signed-in account.
           try {
             const uid = candidateSession.user?.id;
             if (uid) window.localStorage.removeItem(`tm:traceStats:${uid}`);
@@ -103,6 +104,9 @@ export function AuthProvider({ children }) {
           } catch { /* ignore quota / private mode */ }
           endTrialSession();
           return null;
+        }
+        if (error) {
+          console.warn('[AuthProvider] getUser returned an error — keeping session, will rely on next data fetch to detect a true ghost:', error);
         }
         return candidateSession;
       } catch (err) {
@@ -250,6 +254,49 @@ export function AuthProvider({ children }) {
       }
     };
   }, [session?.user?.id, loadUserData]);
+
+  // Presence heartbeat: stamp profiles.last_seen_at every ~60s while the tab
+  // is visible. Powers the "online now" green dot on the admin dashboard.
+  // Cheap (one RPC, no payload) and bounded — we stop on hidden tabs so a
+  // backgrounded tab doesn't keep counting as "online" forever.
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    const HEARTBEAT_MS = 60_000;
+    let timer = null;
+
+    const ping = async () => {
+      // Fire-and-forget. Network/RLS errors are non-fatal — presence is a
+      // nice-to-have, not a correctness signal. The supabase builder is
+      // thenable but not a real Promise, so we await it inside try/catch
+      // rather than chaining .catch (which doesn't exist on the builder).
+      try { await supabase.rpc('touch_last_seen'); } catch { /* ignore */ }
+    };
+    const start = () => {
+      if (timer != null) return;
+      ping();
+      timer = setInterval(ping, HEARTBEAT_MS);
+    };
+    const stop = () => {
+      if (timer != null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') start();
+      else stop();
+    };
+
+    if (document.visibilityState === 'visible') start();
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [session?.user?.id]);
 
   const signOut = useCallback(async () => {
     // Clear per-user state on the device before tearing down auth so the next

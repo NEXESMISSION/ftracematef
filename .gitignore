@@ -25,3 +25,10 @@ public/_webp-test
 # A safe template lives at .env.example.template instead.
 .env.example
 
+# Capacitor: regenerated from public/icon-* via `npm run cap:assets`.
+assets/
+
+# Capacitor production-config backups created during local APK testing.
+capacitor.config.production.json
+capacitor.config.local.json
+

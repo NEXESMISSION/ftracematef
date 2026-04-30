@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import SvgDefs from '../components/SvgDefs.jsx';
 import { supabase } from '../lib/supabase.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { isNative, nativeGoogleSignIn } from '../lib/native.js';
 
 export default function Login() {
   const { user, loading } = useAuth();
@@ -49,6 +50,23 @@ export default function Login() {
   const handleGoogle = async () => {
     setError(null);
     setBusy(true);
+
+    // Native APK path — opens the system Google account picker in-process
+    // (no browser, no redirect). On success, AuthProvider's onAuthStateChange
+    // listener picks up the new Supabase session and the existing redirect
+    // useEffect routes to /account or /pricing. On error, we surface it in
+    // the same UI the web path uses.
+    if (isNative) {
+      try {
+        await nativeGoogleSignIn();
+        // Don't clear `busy` here — leaving it true keeps the button in its
+        // loading state until the redirect-on-user useEffect fires.
+      } catch (e) {
+        setBusy(false);
+        setError(e?.message || 'Could not sign in. Please try again.');
+      }
+      return;
+    }
 
     // Failsafe: if Supabase silently fails to redirect (popup blockers, some
     // mobile browsers blocking 3rd-party redirects), the button would otherwise
@@ -122,7 +140,7 @@ export default function Login() {
               <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" />
               <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" />
             </svg>
-            {busy ? 'Redirecting to Google…' : 'Continue with Google'}
+            {busy ? (isNative ? 'Signing in…' : 'Redirecting to Google…') : 'Continue with Google'}
           </button>
 
           {error && <p className="auth-error">{error}</p>}

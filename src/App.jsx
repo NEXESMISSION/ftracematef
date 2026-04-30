@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useRef } from 'react';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthProvider.jsx';
 import RequireAuth from './auth/RequireAuth.jsx';
 import RequirePaid from './auth/RequirePaid.jsx';
+import RequireAdmin from './auth/RequireAdmin.jsx';
 import { endTrialSession } from './lib/freeTrial.js';
 
 import Home from './pages/Home.jsx';
@@ -18,6 +19,10 @@ import PricingPage from './pages/PricingPage.jsx';
 import Terms from './pages/Terms.jsx';
 import Privacy from './pages/Privacy.jsx';
 import NotFound from './pages/NotFound.jsx';
+
+// Admin dashboard is operator-only and ships its own bundle of UI + data
+// fetching helpers. Lazy-loaded so non-admins never download the chunk.
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
 
 // One-shot free trial: the moment a free user navigates AWAY from /trace,
 // their single session is consumed for good. Doing this at the route layer
@@ -37,10 +42,33 @@ function TrialSessionTracker() {
   return null;
 }
 
+// Native-only: listens for `tm:deeplink` events fired by lib/native.js when
+// Android delivers a tracemate.art URL to the app (App Link, payment redirect,
+// magic-link from email, etc.). Navigates the SPA to the inner path so the
+// user lands inside the app instead of bouncing to a browser.
+//
+// On the web this hook still mounts but never fires — the event is only
+// dispatched from the native deep-link bridge.
+function DeepLinkRouter() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const onDeepLink = (e) => {
+      const target = e?.detail;
+      if (typeof target === 'string' && target.startsWith('/')) {
+        navigate(target, { replace: false });
+      }
+    };
+    window.addEventListener('tm:deeplink', onDeepLink);
+    return () => window.removeEventListener('tm:deeplink', onDeepLink);
+  }, [navigate]);
+  return null;
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <TrialSessionTracker />
+      <DeepLinkRouter />
       <Routes>
         {/* Public — anyone can browse + start an upload */}
         <Route path="/"              element={<Home />} />
@@ -59,6 +87,18 @@ export default function App() {
 
         {/* Paid plan required — Paywall shown otherwise */}
         <Route path="/trace"  element={<RequirePaid><Trace /></RequirePaid>} />
+
+        {/* Secret operator dashboard — non-admins see <NotFound> (no redirect leak). */}
+        <Route
+          path="/admin-me"
+          element={
+            <RequireAdmin>
+              <Suspense fallback={null}>
+                <AdminDashboard />
+              </Suspense>
+            </RequireAdmin>
+          }
+        />
 
         {/* Catch-all — anything else gets a friendly Not Found rather than blank */}
         <Route path="*" element={<NotFound />} />
