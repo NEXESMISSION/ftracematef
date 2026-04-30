@@ -542,6 +542,22 @@ export default function Account() {
         {/* ── Stats: scrapbook polaroids ── */}
         <StatsGrid stats={stats} memberSince={profile?.created_at} />
 
+        {/* ── Live Preview: stream the camera between two devices on this account ── */}
+        <section className="profile-live-card" aria-labelledby="live-card-title">
+          <span className="profile-live-icon" aria-hidden="true">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 7 H7 L9 5 H15 L17 7 H21 a1 1 0 0 1 1 1 V18 a1 1 0 0 1 -1 1 H3 a1 1 0 0 1 -1 -1 V8 a1 1 0 0 1 1 -1 Z" />
+              <circle cx="12" cy="13" r="3.5" />
+            </svg>
+          </span>
+          <div className="profile-live-text">
+            <h2 id="live-card-title">Live Preview</h2>
+            <p>Stream the camera between two devices signed into this account — pick which one broadcasts and which one watches.</p>
+          </div>
+          <Link to="/live" className="profile-live-cta">Open</Link>
+        </section>
+
         {/* ── Subscription (now folds in account email) ── */}
         <SubscriptionCard
           subscription={subscription}

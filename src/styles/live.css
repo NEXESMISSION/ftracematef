@@ -1,0 +1,471 @@
+/* ============ Live Preview page ============ */
+.live-shell {
+  min-height: 100dvh;
+  background: var(--cream);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ----- Top bar ----- */
+.live-bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  padding-top: max(14px, env(safe-area-inset-top));
+  background: var(--paper);
+  border-bottom: 1.5px solid var(--ink);
+}
+.live-back {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 2px 2px 0 var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.live-back:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.live-back:active {
+  transform: translate(0, 0);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+.live-title {
+  margin: 0;
+  font-family: 'Caveat', cursive;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.live-spacer { display: block; }
+
+/* ----- Role picker ----- */
+.live-picker {
+  flex: 1;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 40px);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.live-picker-sub {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-soft, #5a4f43);
+  margin: 0;
+}
+.live-picker-foot {
+  font-size: 12.5px;
+  color: var(--ink-muted, #8b7d6e);
+  text-align: center;
+  margin: 4px 0 0;
+  font-style: italic;
+}
+
+.live-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.live-role-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 24px 22px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 18px;
+  box-shadow: 4px 4px 0 var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  font-family: 'Nunito', sans-serif;
+}
+.live-role-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--ink);
+  background: var(--cream);
+}
+.live-role-card:active {
+  transform: translate(0, 0);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.live-role-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--coral);
+  color: #fff;
+}
+.live-role-name {
+  font-family: 'Caveat', cursive;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+}
+.live-role-desc {
+  font-size: 14px;
+  color: var(--ink-soft, #5a4f43);
+}
+
+/* ----- Active session stage ----- */
+.live-stage {
+  flex: 1;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: clamp(16px, 3vw, 28px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.live-status {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+}
+.live-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 0 currentColor;
+}
+.live-status-wait { color: #b8852a; }
+.live-status-wait .live-status-dot { animation: livePulse 1.4s ease-in-out infinite; }
+.live-status-good { color: #2c6b3a; }
+.live-status-bad  { color: #b03a3a; }
+
+@keyframes livePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(184, 133, 42, 0.45); }
+  50%      { box-shadow: 0 0 0 7px rgba(184, 133, 42, 0); }
+}
+
+.live-error {
+  padding: 12px 14px;
+  background: rgba(232, 122, 122, 0.14);
+  border: 1.5px solid var(--coral);
+  border-radius: 12px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.live-video-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border: 2px solid var(--ink);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+.live-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
+
+.live-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.live-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 11px 20px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: #fff;
+  background: var(--ink);
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 2px 2px 0 var(--ink);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.live-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--ink);
+  background: #1a1410;
+}
+.live-btn:active {
+  transform: translate(0, 0);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+.live-btn-ghost {
+  background: var(--cream);
+  color: var(--ink);
+}
+.live-btn-ghost:hover { background: var(--paper); }
+
+/* ----- Account-page entry card ----- */
+.profile-live-card {
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 18px;
+  padding: clamp(20px, 2.4vw, 26px);
+  box-shadow: 4px 4px 0 var(--ink);
+  margin-bottom: clamp(18px, 2vw, 22px);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.profile-live-icon {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--coral);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.profile-live-text {
+  flex: 1;
+  min-width: 0;
+}
+.profile-live-text h2 {
+  margin: 0 0 4px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.profile-live-text p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink-soft, #5a4f43);
+  line-height: 1.45;
+}
+.profile-live-cta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 11px 18px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 2px 2px 0 var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.profile-live-cta:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.profile-live-cta:active {
+  transform: translate(0, 0);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+@media (max-width: 520px) {
+  .profile-live-card {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+  .profile-live-cta { width: 100%; }
+}
+
+/* ============ Broadcaster + Viewer in trace-stage mode ============ */
+
+/* Hidden source elements (video/img) the canvas draws from. We can't use
+   display:none because some browsers pause the video decoder; off-screen
+   keeps it live. */
+.live-trace-source {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.live-trace-stage { background: #000; }
+.live-trace-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #000;
+  cursor: grab;
+  touch-action: none;
+}
+.live-trace-canvas:active { cursor: grabbing; }
+
+/* Make the trace-topbar accommodate the back button + status pill. */
+.live-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  right: 0;
+  padding-right: 14px;
+}
+
+/* Status pill — shown in both broadcaster and viewer top bars. */
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+.live-pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.live-pill-wait { color: #ffd27a; }
+.live-pill-good { color: #8be38b; }
+.live-pill-bad  { color: #ffa3a3; }
+.live-pill-wait .live-pill-dot {
+  animation: livePillPulse 1.4s ease-in-out infinite;
+}
+@keyframes livePillPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 210, 122, 0.55); }
+  50%      { box-shadow: 0 0 0 8px rgba(255, 210, 122, 0); }
+}
+
+/* Viewer: letterbox the received composite so nothing gets cropped — the
+   broadcaster's full canvas is what the viewer wants to see. The transform
+   inline-style lets the user pan/zoom into the composite. */
+.live-viewer-stage { cursor: grab; }
+.live-viewer-stage:active { cursor: grabbing; }
+.live-viewer-video {
+  object-fit: contain !important;
+  background: #000;
+  will-change: transform;
+}
+
+.live-viewer-reset {
+  position: absolute;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  right: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, transform 0.12s ease;
+  z-index: 5;
+}
+.live-viewer-reset:hover { background: rgba(0, 0, 0, 0.7); }
+.live-viewer-reset:active { transform: scale(0.96); }
+
+/* Initial CTA shown to the broadcaster before they pick an image. */
+.live-pick-cta {
+  position: absolute;
+  inset: auto 0 auto 0;
+  margin: 0 auto;
+  top: 80px;
+  width: min(360px, calc(100vw - 32px));
+  padding: 22px 22px 24px;
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  border-radius: 20px;
+  box-shadow: 6px 6px 0 var(--ink);
+  text-align: center;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.live-pick-cta strong {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.live-pick-cta p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink-soft, #5a4f43);
+  line-height: 1.5;
+}
+.live-skip-btn {
+  margin-top: 2px;
+  background: transparent;
+  border: 0;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--ink-soft, #5a4f43);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.live-skip-btn:hover { color: var(--ink); }
+
+/* Disable visual on action buttons that don't apply yet (no overlay loaded). */
+.trace-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

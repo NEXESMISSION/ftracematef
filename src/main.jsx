@@ -8,6 +8,7 @@ import './styles/login.css';
 import './styles/upload.css';
 import './styles/trace.css';
 import './styles/auth-app.css';
+import './styles/live.css';
 
 // Force the page to load at the top — disable browser scroll restoration
 // and clear any leftover hash so it doesn't auto-jump to a section.

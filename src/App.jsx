@@ -11,6 +11,7 @@ import Login from './pages/Login.jsx';
 import AuthCallback from './pages/AuthCallback.jsx';
 import Upload from './pages/Upload.jsx';
 import Trace from './pages/Trace.jsx';
+import LivePreview from './pages/LivePreview.jsx';
 import Account from './pages/Account.jsx';
 import CheckoutSuccess from './pages/CheckoutSuccess.jsx';
 import PricingPage from './pages/PricingPage.jsx';
@@ -53,6 +54,7 @@ export default function App() {
 
         {/* Auth required (free users allowed) */}
         <Route path="/account"          element={<RequireAuth><Account /></RequireAuth>} />
+        <Route path="/live"             element={<RequireAuth><LivePreview /></RequireAuth>} />
         <Route path="/checkout/success" element={<RequireAuth><CheckoutSuccess /></RequireAuth>} />
 
         {/* Paid plan required — Paywall shown otherwise */}
