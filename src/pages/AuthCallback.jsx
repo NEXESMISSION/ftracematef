@@ -13,9 +13,13 @@ import { supabase } from '../lib/supabase.js';
 // prevents the same error from being logged twice and the same navigate
 // firing twice from duplicate effect runs.
 const inFlightExchanges = new Map();
-function exchangeOnce(code, url) {
+function exchangeOnce(code) {
   if (inFlightExchanges.has(code)) return null;
-  const promise = supabase.auth.exchangeCodeForSession(url);
+  // exchangeCodeForSession takes the auth code itself, not a URL — it sends
+  // whatever string we pass as `auth_code` in the POST body. Passing the full
+  // URL produced "invalid flow state, no valid flow state found" because the
+  // server couldn't match that string to a stored flow.
+  const promise = supabase.auth.exchangeCodeForSession(code);
   inFlightExchanges.set(code, promise);
   return promise;
 }
@@ -29,6 +33,29 @@ function cleanOAuthParamsFromUrl() {
       window.history.replaceState(null, '', window.location.pathname);
     }
   } catch { /* ignore — non-browser or sandboxed env */ }
+}
+
+// On exchange failure, wipe the PKCE state from localStorage so the next
+// "Continue with Google" click starts from a guaranteed-clean slate. The
+// most common cause of "invalid flow state" after a fresh-looking sign-in
+// is a stale code_verifier left over from an earlier half-completed
+// attempt — it can't match the current server-side flow_state's challenge
+// hash, and the server rejects every retry until that key is gone.
+async function purgeStalePkceState() {
+  try {
+    await supabase.auth.signOut({ scope: 'local' });
+  } catch { /* ignore — best effort */ }
+  try {
+    // Belt-and-braces: signOut may not touch the PKCE-specific keys
+    // (`sb-…-auth-token-code-verifier`). Walk localStorage and drop them
+    // explicitly so the next sign-in starts with no orphaned verifier.
+    for (let i = window.localStorage.length - 1; i >= 0; i--) {
+      const key = window.localStorage.key(i);
+      if (key && key.includes('code-verifier')) {
+        window.localStorage.removeItem(key);
+      }
+    }
+  } catch { /* ignore — quota / private mode */ }
 }
 
 // Google sends users back here after consent (?code=…). We wait for Supabase
@@ -101,27 +128,27 @@ export default function AuthCallback() {
         return;
       }
       // Have a code, no session yet — perform the explicit PKCE exchange.
-      // Pass the full URL so the SDK reads the code (and any state) the
-      // same way it would have during auto-detect. exchangeOnce() returns
-      // null for duplicate effect runs; only the originator handles the
-      // result so the error never logs twice.
-      const promise = exchangeOnce(code, window.location.href);
+      // exchangeOnce() returns null for duplicate effect runs; only the
+      // originator handles the result so the error never logs twice.
+      const promise = exchangeOnce(code);
       if (!promise) return;
       promise
-        .then(({ error }) => {
+        .then(async ({ error }) => {
           // Strip ?code=… from the URL whether or not the exchange succeeded
           // — it's burned either way, and leaving it in place would let a
           // refresh replay a dead code and produce the same error again.
           cleanOAuthParamsFromUrl();
           if (error) {
             console.error('[AuthCallback] exchangeCodeForSession failed:', error);
+            await purgeStalePkceState();
             go('/login', { error: "We couldn't complete sign-in. Please try again." });
           }
           // On success the SIGNED_IN listener above handles navigation.
         })
-        .catch((err) => {
+        .catch(async (err) => {
           cleanOAuthParamsFromUrl();
           console.error('[AuthCallback] exchangeCodeForSession threw:', err);
+          await purgeStalePkceState();
           go('/login', { error: "We couldn't complete sign-in. Please try again." });
         });
     });
