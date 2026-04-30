@@ -67,7 +67,7 @@
       ]
     },
     {
-      "source": "/(icon-.*\\.png|apple-touch-icon\\.png)",
+      "source": "/(icon-.*\\.png|apple-touch-icon\\.png|favicon\\.ico)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=604800, must-revalidate" }
       ]
