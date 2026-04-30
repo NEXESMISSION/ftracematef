@@ -1,4 +1,26 @@
 /**
+ * Pull the real error message out of a supabase-js FunctionsHttpError.
+ * supabase-js wraps non-2xx responses in a generic error and stuffs the
+ * Response on `.context` — without this, callers only ever see
+ * "Edge Function returned a non-2xx status code".
+ */
+export async function unwrapFunctionError(err) {
+  if (!err) return null;
+  const ctx = err.context;
+  if (ctx && typeof ctx.json === 'function') {
+    try {
+      const body = await ctx.clone().json();
+      if (body?.error) return body.error;
+    } catch { /* response wasn't JSON — fall through */ }
+    try {
+      const text = await ctx.clone().text();
+      if (text) return text.slice(0, 300);
+    } catch { /* ignore */ }
+  }
+  return err.message ?? String(err);
+}
+
+/**
  * Translate a Supabase / Edge Function error into a friendly user message.
  * The most common one in development is "function not deployed yet".
  */
