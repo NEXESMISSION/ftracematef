@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import SvgDefs from '../components/SvgDefs.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { supabase } from '../lib/supabase.js';
@@ -17,10 +17,22 @@ import { PLANS } from '../lib/plans.js';
  */
 export default function PricingPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, isPaid, profile, signOut } = useAuth();
   const [busy, setBusy]                 = useState(null);
   const [error, setError]               = useState(null);
   const [lifetimeLeft, setLifetimeLeft] = useState(null);
+
+  // Dodo bounces the user back here with ?checkout=cancelled on cancel/failure.
+  // Keep the param reactive (read directly) so the modal can be dismissed by
+  // clearing it from the URL — that way a hard refresh re-shows the modal,
+  // and clicking "Try again" silently removes the param without a reload.
+  const checkoutOutcome = searchParams.get('checkout');
+  const dismissOutcome = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('checkout');
+    setSearchParams(next, { replace: true });
+  };
 
   // Live spots counter
   useEffect(() => {
@@ -160,6 +172,30 @@ export default function PricingPage() {
           &nbsp;·&nbsp; secure payments by Dodo
         </p>
       </main>
+
+      {checkoutOutcome === 'cancelled' && (
+        <div className="profile-modal" role="dialog" aria-modal="true" aria-labelledby="co-cancel-title">
+          <div className="profile-modal-backdrop" onClick={dismissOutcome} />
+          <div className="profile-modal-card co-modal co-modal-warn">
+            <button
+              type="button"
+              className="profile-modal-close"
+              onClick={dismissOutcome}
+              aria-label="Close"
+            >×</button>
+            <div className="co-burst co-burst-warn" aria-hidden="true">
+              <span className="co-burst-mark">!</span>
+            </div>
+            <h2 id="co-cancel-title" className="co-title">Payment didn't go through</h2>
+            <p className="co-sub">
+              No charge was made. You can pick a plan again whenever you're ready.
+            </p>
+            <button type="button" className="co-cta" onClick={dismissOutcome} autoFocus>
+              Try again
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

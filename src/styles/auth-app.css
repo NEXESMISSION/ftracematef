@@ -1590,3 +1590,74 @@
   .paywall-plans      { grid-template-columns: 1fr; max-width: 360px; }
   .profile-plan-grid  { grid-template-columns: 1fr; }
 }
+
+/* ─── Checkout outcome modal (success on /checkout/success, cancelled on /pricing) ── */
+.co-modal {
+  text-align: center;
+  padding-top: 24px;
+}
+.co-burst {
+  width: 84px;
+  height: 84px;
+  margin: 4px auto 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 30% 30%, #fff5dd 0%, #f5d77a 60%, #d6a83a 100%);
+  box-shadow:
+    0 0 0 6px rgba(245, 215, 122, 0.25),
+    0 16px 30px -10px rgba(214, 168, 58, 0.55);
+  animation: coBurstPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.co-burst-warn {
+  background: radial-gradient(circle at 30% 30%, #ffe8d6 0%, #ffb27a 60%, #d97a3a 100%);
+  box-shadow:
+    0 0 0 6px rgba(255, 178, 122, 0.25),
+    0 16px 30px -10px rgba(217, 122, 58, 0.55);
+}
+.co-burst-mark {
+  font-family: 'Caveat', cursive;
+  font-size: 50px;
+  line-height: 1;
+  color: #5a3b08;
+  font-weight: 700;
+  transform: translateY(-2px);
+}
+.co-burst-warn .co-burst-mark { color: #5a2a08; transform: translateY(-1px); }
+@keyframes coBurstPop {
+  0%   { opacity: 0; transform: scale(0.4) rotate(-10deg); }
+  60%  { opacity: 1; transform: scale(1.08) rotate(2deg);  }
+  100% { opacity: 1; transform: scale(1) rotate(0);        }
+}
+.co-title {
+  font-family: 'Instrument Serif', serif !important;
+  font-size: clamp(28px, 4vw, 36px) !important;
+  font-weight: 400 !important;
+  font-style: italic;
+  color: var(--ink);
+  margin: 0 0 10px !important;
+}
+.co-sub {
+  font-size: 15px;
+  color: var(--ink-soft);
+  margin: 0 auto 26px;
+  max-width: 36ch;
+  line-height: 1.55;
+}
+.co-cta {
+  display: inline-block;
+  border: 0;
+  cursor: pointer;
+  padding: 14px 28px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.2px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.4);
+}
+.co-cta:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -8px rgba(0, 0, 0, 0.45); }
+.co-cta:active { transform: translateY(0); }

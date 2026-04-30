@@ -113,8 +113,10 @@ Deno.serve(async (req) => {
       },
       // Where Dodo redirects after successful payment
       return_url: `${appUrl}/checkout/success`,
-      // Where Dodo redirects if the user backs out of checkout
-      cancel_url: `${appUrl}/account`,
+      // Where Dodo redirects if the user backs out or payment fails. Lands
+      // on /pricing with a `checkout=cancelled` query param so the page can
+      // show a "payment didn't go through" modal and the user can retry.
+      cancel_url: `${appUrl}/pricing?checkout=cancelled`,
       // Recommended UX flags
       feature_flags: {
         allow_discount_code: true,
