@@ -116,7 +116,7 @@ function SubscriptionCard({ subscription, refresh, onChangePlan, email }) {
       {/* Actions */}
       {isFree ? (
         <div className="profile-actions">
-          <Link to="/pricing" className="profile-btn profile-btn-primary">Choose a plan →</Link>
+          <Link to="/pricing" className="profile-btn profile-btn-primary">Start tracing →</Link>
         </div>
       ) : isLifetime ? (
         <div className="profile-actions">
@@ -475,7 +475,7 @@ export default function Account() {
               </>
             ) : (
               <Link to="/pricing" className="profile-cta profile-cta-primary">
-                Choose a plan →
+                Start tracing →
               </Link>
             )}
           </div>
