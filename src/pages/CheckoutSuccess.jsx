@@ -13,7 +13,11 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 // Once payment is confirmed we replace history with /upload?welcome=1, and
 // the celebration popup is rendered there (so the user lands directly on
 // the page where they actually pick an image to trace).
-const VERIFY_TIMEOUT_MS = 12000;
+//
+// 30s, not 12s: under load the webhook can take 15-20s to land. Bouncing to
+// "cancelled" too early after a real charge tempts the user to retry and
+// gets them double-charged.
+const VERIFY_TIMEOUT_MS = 30000;
 
 export default function CheckoutSuccess() {
   const navigate = useNavigate();

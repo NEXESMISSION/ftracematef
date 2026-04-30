@@ -95,7 +95,6 @@ export default function Pricing() {
       const url = await startCheckout(plan);
       window.location.href = url;
     } catch (e) {
-      console.error(e);
       setBusy(null);
       setError(friendlyError(e, 'Could not start checkout.'));
     }

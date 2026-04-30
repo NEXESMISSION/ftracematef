@@ -38,7 +38,6 @@ export default function Paywall({ trialUsed = false }) {
       const url = await startCheckout(plan);
       window.location.href = url;
     } catch (e) {
-      console.error(e);
       setBusy(null);
       setError(friendlyError(e, 'Could not start checkout.'));
     }
