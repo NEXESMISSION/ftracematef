@@ -25,8 +25,15 @@ npm run build
 npm run preview   # locally preview the production build
 ```
 
-The optimized build is output to `app/dist/` — drop that on any static host
-(Vercel, Netlify, Cloudflare Pages, GitHub Pages, S3+CloudFront, etc.).
+The optimized build is output to `app/dist/`. Production hosting is on
+**Cloudflare Pages** (auto-deploys from `main`). Build settings:
+
+- Build command: `npm run build`
+- Build output directory: `dist`
+- Required env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+
+Routing/security headers are configured via `public/_headers` and SPA
+fallback via `public/_redirects`.
 
 ## Project structure
 

@@ -74,7 +74,7 @@ supabase secrets set \
   DODO_PRODUCT_MONTHLY=prod_xxx          \
   DODO_PRODUCT_QUARTERLY=prod_xxx        \
   DODO_PRODUCT_LIFETIME=prod_xxx         \
-  APP_URL=https://your-app.vercel.app
+  APP_URL=https://tracemate.art
 
 # deploy (6 functions total)
 supabase functions deploy create-checkout
@@ -122,14 +122,14 @@ VITE_SUPABASE_URL=https://<project-ref>.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
 ```
 
-### Vercel
-**Project → Settings → Environment Variables** — add the same two vars (Production + Preview + Development scopes).
+### Cloudflare Pages
+**Workers & Pages → your project → Settings → Environment variables** — add the same two vars under both **Production** and **Preview** environments.
 
 ---
 
 ## 5. Test the full flow
 
-1. `npm run dev` (locally) or open the Vercel preview URL.
+1. `npm run dev` (locally) or open the Cloudflare Pages preview URL.
 2. Click **"Try it Now"** → routed to `/login`.
 3. Click **"Continue with Google"** → consent → land on `/upload`.
 4. Page shows the **paywall** because you're free.
