@@ -26,12 +26,22 @@ export default function AuthCallback() {
 
       const { data: sub } = await supabase
         .from('subscriptions')
-        .select('plan, status')
+        .select('plan, status, current_period_end')
         .eq('user_id', user.id)
         .eq('status', 'active')
         .maybeSingle();
 
-      const isPaid = !!sub && sub.plan !== 'free';
+      // Mirror the canonical isPaid logic from AuthProvider so we don't
+      // optimistically route to /trace and then immediately get bounced
+      // to a Paywall for a stricter check (with the 6h renewal grace).
+      const RENEWAL_GRACE_MS = 6 * 60 * 60 * 1000;
+      const isPaid = (() => {
+        if (!sub) return false;
+        if (sub.plan === 'free' || sub.status !== 'active') return false;
+        if (sub.plan === 'lifetime') return true;
+        if (!sub.current_period_end) return false;
+        return new Date(sub.current_period_end).getTime() + RENEWAL_GRACE_MS > Date.now();
+      })();
 
       // Pending-image flow: preserve the original "I uploaded, then I'll
       // sign in to trace it" intent.

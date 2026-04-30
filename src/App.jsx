@@ -12,6 +12,7 @@ import Trace from './pages/Trace.jsx';
 import Account from './pages/Account.jsx';
 import CheckoutSuccess from './pages/CheckoutSuccess.jsx';
 import PricingPage from './pages/PricingPage.jsx';
+import NotFound from './pages/NotFound.jsx';
 
 export default function App() {
   return (
@@ -31,6 +32,9 @@ export default function App() {
 
         {/* Paid plan required — Paywall shown otherwise */}
         <Route path="/trace"  element={<RequirePaid><Trace /></RequirePaid>} />
+
+        {/* Catch-all — anything else gets a friendly Not Found rather than blank */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </AuthProvider>
   );

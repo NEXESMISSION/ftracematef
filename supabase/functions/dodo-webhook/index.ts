@@ -320,7 +320,12 @@ async function upsertActiveSubscription(data: any, userId: string, supabase: any
       .maybeSingle();
 
     if (existing) {
-      const TERMINAL = new Set(['cancelled', 'expired', 'failed']);
+      // 'failed' is intentionally NOT terminal here. PSPs (including Dodo) will
+      // sometimes retry a failed charge successfully — when that happens the
+      // user must be re-activated, not stuck locked out. 'cancelled' and
+      // 'expired' remain terminal because re-activating from those would
+      // contradict an explicit user/system intent.
+      const TERMINAL = new Set(['cancelled', 'expired']);
       if (TERMINAL.has(existing.status)) {
         console.warn(
           `Skipping update for sub ${subId}: local row is in terminal state '${existing.status}'`,
@@ -375,10 +380,18 @@ async function markSubscriptionInactive(
     eventType === 'subscription.failed'    ? 'failed'    : 'on_hold';
 
   const subId = data.subscription_id ?? data.id ?? null;
-  const update = {
+  // Build the update conditionally:
+  //  - Only stamp cancelled_at when the new state IS cancelled (otherwise
+  //    we'd wipe a prior cancellation timestamp on a stale 'failed' retry).
+  //  - Reset cancel_at_next_billing_date on every terminal state so the UI
+  //    can't show "Pending cancel" on an already-expired/cancelled row.
+  const update: Record<string, unknown> = {
     status: newStatus,
-    cancelled_at: eventType === 'subscription.cancelled' ? new Date().toISOString() : null,
+    cancel_at_next_billing_date: false,
   };
+  if (eventType === 'subscription.cancelled') {
+    update.cancelled_at = new Date().toISOString();
+  }
 
   if (subId) {
     const { data: existing } = await supabase

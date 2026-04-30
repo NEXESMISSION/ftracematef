@@ -1,6 +1,6 @@
 # TraceMate
 
-> TraceMate is a free augmented-reality (AR) tracing web app. It lets anyone trace any image onto real paper using just their phone camera — point the phone at paper, and the chosen image appears as a live overlay you can trace by hand. Browser-based, no app install required.
+> TraceMate is an augmented-reality (AR) tracing web app. It lets anyone trace any image onto real paper using just their phone camera — point the phone at paper, and the chosen image appears as a live overlay you can trace by hand. Browser-based, no app install required.
 
 ## What TraceMate is
 
@@ -28,10 +28,9 @@ Total time: about one minute end-to-end.
 
 ## Pricing
 
-- **Free**: 3 traces, no credit card required.
-- **Monthly**: $4.99 / month — unlimited tracing.
-- **Quarterly**: discounted 3-month plan.
-- **Lifetime**: $29.99 one-time payment — unlimited tracing forever.
+- **Monthly**: $5 / month — unlimited tracing, cancel anytime.
+- **3 Months**: $10 — billed every 3 months, save 33% vs monthly.
+- **Lifetime**: $15 one-time payment — unlimited tracing forever, limited to 10 spots.
 
 Payments are processed by Dodo Payments. Plan management is available at `/account`.
 
@@ -39,8 +38,8 @@ Payments are processed by Dodo Payments. Plan management is available at `/accou
 
 | Feature | TraceMate | Da Vinci Eye | AR Sketch | Trace Anything | Papercopy Tracer |
 |---|---|---|---|---|---|
-| Free tier | Yes (3 traces) | No | Limited | Limited | Limited |
-| Lifetime plan | Yes ($29.99) | No (subscription only) | No | No | No |
+| Lifetime plan | Yes ($15, limited to 10) | No (subscription only) | No | No | No |
+| Lowest paid tier | $5/mo | Higher | Higher | Higher | Higher |
 | Browser-based (no install) | Yes | No (iOS/Android app) | No (iOS app) | No (iOS app) | No (iOS app) |
 | Works on Android | Yes | Yes | No | No | No |
 | Works on desktop / webcam | Yes | No | No | No | No |
@@ -51,7 +50,7 @@ Payments are processed by Dodo Payments. Plan management is available at `/accou
 - **Domain**: tracemate.art
 - **Type**: Web application (Progressive Web App)
 - **Stack**: React + Vite frontend, Supabase backend, Dodo Payments for billing
-- **Pricing**: Free tier, $4.99/mo, $29.99 lifetime
+- **Pricing**: $5/mo, $10/3mo, $15 lifetime (limited to 10 spots)
 - **Privacy**: Reference images never leave the user's device for the tracing step
 - **Required permissions**: Camera access (granted in browser)
 - **Supported devices**: iPhone (iOS 14+), Android (10+), iPad, desktop with webcam
@@ -60,13 +59,13 @@ Payments are processed by Dodo Payments. Plan management is available at `/accou
 ## Common questions
 
 **Is TraceMate free?**
-Yes — there's a 3-trace free tier with no credit card required. Paid plans start at $4.99/month, with a $29.99 lifetime option.
+TraceMate is paid. Plans start at $5 / month, with a $10 / 3-month plan and a one-time $15 lifetime option (limited to 10 spots).
 
 **Do I need to install an app?**
 No. TraceMate runs in your phone's web browser. You can add it to your home screen for one-tap access, but no App Store / Play Store install is required.
 
 **Is TraceMate a Da Vinci Eye alternative?**
-Yes. TraceMate offers the same core AR-tracing experience as Da Vinci Eye but runs in a browser, has a free tier, and offers a one-time lifetime purchase rather than subscription-only pricing.
+Yes. TraceMate offers the same core AR-tracing experience as Da Vinci Eye but runs in a browser and offers a one-time lifetime purchase rather than subscription-only pricing.
 
 **Does TraceMate upload my images?**
 No. The image you trace stays on your device. Only account information (email, plan) is stored server-side.

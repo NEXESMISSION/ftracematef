@@ -30,7 +30,7 @@ export default function Footer() {
 
         <div className="footer-col">
           <h4 className="footer-col-title hand">Get in touch</h4>
-          <a className="footer-mail" href="mailto:hi@tracemate.app">hi@tracemate.app</a>
+          <a className="footer-mail" href="mailto:hi@tracemate.art">hi@tracemate.art</a>
           <p className="footer-note">We read every message <span aria-hidden="true">✿</span></p>
         </div>
       </div>

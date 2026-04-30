@@ -27,9 +27,15 @@ export default function Login() {
     return () => document.body.classList.remove('auth-body');
   }, []);
 
-  // Already signed in? Skip the page and send them to their account.
+  // Already signed in? Honor any pre-stashed checkout intent first — if the
+  // user landed here from clicking a plan on the marketing site, route them
+  // to /pricing so the intent gets consumed there instead of getting lost
+  // on /account.
   useEffect(() => {
-    if (!loading && user) navigate('/account', { replace: true });
+    if (loading || !user) return;
+    let intent = null;
+    try { intent = sessionStorage.getItem('tm:intent-plan'); } catch {}
+    navigate(intent ? '/pricing' : '/account', { replace: true });
   }, [loading, user, navigate]);
 
   // Clear any pending stuck-timer if we leave the page (cleanup on unmount).
