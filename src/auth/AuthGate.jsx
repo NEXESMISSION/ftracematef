@@ -7,7 +7,7 @@ import { useAuth } from './AuthProvider.jsx';
  *
  * Behaviour:
  *  - Initial load: render a small unobtrusive spinner.
- *  - After 8 seconds still loading: redirect to /login. We treat "auth never
+ *  - After 12 seconds still loading: redirect to /login. We treat "auth never
  *    settled" the same as "auth failed" — surface a usable login screen
  *    instead of a stuck error page that the user can't act on. The login
  *    page then handles re-establishing the session (Google OAuth round-trip
@@ -30,7 +30,7 @@ export function useAuthGate() {
       setStuck(false);
       return;
     }
-    const t = setTimeout(() => setStuck(true), 8000);
+    const t = setTimeout(() => setStuck(true), 12000);
     return () => clearTimeout(t);
   }, [loading]);
 

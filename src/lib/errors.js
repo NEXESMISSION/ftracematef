@@ -30,11 +30,21 @@ export function friendlyError(err, fallback = 'Something went wrong.') {
   if (!err) return fallback;
   const name    = err.name    ?? '';
   const message = err.message ?? String(err);
+  const status  = err.context?.status;
 
   // FunctionsFetchError fires when the edge function URL is unreachable
   // (most often: not deployed, or local dev not running).
   if (name === 'FunctionsFetchError' || /Failed to send a request/.test(message)) {
     return 'Payment service unavailable. The backend may not be deployed yet — try again in a moment.';
+  }
+
+  // Rate-limited (429). The server returns a friendlier per-endpoint message
+  // in the response body, but reading it requires awaiting unwrapFunctionError.
+  // Most call sites use friendlyError synchronously, so surface a sensible
+  // generic message here — beats the default "Edge Function returned a non-2xx
+  // status code" that supabase-js wraps the response in.
+  if (status === 429) {
+    return 'Too many attempts. Please wait a moment and try again.';
   }
 
   if (/Not authenticated/i.test(message)) return 'You need to sign in first.';
