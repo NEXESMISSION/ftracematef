@@ -13,16 +13,22 @@
   "categories": ["art", "design", "education", "lifestyle", "photo"],
   "icons": [
     {
-      "src": "/images/brand/logo-icon.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/images/brand/logo-icon.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "shortcuts": [
@@ -32,7 +38,7 @@
       "description": "Upload an image and start tracing immediately.",
       "url": "/upload?utm_source=pwa_shortcut",
       "icons": [
-        { "src": "/images/brand/logo-icon.png", "sizes": "192x192", "type": "image/png" }
+        { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }
       ]
     },
     {
@@ -40,7 +46,7 @@
       "short_name": "Pricing",
       "url": "/pricing?utm_source=pwa_shortcut",
       "icons": [
-        { "src": "/images/brand/logo-icon.png", "sizes": "192x192", "type": "image/png" }
+        { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }
       ]
     }
   ]

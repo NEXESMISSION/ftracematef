@@ -6,7 +6,7 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/((?!robots\\.txt|sitemap\\.xml|llms\\.txt|humans\\.txt|manifest\\.webmanifest|favicon\\.ico|images/.*|assets/.*).*)", "destination": "/index.html" }
+    { "source": "/((?!robots\\.txt|sitemap\\.xml|llms\\.txt|humans\\.txt|manifest\\.webmanifest|favicon\\.ico|apple-touch-icon\\.png|icon-.*\\.png|images/.*|assets/.*).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
@@ -64,6 +64,12 @@
       "headers": [
         { "key": "Content-Type",  "value": "application/manifest+json; charset=utf-8" },
         { "key": "Cache-Control", "value": "public, max-age=3600" }
+      ]
+    },
+    {
+      "source": "/(icon-.*\\.png|apple-touch-icon\\.png)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=604800, must-revalidate" }
       ]
     }
   ]

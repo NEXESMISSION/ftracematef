@@ -47,12 +47,15 @@
     <meta name="twitter:image" content="https://www.tracemate.art/images/og/og-cover.png" />
     <meta name="twitter:image:alt" content="TraceMate — phone displaying an AR drawing overlay onto real paper" />
 
-    <!-- Icons -->
-    <link rel="icon" type="image/png" sizes="32x32" href="/images/brand/logo-icon.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/images/brand/logo-icon.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/images/brand/logo-icon.png" />
-    <link rel="shortcut icon" href="/images/brand/logo-icon.png" />
-    <link rel="mask-icon" href="/images/brand/logo-icon.png" color="#e87a7a" />
+    <!-- Icons — favicon, browser tab, iOS home screen, PWA -->
+    <link rel="icon" type="image/png" sizes="16x16"  href="/icon-16.png" />
+    <link rel="icon" type="image/png" sizes="32x32"  href="/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="48x48"  href="/icon-48.png" />
+    <link rel="icon" type="image/png" sizes="96x96"  href="/icon-96.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="shortcut icon" href="/icon-32.png" />
 
     <!-- PWA manifest -->
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -106,9 +109,10 @@
           "url": "https://www.tracemate.art/",
           "logo": {
             "@type": "ImageObject",
-            "url": "https://www.tracemate.art/images/brand/logo.png",
+            "url": "https://www.tracemate.art/icon-512-square.png",
             "width": 512,
-            "height": 512
+            "height": 512,
+            "caption": "TraceMate logo"
           },
           "image": "https://www.tracemate.art/images/og/og-cover.png",
           "description": "TraceMate is a free augmented-reality tracing tool that overlays any image onto real paper through your phone camera, so artists, tattooists, and calligraphers can trace by hand without a lightbox.",
