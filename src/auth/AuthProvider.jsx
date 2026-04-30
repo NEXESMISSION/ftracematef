@@ -63,11 +63,49 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true;
 
+    // Detect "ghost session" — token in localStorage references a user that
+    // no longer exists in the DB (e.g., DB was wiped during testing, or the
+    // user was deleted from auth.users). Without this check the app thinks
+    // the user is signed in but every query returns empty.
+    //
+    // Strategy: getSession() reads localStorage WITHOUT contacting the server.
+    // getUser() makes an API round-trip to /auth/v1/user which validates the
+    // JWT against the live user record. If that fails, the session is stale.
+    const validateOrClear = async (candidateSession) => {
+      if (!candidateSession) return null;
+      try {
+        const { data: { user: verifiedUser }, error } = await supabase.auth.getUser();
+        if (error || !verifiedUser) {
+          console.warn('[AuthProvider] stale session detected — user no longer exists. Clearing.');
+          // Local-only sign-out: don't make an API call (would fail anyway,
+          // since the user is gone). This wipes the token from localStorage.
+          await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+          // Also wipe per-user app state so the next signed-in user (or the
+          // same user re-signing-in) doesn't inherit leftovers.
+          try {
+            const uid = candidateSession.user?.id;
+            if (uid) window.localStorage.removeItem(`tm:traceStats:${uid}`);
+            window.sessionStorage.removeItem('tm:pending-image');
+            window.sessionStorage.removeItem('tm:intent-plan');
+          } catch { /* ignore quota / private mode */ }
+          return null;
+        }
+        return candidateSession;
+      } catch (err) {
+        // Network failure — keep the session and let the UI retry. Don't
+        // sign people out just because the validation request blipped.
+        console.warn('[AuthProvider] session validation failed (network?), keeping session:', err);
+        return candidateSession;
+      }
+    };
+
     const settle = async (newSession) => {
       if (!mounted) return;
-      setSession(newSession);
+      const validated = await validateOrClear(newSession);
+      if (!mounted) return;
+      setSession(validated);
       try {
-        await loadUserData(newSession?.user?.id);
+        await loadUserData(validated?.user?.id);
       } catch (err) {
         // loadUserData already handles its own errors, but belt-and-braces.
         console.error('[AuthProvider] settle failed:', err);
