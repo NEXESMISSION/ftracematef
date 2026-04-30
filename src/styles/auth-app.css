@@ -2035,40 +2035,64 @@
   .dev-meta { grid-template-columns: 1fr; }
 }
 
-/* ── Signed-in CTAs (replaces "Try it Now" image with a text-styled button) ── */
+/* ── Signed-in CTAs — outlined pill with brand hard-shadow, matches the
+       hand-drawn style of the rest of the marketing site ── */
 .nav-account-cta {
-  display: inline-block;
-  padding: 9px 18px;
-  border-radius: 10px;
-  background: var(--ink);
-  color: var(--paper);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
   font-family: 'Nunito', sans-serif;
   font-weight: 800;
-  font-size: 13px;
-  text-decoration: none;
+  font-size: 14px;
   letter-spacing: 0.2px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 4px 10px -4px rgba(0,0,0,0.35);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 3px 3px 0 var(--ink);
 }
-.nav-account-cta:hover { transform: translateY(-1px); box-shadow: 0 8px 16px -6px rgba(0,0,0,0.4); }
+.nav-account-cta:hover {
+  background: var(--ink);
+  color: var(--paper);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+.nav-account-cta:active {
+  transform: translate(0, 0);
+  box-shadow: 3px 3px 0 var(--ink);
+}
 
 .hero-account-cta {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 16px 28px;
-  border-radius: 14px;
-  background: var(--ink);
-  color: var(--paper);
+  gap: 8px;
+  padding: 18px 36px;
+  border-radius: 999px;
+  border: 2.5px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
   font-family: 'Nunito', sans-serif;
   font-weight: 800;
   font-size: 17px;
-  text-decoration: none;
   letter-spacing: 0.3px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 8px 18px -8px rgba(0,0,0,0.45);
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 5px 5px 0 var(--ink);
 }
-.hero-account-cta:hover { transform: translateY(-2px); box-shadow: 0 14px 26px -10px rgba(0,0,0,0.55); }
+.hero-account-cta:hover {
+  background: var(--ink);
+  color: var(--paper);
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0 var(--ink);
+}
+.hero-account-cta:active {
+  transform: translate(0, 0);
+  box-shadow: 5px 5px 0 var(--ink);
+}
 
 /* ── Pricing — standalone "Back to account" pill button ── */
 .pp-back-link {
@@ -2099,13 +2123,17 @@
   box-shadow: 2px 2px 0 var(--ink);
 }
 
-/* Standalone variant — sits above the plan grid as a clear "leave this page" affordance */
-.pp-back-link-standalone {
-  align-self: flex-start;
-  margin-bottom: 18px;
+/* Row that contains the standalone "Back to account" pill at the top of
+   the page. Constrained max-width matches the rest of the page content,
+   so the back button visually aligns with the headline below it. */
+.pp-back-row {
+  max-width: 1080px;
+  margin: 0 auto 28px;
+  display: flex;
+  justify-content: flex-start;
 }
 
 @media (max-width: 480px) {
   .pp-back-link { padding: 7px 14px; font-size: 13px; }
-  .pp-back-link-standalone { margin-bottom: 14px; }
+  .pp-back-row { margin-bottom: 18px; }
 }

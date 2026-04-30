@@ -652,23 +652,12 @@ main, header, section, footer { position: relative; z-index: 1; }
 @media (max-width: 960px) {
   .how-shorts-head { margin-top: 36px; margin-bottom: 18px; }
   .how-shorts-head h3 { font-size: 22px; }
-  .shorts-row { grid-template-columns: repeat(3, 1fr); gap: 14px; max-width: 620px; margin: 0 auto; }
-  .short-card { max-width: 180px; border-radius: 14px; }
-  .short-placeholder svg { width: 36px; height: 36px; }
-}
-
-@media (max-width: 560px) {
-  .shorts-row { grid-template-columns: repeat(2, 1fr); gap: 14px; max-width: 460px; padding: 0 12px; }
+  /* Mobile + tablet: always 2 per row. Big enough to read as actual
+     phone-shaped video previews without going single-column. */
+  .shorts-row { grid-template-columns: repeat(2, 1fr); gap: 14px; max-width: 520px; margin: 0 auto; padding: 0 12px; }
   .short-card { max-width: 100%; border-radius: 14px; box-shadow: 5px 5px 0 var(--ink); }
   .short-card:hover { box-shadow: 7px 7px 0 var(--ink); }
   .short-placeholder svg { width: 44px; height: 44px; }
-}
-
-@media (max-width: 380px) {
-  /* Single-column for very narrow phones — placeholders read as actual phone-shaped previews */
-  .shorts-row { grid-template-columns: 1fr; max-width: 280px; gap: 18px; }
-  .short-card { max-width: 240px; }
-  .short-placeholder svg { width: 56px; height: 56px; }
 }
 
 /* ============ HOW ============ */

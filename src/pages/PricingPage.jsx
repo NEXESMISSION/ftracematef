@@ -79,9 +79,11 @@ export default function PricingPage() {
 
       <main className="pp-shell">
         {user && (
-          <Link to="/account" className="pp-back-link pp-back-link-standalone">
-            ← Back to account
-          </Link>
+          <div className="pp-back-row">
+            <Link to="/account" className="pp-back-link">
+              ← Back to account
+            </Link>
+          </div>
         )}
 
         {/* Header copy */}
