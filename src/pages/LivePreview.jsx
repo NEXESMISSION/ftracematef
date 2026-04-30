@@ -234,7 +234,20 @@ function ViewerStage({ userId, onChangeRole }) {
   }, []);
 
   // ───────── Gestures: dispatch to overlay (edit) or video (view) ─────────
+  // The viewer's gesture handlers live on the entire trace-stage div, so
+  // taps anywhere on the video drag/zoom it. Buttons in the top bar /
+  // controls dock are inside that same div though — their pointerdowns
+  // bubble up here and would otherwise get swallowed (the parent grabs
+  // the pointer, the child's click never fires). Bail out for any
+  // pointerdown that started on an interactive surface.
+  const isUiTarget = (target) =>
+    !!target?.closest?.(
+      '.trace-topbar, .trace-controls, .live-quality-menu, ' +
+      '.live-viewer-reset, .warp-reset, .trace-error, .live-pick-cta'
+    );
+
   const onPointerDown = useCallback((e) => {
+    if (isUiTarget(e.target)) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (editMode) {
@@ -337,6 +350,7 @@ function ViewerStage({ userId, onChangeRole }) {
   }, [editMode, transform, view]);
 
   const onWheel = useCallback((e) => {
+    if (isUiTarget(e.target)) return;
     e.preventDefault();
     if (editMode) {
       if (e.ctrlKey || e.metaKey) {
