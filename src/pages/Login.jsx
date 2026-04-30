@@ -9,7 +9,10 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
+  // If /auth/callback bounced us here with a failure reason, show it. The
+  // initial render seeds from location.state so the message appears without
+  // a re-render flash.
+  const [error, setError] = useState(location.state?.error ?? null);
   const stuckTimerRef = useRef(null);
 
   // Remember the user's pre-login intent (e.g. they clicked "Lifetime" on the
@@ -72,11 +75,11 @@ export default function Login() {
     // The stuck-timer fires only if that navigation never happens.
   };
 
-  // Don't render the sign-in form while auth is still loading OR if the user
-  // is already signed in — the redirect effect above is about to fire and
-  // rendering the full Login UI for one tick was causing a visible flash
-  // (looked like the page "showed up twice" briefly).
-  if (loading || user) {
+  // Only show the loader when we actually have a signed-in user about to be
+  // redirected away. Showing it during the initial `loading` tick made the
+  // common (unsigned) visit feel like the page loaded twice — pulsing dot,
+  // then form.
+  if (user) {
     return (
       <div className="auth-loading-screen">
         <span className="auth-loading-dot" />
