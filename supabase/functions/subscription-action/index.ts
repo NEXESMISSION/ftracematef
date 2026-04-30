@@ -81,15 +81,82 @@ Deno.serve(async (req) => {
   if (sub.plan === 'lifetime') {
     return json({ error: 'Lifetime plans cannot be cancelled or changed.' }, 409);
   }
-  if (!sub.dodo_subscription_id) {
-    return json({ error: 'Subscription not linked to a Dodo subscription_id yet — try again in a moment.' }, 409);
-  }
 
   // 3. Parse body
   let body: { action?: string; plan?: string } = {};
   try { body = await req.json(); } catch { /* ignored */ }
 
-  // 4. Init the SDK
+  // ── Dev-test mock branch ──────────────────────────────────────────────
+  // A subscription with no `dodo_subscription_id` (or one beginning with
+  // `dev_`) was fabricated by dev-mutate-subscription, not paid for at
+  // Dodo. Calling Dodo's API on it would 404. In a non-live project we
+  // mutate the local row directly via service role so admins can exercise
+  // the full UI flow without real payments. In live_mode we fall through
+  // and return the same 409 the previous code returned — that's the only
+  // legit way to hit this branch in production (the ~1s race between
+  // checkout return and the webhook landing).
+  const subId = sub.dodo_subscription_id;
+  const isDevTest = !subId || subId.startsWith('dev_');
+  const isLive    = Deno.env.get('DODO_ENVIRONMENT') === 'live_mode';
+
+  if (isDevTest && isLive) {
+    return json({ error: 'Subscription not linked to a Dodo subscription_id yet — try again in a moment.' }, 409);
+  }
+
+  if (isDevTest) {
+    // Service role bypasses RLS so we can write to subscriptions directly.
+    // Scope every update to `id = sub.id` (already verified to belong to
+    // the caller above) so this branch can't touch any other row.
+    const admin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      { auth: { persistSession: false } },
+    );
+
+    switch (body.action) {
+      case 'cancel-at-period-end': {
+        const { error } = await admin
+          .from('subscriptions')
+          .update({ cancel_at_next_billing_date: true })
+          .eq('id', sub.id);
+        if (error) return json({ error: error.message }, 500);
+        return json({ ok: true, mock: true });
+      }
+
+      case 'undo-cancel': {
+        const { error } = await admin
+          .from('subscriptions')
+          .update({ cancel_at_next_billing_date: false, cancelled_at: null })
+          .eq('id', sub.id);
+        if (error) return json({ error: error.message }, 500);
+        return json({ ok: true, mock: true });
+      }
+
+      case 'change-plan': {
+        const targetPlan = body.plan;
+        if (!targetPlan || !PLAN_TO_PRODUCT_ENV[targetPlan]) {
+          return json({ error: 'Invalid target plan' }, 400);
+        }
+        if (targetPlan === sub.plan) {
+          return json({ error: 'Already on this plan' }, 409);
+        }
+        // Skip the 2/day change-plan rate limit on the mock branch — admins
+        // testing the flow want to flip back and forth, and no real money
+        // moves so the rounding-artefact concern doesn't apply.
+        const { error } = await admin
+          .from('subscriptions')
+          .update({ plan: targetPlan })
+          .eq('id', sub.id);
+        if (error) return json({ error: error.message }, 500);
+        return json({ ok: true, mock: true });
+      }
+
+      default:
+        return json({ error: 'Unknown action' }, 400);
+    }
+  }
+
+  // ── Production path: real Dodo SDK ────────────────────────────────────
   const apiKey = Deno.env.get('DODO_API_KEY');
   if (!apiKey) return json({ error: 'Server misconfigured: DODO_API_KEY missing' }, 500);
 
@@ -103,14 +170,14 @@ Deno.serve(async (req) => {
   try {
     switch (body.action) {
       case 'cancel-at-period-end': {
-        const updated = await client.subscriptions.update(sub.dodo_subscription_id, {
+        const updated = await client.subscriptions.update(subId!, {
           cancel_at_next_billing_date: true,
         });
         return json({ ok: true, subscription: updated });
       }
 
       case 'undo-cancel': {
-        const updated = await client.subscriptions.update(sub.dodo_subscription_id, {
+        const updated = await client.subscriptions.update(subId!, {
           cancel_at_next_billing_date: false,
         });
         return json({ ok: true, subscription: updated });
@@ -141,7 +208,7 @@ Deno.serve(async (req) => {
         }
 
         // changePlan returns 202-style result with status/invoice_id/payment_id
-        const result = await client.subscriptions.changePlan(sub.dodo_subscription_id, {
+        const result = await client.subscriptions.changePlan(subId!, {
           product_id: newProductId,
           quantity: 1,
           proration_billing_mode: 'prorated_immediately',
