@@ -72,6 +72,18 @@ export default function Login() {
     // The stuck-timer fires only if that navigation never happens.
   };
 
+  // Don't render the sign-in form while auth is still loading OR if the user
+  // is already signed in — the redirect effect above is about to fire and
+  // rendering the full Login UI for one tick was causing a visible flash
+  // (looked like the page "showed up twice" briefly).
+  if (loading || user) {
+    return (
+      <div className="auth-loading-screen">
+        <span className="auth-loading-dot" />
+      </div>
+    );
+  }
+
   return (
     <>
       <SvgDefs />
