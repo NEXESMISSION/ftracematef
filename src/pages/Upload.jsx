@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import SvgDefs from '../components/SvgDefs.jsx';
 import LoginModal from '../components/LoginModal.jsx';
+import SuccessCelebration from '../components/SuccessCelebration.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import {
   savePendingImage,
   loadPendingImage,
   clearPendingImage,
+  hasPendingImage,
 } from '../lib/pendingImage.js';
 
 /**
@@ -19,6 +21,7 @@ import {
 export default function Upload() {
   const navigate = useNavigate();
   const { user, isPaid, loading } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const inputRef = useRef(null);
   const [preview, setPreview]       = useState(null);   // object URL for current preview
@@ -27,11 +30,48 @@ export default function Upload() {
   const [error, setError]           = useState('');
   const [savedFile, setSavedFile]   = useState(null);   // raw File, used for preview only
   const [loginOpen, setLoginOpen]   = useState(false);
+  const [celebrateOpen, setCelebrateOpen] = useState(false);
 
   useEffect(() => {
     document.body.classList.add('upload-body');
     return () => document.body.classList.remove('upload-body');
   }, []);
+
+  // Show the celebration popup after a successful payment.
+  // Trigger conditions: ?welcome=1 in the URL AND the user is actually
+  // confirmed paid (we already verified this on /checkout/success before
+  // redirecting here, but we re-check so a manually-typed ?welcome=1
+  // can't fake a celebration).
+  useEffect(() => {
+    if (searchParams.get('welcome') !== '1') return;
+    if (loading) return;          // wait for auth to settle
+    if (!isPaid) {
+      // Strip the param if the user isn't actually paid (e.g. shared link).
+      setSearchParams({}, { replace: true });
+      return;
+    }
+    setCelebrateOpen(true);
+  }, [searchParams, loading, isPaid, setSearchParams]);
+
+  const closeCelebrate = () => {
+    setCelebrateOpen(false);
+    // Clean the query param so a refresh doesn't replay the celebration.
+    if (searchParams.get('welcome') === '1') {
+      setSearchParams({}, { replace: true });
+    }
+  };
+
+  const onCelebratePrimary = () => {
+    closeCelebrate();
+    // If the user already had an image queued before paying, take them
+    // straight to /trace. Otherwise just dismiss so they can pick one.
+    if (hasPendingImage()) {
+      const pending = loadPendingImage();
+      navigate('/trace', {
+        state: pending ? { imageUrl: pending.dataUrl, fileName: pending.name } : undefined,
+      });
+    }
+  };
 
   // On first mount, if the user previously uploaded an image (e.g. they
   // signed in and came back), restore the preview from sessionStorage.
@@ -201,6 +241,19 @@ export default function Upload() {
         open={loginOpen}
         onClose={() => setLoginOpen(false)}
         intentLabel="Sign in to start tracing"
+      />
+
+      <SuccessCelebration
+        open={celebrateOpen}
+        onClose={closeCelebrate}
+        onPrimary={onCelebratePrimary}
+        primaryLabel={hasPendingImage() ? 'Start tracing' : 'Pick an image'}
+        title="You're in!"
+        subtitle={
+          hasPendingImage()
+            ? "Welcome to Trace Mate. Your studio is unlocked — your image is ready to trace."
+            : "Welcome to Trace Mate. Your studio is unlocked — pick an image and start tracing."
+        }
       />
     </>
   );

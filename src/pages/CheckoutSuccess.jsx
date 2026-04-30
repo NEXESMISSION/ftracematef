@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { hasPendingImage } from '../lib/pendingImage.js';
 
 // Dodo redirects here after a successful payment. We DO NOT trust the URL
 // alone — Dodo will sometimes hit return_url on failure too, and showing a
 // celebration to someone who didn't pay is the worst possible outcome. We
-// gate the celebration on `isPaid` (driven by the webhook + AuthProvider's
+// gate "paid confirmed" on `isPaid` (driven by the webhook + AuthProvider's
 // realtime/poll). If the subscription doesn't activate within VERIFY_TIMEOUT,
 // we treat it as a failed checkout and bounce to /pricing?checkout=cancelled.
 //
-// Visual goal: don't repeat the old "Confirming your payment…" full-page
-// spinner. The verifying state is a small unobtrusive card that flips to
-// the celebration the second `isPaid` becomes true.
+// Behavioural change: this page no longer renders the celebration itself.
+// Once payment is confirmed we replace history with /upload?welcome=1, and
+// the celebration popup is rendered there (so the user lands directly on
+// the page where they actually pick an image to trace).
 const VERIFY_TIMEOUT_MS = 12000;
 
 export default function CheckoutSuccess() {
@@ -42,37 +42,22 @@ export default function CheckoutSuccess() {
     return () => clearTimeout(t);
   }, [isPaid, explicitFailure]);
 
-  const dest = hasPendingImage() ? '/trace' : '/upload';
-  const onStart = () => navigate(dest, { replace: true });
+  // Confirmed paid → replace into /upload with the welcome flag, so the
+  // celebration popup shows on the upload page itself. `replace: true` keeps
+  // the back button from sending users back to a stale "Confirming…" screen.
+  useEffect(() => {
+    if (isPaid) {
+      navigate('/upload?welcome=1', { replace: true });
+    }
+  }, [isPaid, navigate]);
 
-  // Verifying state — small, unobtrusive
-  if (!isPaid) {
-    return (
-      <div className="profile-modal" role="status" aria-live="polite">
-        <div className="profile-modal-backdrop" />
-        <div className="profile-modal-card co-modal co-modal-verify">
-          <span className="co-spinner" aria-hidden="true" />
-          <p className="co-verify-text">Confirming your payment…</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Confirmed paid — celebrate.
+  // Verifying state — small, unobtrusive card while the webhook lands.
   return (
-    <div className="profile-modal" role="dialog" aria-modal="true" aria-labelledby="cs-title">
+    <div className="profile-modal" role="status" aria-live="polite">
       <div className="profile-modal-backdrop" />
-      <div className="profile-modal-card co-modal">
-        <div className="co-burst" aria-hidden="true">
-          <span className="co-burst-mark">✦</span>
-        </div>
-        <h2 id="cs-title" className="co-title">You're in!</h2>
-        <p className="co-sub">
-          Welcome to Trace Mate. Your studio is unlocked — let's trace something.
-        </p>
-        <button type="button" className="co-cta" onClick={onStart} autoFocus>
-          Start tracing →
-        </button>
+      <div className="profile-modal-card co-modal co-modal-verify">
+        <span className="co-spinner" aria-hidden="true" />
+        <p className="co-verify-text">Confirming your payment…</p>
       </div>
     </div>
   );
