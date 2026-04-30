@@ -6,10 +6,11 @@ import { hasPendingImage } from '../lib/pendingImage.js';
 /**
  * Google sends users back here after consent (?code=…).
  * We wait for Supabase to settle the session, then route smartly:
- *   - has pending image + already paid → /trace (jump straight in)
- *   - has pending image + not paid     → /pricing (let them buy a plan)
- *   - no pending image  + already paid → /upload (let them pick one)
- *   - no pending image  + not paid     → /pricing (their first stop)
+ *   - has pending image + already paid → /trace (jump straight in — they
+ *     uploaded and clicked "Start tracing" before signing in)
+ *   - has pending image + not paid     → /pricing (mid-flow, needs to pay)
+ *   - no pending image                 → /account (the default home for
+ *     anyone who signed in directly without staging an image first)
  */
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -32,10 +33,13 @@ export default function AuthCallback() {
 
       const isPaid = !!sub && sub.plan !== 'free';
 
-      if (hasImage && isPaid)   return '/trace';
-      if (hasImage && !isPaid)  return '/pricing';
-      if (!hasImage && isPaid)  return '/upload';
-      return '/pricing';
+      // Pending-image flow: preserve the original "I uploaded, then I'll
+      // sign in to trace it" intent.
+      if (hasImage && isPaid)  return '/trace';
+      if (hasImage && !isPaid) return '/pricing';
+
+      // Plain sign-in: send everyone to their account page.
+      return '/account';
     };
 
     const go = async (fallback) => {

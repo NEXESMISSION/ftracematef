@@ -27,9 +27,9 @@ export default function Login() {
     return () => document.body.classList.remove('auth-body');
   }, []);
 
-  // Already signed in? Skip the page.
+  // Already signed in? Skip the page and send them to their account.
   useEffect(() => {
-    if (!loading && user) navigate('/upload', { replace: true });
+    if (!loading && user) navigate('/account', { replace: true });
   }, [loading, user, navigate]);
 
   // Clear any pending stuck-timer if we leave the page (cleanup on unmount).
