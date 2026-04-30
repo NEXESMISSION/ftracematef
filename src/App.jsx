@@ -14,6 +14,8 @@ import Trace from './pages/Trace.jsx';
 import Account from './pages/Account.jsx';
 import CheckoutSuccess from './pages/CheckoutSuccess.jsx';
 import PricingPage from './pages/PricingPage.jsx';
+import Terms from './pages/Terms.jsx';
+import Privacy from './pages/Privacy.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 // One-shot free trial: the moment a free user navigates AWAY from /trace,
@@ -46,6 +48,8 @@ export default function App() {
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/upload"        element={<Upload />} />
         <Route path="/pricing"       element={<PricingPage />} />
+        <Route path="/terms"         element={<Terms />} />
+        <Route path="/privacy"       element={<Privacy />} />
 
         {/* Auth required (free users allowed) */}
         <Route path="/account"          element={<RequireAuth><Account /></RequireAuth>} />

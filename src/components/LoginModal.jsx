@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 
 /**
@@ -81,7 +82,9 @@ export default function LoginModal({ open, onClose, intentLabel = 'Sign in to co
         {error && <p className="auth-error">{error}</p>}
 
         <p className="auth-fineprint">
-          By continuing, you agree to our Terms and Privacy policy.
+          By continuing, you agree to our{' '}
+          <Link to="/terms" onClick={onClose}>Terms</Link> and{' '}
+          <Link to="/privacy" onClick={onClose}>Privacy Policy</Link>.
           Your uploaded image is preserved.
         </p>
       </section>

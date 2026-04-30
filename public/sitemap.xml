@@ -46,4 +46,18 @@
     <priority>0.5</priority>
   </url>
 
+  <url>
+    <loc>https://www.tracemate.art/terms</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+  <url>
+    <loc>https://www.tracemate.art/privacy</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
 </urlset>

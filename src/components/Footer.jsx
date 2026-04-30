@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export default function Footer() {
   return (
     <footer className="footer">
@@ -32,6 +34,14 @@ export default function Footer() {
           <h4 className="footer-col-title hand">Get in touch</h4>
           <a className="footer-mail" href="mailto:hi@tracemate.art">hi@tracemate.art</a>
           <p className="footer-note">We read every message <span aria-hidden="true">✿</span></p>
+        </div>
+
+        <div className="footer-col">
+          <h4 className="footer-col-title hand">Legal</h4>
+          <nav className="footer-links" aria-label="Legal links">
+            <Link to="/terms">Terms of Service</Link>
+            <Link to="/privacy">Privacy Policy</Link>
+          </nav>
         </div>
       </div>
 
