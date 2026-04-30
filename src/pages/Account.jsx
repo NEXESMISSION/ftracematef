@@ -45,11 +45,9 @@ function formatDate(d) {
 
 /* ─────────────────────────── Subscription card ─────────────────────────── */
 
-function SubscriptionCard({ subscription, refresh, onChangePlan, email }) {
+function SubscriptionCard({ subscription, refresh, onChangePlan, email, alert, setAlert }) {
   const [busy, setBusy] = useState(null);
   const [confirm, setConfirm] = useState(null); // 'cancel-end' | null
-  const [error, setError] = useState(null);
-  const [portalAlert, setPortalAlert] = useState(null);
 
   const plan      = subscription?.plan ?? 'free';
   const status    = subscription?.status ?? 'active';
@@ -61,14 +59,21 @@ function SubscriptionCard({ subscription, refresh, onChangePlan, email }) {
   const isLifetime = plan === 'lifetime';
 
   const run = async (action) => {
-    setError(null);
     setBusy(action);
     try {
       await subscriptionAction(action);
       await refresh();
       setConfirm(null);
     } catch (e) {
-      setError(friendlyError(e, 'Something went wrong.'));
+      // Show errors as a centered Alert modal (same pattern as the portal
+      // call) instead of inline red text. The previous inline path looked
+      // broken next to a confirm dialog and could leak technical strings
+      // like "Subscription not linked to a Dodo subscription_id yet".
+      setConfirm(null);
+      setAlert({
+        title: "Couldn't update subscription",
+        message: friendlyError(e, 'Something went wrong.'),
+      });
     } finally {
       setBusy(null);
     }
@@ -81,7 +86,10 @@ function SubscriptionCard({ subscription, refresh, onChangePlan, email }) {
     try {
       await openBillingPortal();
     } catch (e) {
-      setPortalAlert(friendlyError(e, 'Could not open the billing portal.'));
+      setAlert({
+        title: "Billing portal isn't ready yet",
+        message: friendlyError(e, 'Could not open the billing portal.'),
+      });
     }
   };
 
@@ -128,8 +136,6 @@ function SubscriptionCard({ subscription, refresh, onChangePlan, email }) {
           </div>
         )}
       </div>
-
-      {error && <p className="profile-error">{error}</p>}
 
       {/* Actions */}
       {isFree ? null : isLifetime ? (
@@ -263,9 +269,16 @@ function ChangePlanModal({ currentPlan, onClose, refresh }) {
               onClick={() => swap(p.id)}
               disabled={!!busy}
             >
-              <span className="profile-plan-pick-name">{p.name}</span>
-              <span className="profile-plan-pick-price">{p.price}<small>{p.period}</small></span>
-              <span className="profile-plan-pick-cta">{busy === p.id ? 'Switching…' : 'Switch'}</span>
+              <span className="profile-plan-pick-info">
+                <span className="profile-plan-pick-name">{p.name}</span>
+                <span className="profile-plan-pick-price">
+                  <strong>{p.price}</strong>
+                  <span className="profile-plan-pick-period">{p.period}</span>
+                </span>
+              </span>
+              <span className="profile-plan-pick-cta">
+                {busy === p.id ? 'Switching…' : 'Switch'}
+              </span>
             </button>
           ))}
 
@@ -275,9 +288,21 @@ function ChangePlanModal({ currentPlan, onClose, refresh }) {
             onClick={upgradeToLifetime}
             disabled={!!busy}
           >
-            <span className="profile-plan-pick-name">{UPGRADE_LIFETIME.name}</span>
-            <span className="profile-plan-pick-price">{UPGRADE_LIFETIME.price}<small> {UPGRADE_LIFETIME.period}</small></span>
-            <span className="profile-plan-pick-cta">{busy === 'lifetime' ? 'Opening…' : 'Upgrade →'}</span>
+            <span className="profile-plan-pick-badge">Best value</span>
+            <span className="profile-plan-pick-info">
+              <span className="profile-plan-pick-name">{UPGRADE_LIFETIME.name}</span>
+              <span className="profile-plan-pick-price">
+                <strong>{UPGRADE_LIFETIME.price}</strong>
+                <span className="profile-plan-pick-period">{UPGRADE_LIFETIME.period}</span>
+              </span>
+            </span>
+            <span className="profile-plan-pick-cta">
+              {busy === 'lifetime' ? 'Opening…' : 'Upgrade'}
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+                   strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 6 H9 M6.5 3 L9 6 L6.5 9" />
+              </svg>
+            </span>
           </button>
         </div>
 

@@ -54,6 +54,13 @@ export function friendlyError(err, fallback = 'Something went wrong.') {
   // user lands here is clicking "Manage billing" by accident on a stale tab.
   if (/no dodo customer/i.test(message))
     return "You haven't picked a plan yet, so there's no billing portal to open. Choose a plan first and we'll set everything up.";
+  // Subscription row exists locally but the Dodo webhook hasn't linked it
+  // yet. Two real-world causes: (a) ~1s race between checkout return and
+  // the activation webhook, (b) a dev-mutate row that was never paid for.
+  // The technical message ("dodo_subscription_id") leaks an internal column
+  // name — surface a clearer prompt instead.
+  if (/not linked to a dodo/i.test(message) || /dodo_subscription_id/i.test(message))
+    return "Your subscription isn't fully set up yet. Wait a few seconds and refresh — the payment provider needs a moment to confirm.";
 
   return message || fallback;
 }
