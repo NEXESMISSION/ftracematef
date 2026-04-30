@@ -33,10 +33,13 @@ const newId = () =>
 
 // ────────────────────────────────────────────────────────────────────────────
 // Broadcaster: owns the camera stream, sends offers when a viewer appears.
+// onQualityRequest: optional callback fired when the viewer requests a
+// quality preset — the broadcaster's UI uses it to resize the canvas etc.
 // ────────────────────────────────────────────────────────────────────────────
-export function startBroadcaster({ userId, stream, onStatus, onError }) {
+export function startBroadcaster({ userId, stream, onStatus, onError, onQualityRequest }) {
   const myId = newId();
   let pc = null;
+  let videoSender = null;
   let viewerId = null;
   let pendingIce = [];
   let stopped = false;
@@ -65,7 +68,11 @@ export function startBroadcaster({ userId, stream, onStatus, onError }) {
   const initiateOffer = async () => {
     teardownPC();
     pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+    videoSender = null;
+    stream.getTracks().forEach((track) => {
+      const sender = pc.addTrack(track, stream);
+      if (track.kind === 'video') videoSender = sender;
+    });
     pc.onicecandidate = (e) => {
       if (e.candidate && viewerId) send('ice', { candidate: e.candidate, to: viewerId });
     };
@@ -114,6 +121,14 @@ export function startBroadcaster({ userId, stream, onStatus, onError }) {
     if (stopped || !payload || payload.fromId === myId) return;
     if (payload.role !== 'viewer') return;
     if (payload.to && payload.to !== myId) return;
+
+    // Quality requests don't need an active peer connection — the viewer
+    // can send their preference before the offer is even out.
+    if (payload.type === 'quality' && payload.preset) {
+      try { onQualityRequest?.(payload.preset); } catch { /* ignore */ }
+      return;
+    }
+
     if (!pc) return;
 
     try {
@@ -156,6 +171,24 @@ export function startBroadcaster({ userId, stream, onStatus, onError }) {
       try { channel.untrack(); } catch { /* ignore */ }
       teardownPC();
       try { supabase.removeChannel(channel); } catch { /* ignore */ }
+    },
+    // Apply WebRTC sender encoding parameters. maxBitrate is the most
+    // useful knob — it directly controls perceived quality on a fast
+    // connection. maxFramerate is honored by some browsers (Chrome) but
+    // not others (Safari may ignore).
+    setEncoding: async ({ maxBitrate, maxFramerate } = {}) => {
+      if (!videoSender) return;
+      try {
+        const params = videoSender.getParameters();
+        if (!params.encodings || params.encodings.length === 0) {
+          params.encodings = [{}];
+        }
+        if (maxBitrate != null)   params.encodings[0].maxBitrate   = maxBitrate;
+        if (maxFramerate != null) params.encodings[0].maxFramerate = maxFramerate;
+        await videoSender.setParameters(params);
+      } catch (err) {
+        console.warn('[livePreview] setParameters failed:', err);
+      }
     },
   };
 }
@@ -262,6 +295,11 @@ export function startViewer({ userId, onStream, onStatus, onError }) {
     }
   });
 
+  const send = (payload) => {
+    if (stopped) return;
+    channel.send({ type: 'broadcast', event: 'live', payload });
+  };
+
   return {
     stop: () => {
       if (stopped) return;
@@ -269,6 +307,18 @@ export function startViewer({ userId, onStream, onStatus, onError }) {
       try { channel.untrack(); } catch { /* ignore */ }
       try { pc.close(); } catch { /* ignore */ }
       try { supabase.removeChannel(channel); } catch { /* ignore */ }
+    },
+    // Tell the broadcaster which quality preset we want. They apply it
+    // (canvas resolution + sender bitrate). Safe to call before the
+    // connection is up — broadcaster handles it whenever it arrives.
+    requestQuality: (preset) => {
+      send({
+        type: 'quality',
+        preset,
+        fromId: myId,
+        role: 'viewer',
+        to: broadcasterId,
+      });
     },
   };
 }

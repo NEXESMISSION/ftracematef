@@ -23,6 +23,20 @@ const STATUS_LABEL = {
   disconnected: 'Disconnected',
 };
 
+// Quality presets — sender (broadcaster) does the actual work; the viewer's
+// pick is sent over the signaling channel as a request. maxDim caps the
+// longest side of the broadcaster's canvas (= captured stream resolution).
+// maxBitrate is the WebRTC ceiling — the engine will adapt down on bad
+// networks but won't exceed this when there's headroom.
+const QUALITY_PRESETS = {
+  low:    { label: 'Low · 480p',    maxDim:  854, maxBitrate:  1_000_000 },
+  medium: { label: 'Medium · 720p', maxDim: 1280, maxBitrate:  2_500_000 },
+  high:   { label: 'High · 1080p',  maxDim: 1920, maxBitrate:  5_000_000 },
+  max:    { label: 'Maximum · 4K',  maxDim: 3840, maxBitrate: 16_000_000 },
+};
+const QUALITY_ORDER = ['low', 'medium', 'high', 'max'];
+const DEFAULT_QUALITY = 'high';
+
 const INITIAL_TRANSFORM = { x: 0, y: 0, scale: 1, rotation: 0, flip: false };
 
 const statusTone = (s) =>
@@ -93,6 +107,10 @@ function ViewerStage({ userId, onChangeRole }) {
   const videoRef    = useRef(null);
   const sessionRef  = useRef(null);
 
+  // ─── Quality preference (viewer requests, broadcaster honors) ───
+  const [quality, setQuality]   = useLocalState('tm:viewer:quality', DEFAULT_QUALITY);
+  const [qualityOpen, setQualityOpen] = useState(false);
+
   // ─── Video zoom (active when NOT in edit mode) ───
   const [view, setView]         = useState({ x: 0, y: 0, scale: 1 });
 
@@ -140,6 +158,13 @@ function ViewerStage({ userId, onChangeRole }) {
       if (videoRef.current) videoRef.current.srcObject = null;
     };
   }, [userId]);
+
+  // Send the quality preference to the broadcaster. We also re-send when
+  // status changes — covers the case where the viewer's preset was set
+  // before a broadcaster was on the channel.
+  useEffect(() => {
+    sessionRef.current?.requestQuality(quality);
+  }, [quality, status]);
 
   // ───────── Flicker (writes to setState; the img re-renders with new opacity) ─────────
   useEffect(() => {
@@ -465,6 +490,56 @@ function ViewerStage({ userId, onChangeRole }) {
           <span>{STATUS_LABEL[status] ?? status}</span>
         </div>
         <span className="live-topbar-spacer" />
+
+        {/* ── Quality picker ── */}
+        <div className={`live-quality ${qualityOpen ? 'is-open' : ''}`}>
+          <button
+            type="button"
+            className="trace-icon-btn live-quality-btn"
+            onClick={() => setQualityOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={qualityOpen}
+            aria-label="Stream quality"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor"
+                 strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M2 13 L2 11 L4 11 L4 13 Z" fill="currentColor" />
+              <path d="M6 13 L6 8 L8 8 L8 13 Z" fill="currentColor" />
+              <path d="M10 13 L10 5 L12 5 L12 13 Z" fill="currentColor" />
+              <path d="M14 13 L14 2 L16 2 L16 13 Z" fill="currentColor" />
+            </svg>
+          </button>
+          {qualityOpen && (
+            <>
+              <div className="live-quality-overlay" onPointerDown={() => setQualityOpen(false)} />
+              <div className="live-quality-menu" role="menu">
+                <div className="live-quality-title">Stream quality</div>
+                {QUALITY_ORDER.map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={quality === key}
+                    className={`live-quality-item ${quality === key ? 'is-active' : ''}`}
+                    onClick={() => { setQuality(key); setQualityOpen(false); }}
+                  >
+                    <span className="live-quality-check" aria-hidden="true">
+                      {quality === key ? '●' : '○'}
+                    </span>
+                    <span className="live-quality-label">{QUALITY_PRESETS[key].label}</span>
+                    <span className="live-quality-bitrate">
+                      {Math.round(QUALITY_PRESETS[key].maxBitrate / 1_000_000)} Mbps
+                    </span>
+                  </button>
+                ))}
+                <div className="live-quality-foot">
+                  Set by you · applied by the broadcaster
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
         {!hasOverlay ? (
           <button type="button" className="trace-icon-btn live-edit-btn" onClick={() => fileInputRef.current?.click()} aria-label="Add overlay image">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor"
@@ -628,6 +703,7 @@ function BroadcasterStage({ userId, onChangeRole }) {
   const [ctaDismissed, setCtaDismissed]  = useState(false);
   const [warpMode,     setWarpMode]      = useState(false);
   const [corners,      setCorners]       = useState(null);
+  const [quality,      setQuality]       = useLocalState('tm:live:quality', DEFAULT_QUALITY);
   const handleDragRef  = useRef(null);
 
   const stageRef        = useRef(null);
@@ -688,7 +764,7 @@ function BroadcasterStage({ userId, onChangeRole }) {
     };
   }, [facingMode]);
 
-  // ===== Canvas size — match the on-screen stage so transforms are 1:1 with finger movement =====
+  // ===== Canvas size — match the on-screen stage, capped by the quality preset =====
   useEffect(() => {
     const canvas = canvasRef.current;
     const stage  = stageRef.current;
@@ -696,10 +772,12 @@ function BroadcasterStage({ userId, onChangeRole }) {
 
     const resize = () => {
       const r = stage.getBoundingClientRect();
-      // Cap longest side to 1080px to keep stream bandwidth reasonable on big monitors.
-      const MAX = 1080;
-      let w = Math.max(2, Math.round(r.width));
-      let h = Math.max(2, Math.round(r.height));
+      const MAX = QUALITY_PRESETS[quality]?.maxDim ?? QUALITY_PRESETS[DEFAULT_QUALITY].maxDim;
+      // Render at devicePixelRatio for a crisper local preview, capped by
+      // the preset so high-DPI phones don't overshoot bandwidth budgets.
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      let w = Math.max(2, Math.round(r.width  * dpr));
+      let h = Math.max(2, Math.round(r.height * dpr));
       const m = Math.max(w, h);
       if (m > MAX) {
         const k = MAX / m;
@@ -715,7 +793,7 @@ function BroadcasterStage({ userId, onChangeRole }) {
     const ro = new ResizeObserver(resize);
     ro.observe(stage);
     return () => ro.disconnect();
-  }, []);
+  }, [quality]);
 
   // ===== Compositing draw loop =====
   // drawRef is reassigned every render so it always closes over the latest
@@ -929,6 +1007,9 @@ function BroadcasterStage({ userId, onChangeRole }) {
       stream,
       onStatus: (s) => setStatus(s),
       onError:  (m) => setError(m),
+      onQualityRequest: (preset) => {
+        if (QUALITY_PRESETS[preset]) setQuality(preset);
+      },
     });
     return () => {
       try { sessionRef.current?.stop(); } catch { /* ignore */ }
@@ -937,6 +1018,16 @@ function BroadcasterStage({ userId, onChangeRole }) {
       captureStreamRef.current = null;
     };
   }, [cameraReady, userId]);
+
+  // Apply max-bitrate to the current peer connection whenever the preset
+  // changes. setEncoding is a no-op until a peer connection exists, but
+  // we also re-apply on (re)connect because RTCRtpSender resets across
+  // re-negotiation.
+  useEffect(() => {
+    const preset = QUALITY_PRESETS[quality];
+    if (!preset) return;
+    sessionRef.current?.setEncoding({ maxBitrate: preset.maxBitrate });
+  }, [quality, status]);
 
   // ===== Gestures (drag, pinch, rotate) — same logic as Trace, mapped to canvas pixels =====
   const onPointerDown = useCallback((e) => {

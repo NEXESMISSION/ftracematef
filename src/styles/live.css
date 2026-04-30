@@ -439,6 +439,89 @@
   z-index: 2;
 }
 
+/* ── Quality picker (viewer) ── */
+.live-quality { position: relative; }
+.live-quality-btn { color: #fff; }
+.live-quality.is-open .live-quality-btn { background: var(--coral); border-color: var(--coral); }
+
+.live-quality-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+}
+.live-quality-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 7;
+  min-width: 240px;
+  padding: 6px;
+  background: rgba(20, 16, 12, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-family: 'Nunito', sans-serif;
+  animation: liveQualityIn 0.15s ease-out;
+}
+@keyframes liveQualityIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.live-quality-title {
+  padding: 8px 10px 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.live-quality-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s ease;
+}
+.live-quality-item:hover { background: rgba(255, 255, 255, 0.08); }
+.live-quality-item.is-active { background: rgba(232, 122, 122, 0.18); }
+.live-quality-check {
+  flex: 0 0 14px;
+  font-size: 14px;
+  color: var(--coral);
+  text-align: center;
+}
+.live-quality-label { flex: 1; }
+.live-quality-bitrate {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.55);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.live-quality-foot {
+  padding: 8px 10px 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-style: italic;
+  text-align: center;
+}
+
 .live-viewer-reset {
   position: absolute;
   bottom: max(20px, env(safe-area-inset-bottom));
