@@ -114,11 +114,7 @@ function SubscriptionCard({ subscription, refresh, onChangePlan, email }) {
       {error && <p className="profile-error">{error}</p>}
 
       {/* Actions */}
-      {isFree ? (
-        <div className="profile-actions">
-          <Link to="/pricing" className="profile-btn profile-btn-primary">Start tracing →</Link>
-        </div>
-      ) : isLifetime ? (
+      {isFree ? null : isLifetime ? (
         <div className="profile-actions">
           <button type="button" className="profile-btn" onClick={openBillingPortal}>
             View invoice
