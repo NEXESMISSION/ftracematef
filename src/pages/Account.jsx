@@ -10,6 +10,8 @@ import {
 import { PLANS, PLAN_LABEL } from '../lib/plans.js';
 import { friendlyError } from '../lib/errors.js';
 import { getStats, formatDuration, formatRelative } from '../lib/traceStats.js';
+import { isAdminUser } from '../lib/admin.js';
+import DevPanel from '../components/DevPanel.jsx';
 
 const STATUS_TONE = {
   active:    { label: 'Active',     tone: 'good'    },
@@ -510,6 +512,9 @@ export default function Account() {
 
         {/* ── Receipts (collapsible) ── */}
         <ReceiptsCard />
+
+        {/* ── Dev self-test panel (admin emails only) ── */}
+        {isAdminUser(user) && <DevPanel />}
 
         {/* ── Sign out ── */}
         <div className="profile-foot">

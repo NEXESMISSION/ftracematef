@@ -183,13 +183,23 @@ export function AuthProvider({ children }) {
   // Lifetime never has a period_end. Recurring plans must still be inside
   // their billing window — a missed `subscription.expired` webhook shouldn't
   // grant infinite free access if the row stays 'active' past its end date.
+  //
+  // Hardening notes:
+  //  - We grant a 6-hour grace past `current_period_end` so a slightly
+  //    delayed `subscription.renewed` webhook doesn't paywall a paying
+  //    customer. Trade-off: a cancellation can over-grant up to 6h, which
+  //    is acceptable.
+  //  - Recurring plans with no `current_period_end` fail CLOSED. Previously
+  //    this fail-open path could grant infinite access if a webhook ever
+  //    stored bad data; that's strictly worse than a paywall.
+  const RENEWAL_GRACE_MS = 6 * 60 * 60 * 1000;
   const isPaid = (() => {
     if (!subscription) return false;
     if (subscription.plan === 'free' || subscription.status !== 'active') return false;
     if (subscription.plan === 'lifetime') return true;
     const end = subscription.current_period_end;
-    if (!end) return true; // missing period end on a recurring plan — fail open here
-    return new Date(end).getTime() > Date.now();
+    if (!end) return false; // recurring plan with no end date — refuse rather than fail open
+    return new Date(end).getTime() + RENEWAL_GRACE_MS > Date.now();
   })();
 
   const value = {
