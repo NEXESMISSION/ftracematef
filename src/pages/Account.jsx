@@ -45,7 +45,7 @@ function formatDate(d) {
 
 /* ─────────────────────────── Subscription card ─────────────────────────── */
 
-function SubscriptionCard({ subscription, refresh, onChangePlan, email, alert, setAlert }) {
+function SubscriptionCard({ subscription, refresh, onChangePlan, email, setAlert }) {
   const [busy, setBusy] = useState(null);
   const [confirm, setConfirm] = useState(null); // 'cancel-end' | null
 
@@ -198,12 +198,6 @@ function SubscriptionCard({ subscription, refresh, onChangePlan, email, alert, s
         </>
       )}
 
-      <Alert
-        open={!!portalAlert}
-        onClose={() => setPortalAlert(null)}
-        title="Billing portal isn't ready yet"
-        message={portalAlert}
-      />
     </section>
   );
 }
@@ -222,22 +216,28 @@ const UPGRADE_LIFETIME = {
   period: 'forever',
 };
 
-function ChangePlanModal({ currentPlan, onClose, refresh }) {
+function ChangePlanModal({ currentPlan, onClose, refresh, onError }) {
   const [busy, setBusy] = useState(null);
-  const [error, setError] = useState(null);
 
   const swapPlans = SWAP_PLANS.filter((p) => p.id !== currentPlan);
 
+  // On failure we close this modal and surface the error via the parent's
+  // shared Alert. Stacking an inline error inside an already-modal change-plan
+  // dialog feels broken; one centered Alert is cleaner.
+  const fail = (e, fallback, title) => {
+    setBusy(null);
+    onClose();
+    onError?.({ title, message: friendlyError(e, fallback) });
+  };
+
   const swap = async (targetPlan) => {
-    setError(null);
     setBusy(targetPlan);
     try {
       await subscriptionAction('change-plan', { plan: targetPlan });
       await refresh();
       onClose();
     } catch (e) {
-      setError(friendlyError(e, 'Could not change plan.'));
-      setBusy(null);
+      fail(e, 'Could not change plan.', "Couldn't change plan");
     }
   };
 
@@ -247,8 +247,7 @@ function ChangePlanModal({ currentPlan, onClose, refresh }) {
       const url = await startCheckout('lifetime');
       window.location.href = url;
     } catch (e) {
-      setError(friendlyError(e, 'Could not open checkout.'));
-      setBusy(null);
+      fail(e, 'Could not open checkout.', "Couldn't open checkout");
     }
   };
 
@@ -305,8 +304,6 @@ function ChangePlanModal({ currentPlan, onClose, refresh }) {
             </span>
           </button>
         </div>
-
-        {error && <p className="profile-error">{error}</p>}
       </div>
     </div>
   );
@@ -445,6 +442,9 @@ export default function Account() {
   const { user, profile, subscription, signOut, refresh, isPaid, loading } = useAuth();
   const [showChange, setShowChange] = useState(false);
   const [stats, setStats] = useState(() => getStats(user?.id));
+  // Single source of truth for action/portal/change-plan errors. SubscriptionCard
+  // and ChangePlanModal both write here; one Alert at page level renders it.
+  const [alert, setAlert] = useState(null); // { title, message } | null
 
   useEffect(() => {
     setStats(getStats(user?.id));
@@ -548,6 +548,7 @@ export default function Account() {
           refresh={refresh}
           onChangePlan={() => setShowChange(true)}
           email={user?.email}
+          setAlert={setAlert}
         />
 
         {/* ── Receipts (collapsible) ── */}
@@ -573,8 +574,16 @@ export default function Account() {
           currentPlan={subscription?.plan}
           onClose={() => setShowChange(false)}
           refresh={refresh}
+          onError={setAlert}
         />
       )}
+
+      <Alert
+        open={!!alert}
+        onClose={() => setAlert(null)}
+        title={alert?.title ?? 'Heads up'}
+        message={alert?.message ?? ''}
+      />
     </div>
   );
 }
