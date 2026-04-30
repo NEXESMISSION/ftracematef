@@ -2,6 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 
+  <!-- Homepage — primary landing surface for AI engines and search. -->
   <url>
     <loc>https://www.tracemate.art/</loc>
     <lastmod>2026-04-30</lastmod>
@@ -14,10 +15,36 @@
     </image:image>
     <image:image>
       <image:loc>https://www.tracemate.art/images/og/og-cover.png</image:loc>
-      <image:title>TraceMate — Free AR Tracing App</image:title>
+      <image:title>TraceMate — AR Tracing in Your Browser</image:title>
     </image:image>
   </url>
 
+  <!-- Anchor URLs on the homepage — AI crawlers (and Google) index in-page
+       sections separately when the section ids match what JSON-LD HowTo and
+       inline links reference. Only listing anchors that actually exist in
+       the rendered DOM (see Hero/HowItWorks/Gallery/Pricing components). -->
+  <url>
+    <loc>https://www.tracemate.art/#how</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.tracemate.art/#gallery</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.tracemate.art/#pricing</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Standalone marketing routes — each now ships its own prerendered
+       index.html with route-specific title/description/canonical so AI
+       engines see them as distinct pages. See scripts/prerender-routes.mjs. -->
   <url>
     <loc>https://www.tracemate.art/welcome</loc>
     <lastmod>2026-04-30</lastmod>
@@ -58,6 +85,16 @@
     <lastmod>2026-04-30</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
+  </url>
+
+  <!-- LLM-facing index. AI crawlers (GPTBot, ClaudeBot, PerplexityBot, etc.)
+       look for /llms.txt before fetching the SPA, so listing it explicitly
+       short-circuits a wasted JS render attempt. -->
+  <url>
+    <loc>https://www.tracemate.art/llms.txt</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
   </url>
 
 </urlset>

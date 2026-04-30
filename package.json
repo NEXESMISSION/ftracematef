@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/csp-hash.mjs && vite build",
+    "build": "node scripts/csp-hash.mjs && vite build && node scripts/prerender-routes.mjs",
     "csp:hash": "node scripts/csp-hash.mjs --print",
     "preview": "vite preview",
     "sb": "supabase",
