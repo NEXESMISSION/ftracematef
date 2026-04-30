@@ -1661,3 +1661,29 @@
 }
 .co-cta:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -8px rgba(0, 0, 0, 0.45); }
 .co-cta:active { transform: translateY(0); }
+
+/* Small, unobtrusive verifying card — replaces the old full-page spinner */
+.co-modal-verify {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 32px;
+  max-width: 320px;
+}
+.co-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(43, 33, 24, 0.15);
+  border-top-color: var(--ink);
+  animation: coSpin 0.8s linear infinite;
+}
+@keyframes coSpin { to { transform: rotate(360deg); } }
+.co-verify-text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 600;
+}
