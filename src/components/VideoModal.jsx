@@ -13,8 +13,7 @@ export default function VideoModal({ open, videoId, onClose }) {
     };
   }, [open, onClose]);
 
-  const isReal = videoId && videoId !== 'YOUR_VIDEO_ID';
-  const src = open && isReal
+  const src = open && videoId
     ? `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`
     : '';
 

@@ -103,7 +103,7 @@ export default function Login() {
           {error && <p className="auth-error">{error}</p>}
 
           <p className="auth-fineprint">
-            By continuing, you agree to our <a href="#">Terms</a> and <a href="#">Privacy</a>.
+            By continuing, you agree to our Terms and Privacy policy.
           </p>
         </section>
       </main>

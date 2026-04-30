@@ -4,10 +4,18 @@
 // the request origin as untrusted and echoing it would defeat the purpose; we
 // match against the configured value and serve `null` otherwise — that fails
 // the browser's CORS check rather than silently allowing the call.
-const ALLOWED_ORIGIN =
-  Deno.env.get('APP_URL') ??
-  Deno.env.get('DODO_APP_URL') ??
-  'http://localhost:5173';
+const _appUrl = Deno.env.get('APP_URL') ?? Deno.env.get('DODO_APP_URL');
+const ALLOWED_ORIGIN = _appUrl ?? 'http://localhost:5173';
+
+if (!_appUrl) {
+  // Loud failure mode for prod misconfig — silently allowing only localhost
+  // means every browser request fails CORS in production.
+  console.warn(
+    '[cors] APP_URL / DODO_APP_URL not set — falling back to http://localhost:5173. ' +
+    'In production this will block every browser request as a CORS mismatch. ' +
+    'Set APP_URL via `supabase secrets set APP_URL=https://your-domain.com`.',
+  );
+}
 
 export function corsHeadersFor(req: Request): HeadersInit {
   const origin = req.headers.get('origin') ?? '';

@@ -76,15 +76,38 @@ supabase secrets set \
   DODO_PRODUCT_LIFETIME=prod_xxx         \
   APP_URL=https://your-app.vercel.app
 
-# deploy (5 functions total)
+# deploy (6 functions total)
 supabase functions deploy create-checkout
 supabase functions deploy create-portal-session
 supabase functions deploy subscription-action
 supabase functions deploy list-payments
+supabase functions deploy dev-mutate-subscription
 supabase functions deploy dodo-webhook
 ```
 
 When you're ready to go live, change `DODO_ENVIRONMENT` to `live_mode` and use a live API key.
+
+### Optional: enable the dev self-test panel
+
+The `/account` page has a hidden self-test panel that lets an admin flip
+their own subscription state to any plan/status — handy for verifying the
+paywall, renewal, and failure flows without involving Dodo. Two env vars
+control it:
+
+```bash
+# Backend gate (real security boundary):
+supabase secrets set ADMIN_EMAILS=you@example.com,teammate@example.com
+supabase functions deploy dev-mutate-subscription
+
+# Frontend gate (just hides the UI for non-admins):
+# Add VITE_ADMIN_EMAILS=you@example.com,teammate@example.com to:
+#   - app/.env.local             (local dev)
+#   - Vercel → Settings → Environment Variables (production)
+# Mirror the same list in both — the panel only renders when the email matches.
+```
+
+Mutations are scoped to the caller's own user_id; admins can't reach other
+users' rows through this endpoint.
 
 ---
 

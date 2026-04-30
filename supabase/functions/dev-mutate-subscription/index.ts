@@ -75,6 +75,16 @@ Deno.serve(async (req) => {
     update.dodo_payment_id = null;
   }
 
+  // Reactivating from a previously-cancelled state? Clear the stale
+  // cancelled_at so the Account UI doesn't keep saying "Pending cancel".
+  // This makes the "Simulate renewal" preset behave intuitively.
+  if (body.status === 'active') {
+    update.cancelled_at = null;
+    if (update.cancel_at_next_billing_date === undefined) {
+      update.cancel_at_next_billing_date = false;
+    }
+  }
+
   if (Object.keys(update).length === 0) {
     return json({ error: 'No fields to update' }, 400);
   }

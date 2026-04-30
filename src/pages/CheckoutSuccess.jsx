@@ -51,6 +51,11 @@ export default function CheckoutSuccess() {
     }
   }, [isPaid, navigate]);
 
+  // If we already know the outcome, don't render the verifying modal at all
+  // — the redirect effect above is about to fire on the next tick. Without
+  // this short-circuit the modal flashes for one frame on the way out.
+  if (explicitFailure || timedOut || isPaid) return null;
+
   // Verifying state — small, unobtrusive card while the webhook lands.
   return (
     <div className="profile-modal" role="status" aria-live="polite">

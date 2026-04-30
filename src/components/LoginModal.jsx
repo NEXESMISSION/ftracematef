@@ -70,7 +70,7 @@ export default function LoginModal({ open, onClose, intentLabel = 'Sign in to co
         {error && <p className="auth-error">{error}</p>}
 
         <p className="auth-fineprint">
-          By continuing, you agree to our <a href="#">Terms</a> and <a href="#">Privacy</a>.
+          By continuing, you agree to our Terms and Privacy policy.
           Your uploaded image is preserved.
         </p>
       </section>

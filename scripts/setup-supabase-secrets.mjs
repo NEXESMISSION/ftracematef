@@ -27,6 +27,10 @@ const REQUIRED = [
   'APP_URL',
 ];
 
+// Optional — only needed if you want the /account dev self-test panel.
+// Comma-separated emails. Mirror VITE_ADMIN_EMAILS in the frontend env.
+const OPTIONAL = ['ADMIN_EMAILS'];
+
 function parseEnvFile(path) {
   if (!existsSync(path)) return {};
   const out = {};
@@ -56,6 +60,12 @@ for (const key of REQUIRED) {
   const val = process.env[key] ?? fromFile[key];
   if (!val) missing.push(key);
   else SECRETS[key] = val;
+}
+
+// Optionals: include if set, skip silently otherwise.
+for (const key of OPTIONAL) {
+  const val = process.env[key] ?? fromFile[key];
+  if (val) SECRETS[key] = val;
 }
 
 if (missing.length) {

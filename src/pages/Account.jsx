@@ -331,19 +331,7 @@ function ReceiptsCard() {
 
 /* ─────────────────────────── Stats grid (polaroids) ─────────────────────── */
 
-function StatsGrid({ userId, memberSince }) {
-  const [stats, setStats] = useState(() => getStats(userId));
-
-  useEffect(() => {
-    const refresh = () => setStats(getStats(userId));
-    window.addEventListener('focus', refresh);
-    window.addEventListener('storage', refresh);
-    return () => {
-      window.removeEventListener('focus', refresh);
-      window.removeEventListener('storage', refresh);
-    };
-  }, [userId]);
-
+function StatsGrid({ stats, memberSince }) {
   const tiles = [
     {
       key: 'time',
@@ -500,7 +488,7 @@ export default function Account() {
         </section>
 
         {/* ── Stats: scrapbook polaroids ── */}
-        <StatsGrid userId={user?.id} memberSince={profile?.created_at} />
+        <StatsGrid stats={stats} memberSince={profile?.created_at} />
 
         {/* ── Subscription (now folds in account email) ── */}
         <SubscriptionCard
