@@ -99,7 +99,17 @@ export default function Login() {
       <main className="auth-shell">
         <section className="auth-card">
           <Link to="/" className="auth-hero" aria-label="Welcome to Trace Mate — back to home">
-            <img src="/images/auth/welcome.webp" alt="Welcome to tracemate.art" />
+            <img
+              src="/images/auth/welcome-480.webp"
+              srcSet="/images/auth/welcome-480.webp 480w, /images/auth/welcome.webp 694w"
+              sizes="(max-width: 480px) 190px, 240px"
+              width="480"
+              height="474"
+              alt="Welcome to tracemate.art"
+              fetchpriority="high"
+              decoding="async"
+              loading="eager"
+            />
           </Link>
 
           <button type="button" className="google-btn" onClick={handleGoogle} disabled={busy}>

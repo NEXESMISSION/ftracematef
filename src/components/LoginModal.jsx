@@ -53,7 +53,18 @@ export default function LoginModal({ open, onClose, intentLabel = 'Sign in to co
           </svg>
         </button>
 
-        <img className="login-modal-hero" src="/images/auth/welcome.webp" alt="Welcome to tracemate.art" />
+        <img
+          className="login-modal-hero"
+          src="/images/auth/welcome-480.webp"
+          srcSet="/images/auth/welcome-480.webp 480w, /images/auth/welcome.webp 694w"
+          sizes="220px"
+          width="480"
+          height="474"
+          alt="Welcome to tracemate.art"
+          fetchpriority="high"
+          decoding="async"
+          loading="eager"
+        />
 
         <p className="login-modal-intent">{intentLabel}</p>
 

@@ -267,6 +267,7 @@
 .auth-hero img {
   width: clamp(190px, 24vw, 240px);
   height: auto;
+  aspect-ratio: 480 / 474;
   display: block;
 }
 
