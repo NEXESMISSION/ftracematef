@@ -1,22 +1,35 @@
 import { useEffect, useState } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider.jsx';
 
 /**
  * Shared loading + stuck-loader UI used by both RequireAuth and RequirePaid.
- * Keeps the 8-second safety-net behaviour and "couldn't reach our servers"
- * fallback in one place so the two gates can't drift apart.
+ *
+ * Behaviour:
+ *  - Initial load: render a small unobtrusive spinner.
+ *  - After 8 seconds still loading: redirect to /login. We treat "auth never
+ *    settled" the same as "auth failed" — surface a usable login screen
+ *    instead of a stuck error page that the user can't act on. The login
+ *    page then handles re-establishing the session (Google OAuth round-trip
+ *    or PKCE callback).
+ *  - The original location is passed via state so /login can bounce them
+ *    back where they were once they sign in again.
  *
  * Usage:
  *   const gate = useAuthGate();
- *   if (gate.element) return gate.element;     // still resolving / stuck
+ *   if (gate.element) return gate.element;     // still resolving / redirecting
  *   if (!user) return <Navigate to="/login" />; // proceed with your own checks
  */
 export function useAuthGate() {
   const { loading } = useAuth();
+  const location = useLocation();
   const [stuck, setStuck] = useState(false);
 
   useEffect(() => {
-    if (!loading) return;
+    if (!loading) {
+      setStuck(false);
+      return;
+    }
     const t = setTimeout(() => setStuck(true), 8000);
     return () => clearTimeout(t);
   }, [loading]);
@@ -32,17 +45,11 @@ export function useAuthGate() {
   }
 
   if (loading && stuck) {
+    // Auth never settled — bounce to login rather than stranding the user
+    // on an error page. Pass the original location so /login can return
+    // them after a successful sign-in.
     return {
-      element: (
-        <div className="auth-loading-screen">
-          <p className="auth-loading-text">
-            Couldn't reach our servers — check your connection.
-          </p>
-          <a href="/" className="profile-btn" style={{ marginTop: 14 }}>
-            Back to home
-          </a>
-        </div>
-      ),
+      element: <Navigate to="/login" state={{ from: location.pathname }} replace />,
     };
   }
 
