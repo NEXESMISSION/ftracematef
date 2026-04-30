@@ -2066,6 +2066,18 @@
   box-shadow: 2px 2px 0 var(--ink);
 }
 
+/* Two label variants — the long one for desktop/tablet, the short one
+   for narrow phones where space is tight. Default visibility flipped at
+   the mobile breakpoint below. */
+.nav-account-cta-short { display: none; }
+.nav-account-cta-full  { display: inline; }
+
+@media (max-width: 480px) {
+  .nav-account-cta { padding: 6px 11px; font-size: 12px; }
+  .nav-account-cta-short { display: inline; }
+  .nav-account-cta-full  { display: none; }
+}
+
 
 /* ── Pricing — standalone "Back to account" pill button ── */
 .pp-back-link {

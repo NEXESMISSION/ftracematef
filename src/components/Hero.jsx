@@ -6,8 +6,23 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 // broken `YOUR_VIDEO_ID` embed.
 const DEMO_VIDEO_ID = '';
 
+// Synchronous heuristic — see Nav.jsx for the same trick.
+function hasPersistedSession() {
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) return true;
+    }
+  } catch { /* private mode / disabled storage */ }
+  return false;
+}
+
 export default function Hero({ onPlayClick }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  // Suppress the visitor 'Try it Now' CTA while auth is loading IF there's
+  // a persisted session — otherwise the button flashes for ~1s before
+  // disappearing for signed-in users.
+  const isOrLikelySignedIn = user || (loading && hasPersistedSession());
   return (
     <section className="hero tm-section-pad">
       <div className="hero-grid">
@@ -35,7 +50,7 @@ export default function Hero({ onPlayClick }) {
           <div className="ctas">
             {/* Signed-in users get the 'See my profile' button via Nav.
                 The Hero CTA is reserved for the visitor's primary action. */}
-            {!user && (
+            {!isOrLikelySignedIn && (
               <Link className="img-btn" to="/login" aria-label="Try it Now">
                 <img src="/images/ui/btn-try-now.webp" alt="Try it Now" />
               </Link>
