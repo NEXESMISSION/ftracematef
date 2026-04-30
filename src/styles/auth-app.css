@@ -2035,64 +2035,37 @@
   .dev-meta { grid-template-columns: 1fr; }
 }
 
-/* ── Signed-in CTAs — outlined pill with brand hard-shadow, matches the
-       hand-drawn style of the rest of the marketing site ── */
+/* ── Signed-in CTA — outlined pill in the nav, sized to sit cleanly next
+       to the nav links without dominating the bar. ── */
 .nav-account-cta {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 18px;
+  gap: 5px;
+  padding: 7px 13px;
   border-radius: 999px;
-  border: 2px solid var(--ink);
+  border: 1.5px solid var(--ink);
   background: var(--paper);
   color: var(--ink);
   font-family: 'Nunito', sans-serif;
   font-weight: 800;
-  font-size: 14px;
+  font-size: 12.5px;
   letter-spacing: 0.2px;
   text-decoration: none;
   white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 3px 3px 0 var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
 }
 .nav-account-cta:hover {
   background: var(--ink);
   color: var(--paper);
   transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0 var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
 }
 .nav-account-cta:active {
   transform: translate(0, 0);
-  box-shadow: 3px 3px 0 var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
 }
 
-.hero-account-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 18px 36px;
-  border-radius: 999px;
-  border: 2.5px solid var(--ink);
-  background: var(--paper);
-  color: var(--ink);
-  font-family: 'Nunito', sans-serif;
-  font-weight: 800;
-  font-size: 17px;
-  letter-spacing: 0.3px;
-  text-decoration: none;
-  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 5px 5px 0 var(--ink);
-}
-.hero-account-cta:hover {
-  background: var(--ink);
-  color: var(--paper);
-  transform: translate(-2px, -2px);
-  box-shadow: 7px 7px 0 var(--ink);
-}
-.hero-account-cta:active {
-  transform: translate(0, 0);
-  box-shadow: 5px 5px 0 var(--ink);
-}
 
 /* ── Pricing — standalone "Back to account" pill button ── */
 .pp-back-link {
@@ -2123,17 +2096,6 @@
   box-shadow: 2px 2px 0 var(--ink);
 }
 
-/* Row that contains the standalone "Back to account" pill at the top of
-   the page. Constrained max-width matches the rest of the page content,
-   so the back button visually aligns with the headline below it. */
-.pp-back-row {
-  max-width: 1080px;
-  margin: 0 auto 28px;
-  display: flex;
-  justify-content: flex-start;
-}
-
 @media (max-width: 480px) {
   .pp-back-link { padding: 7px 14px; font-size: 13px; }
-  .pp-back-row { margin-bottom: 18px; }
 }

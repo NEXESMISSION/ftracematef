@@ -33,11 +33,9 @@ export default function Hero({ onPlayClick }) {
           </p>
 
           <div className="ctas">
-            {user ? (
-              <Link className="hero-account-cta" to="/account" aria-label="See my profile">
-                See my profile →
-              </Link>
-            ) : (
+            {/* Signed-in users get the 'See my profile' button via Nav.
+                The Hero CTA is reserved for the visitor's primary action. */}
+            {!user && (
               <Link className="img-btn" to="/login" aria-label="Try it Now">
                 <img src="/images/ui/btn-try-now.webp" alt="Try it Now" />
               </Link>

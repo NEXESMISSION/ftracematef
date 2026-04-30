@@ -75,17 +75,14 @@ export default function PricingPage() {
         <Link to="/" className="pp-brand">
           <img src="/images/brand/logo.webp" alt="Trace Mate" />
         </Link>
+        {user && (
+          <Link to="/account" className="pp-back-link">
+            ← Back to account
+          </Link>
+        )}
       </header>
 
       <main className="pp-shell">
-        {user && (
-          <div className="pp-back-row">
-            <Link to="/account" className="pp-back-link">
-              ← Back to account
-            </Link>
-          </div>
-        )}
-
         {/* Header copy */}
         <div className="pp-header">
           <span className="pp-eyebrow">
