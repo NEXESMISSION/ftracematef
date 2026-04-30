@@ -2070,12 +2070,7 @@
 }
 .hero-account-cta:hover { transform: translateY(-2px); box-shadow: 0 14px 26px -10px rgba(0,0,0,0.55); }
 
-/* ── Pricing topbar — signed-in nav row ── */
-.pp-topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+/* ── Pricing — standalone "Back to account" pill button ── */
 .pp-back-link {
   display: inline-flex;
   align-items: center;
@@ -2104,8 +2099,13 @@
   box-shadow: 2px 2px 0 var(--ink);
 }
 
+/* Standalone variant — sits above the plan grid as a clear "leave this page" affordance */
+.pp-back-link-standalone {
+  align-self: flex-start;
+  margin-bottom: 18px;
+}
+
 @media (max-width: 480px) {
-  /* Tighter on mobile so the topbar doesn't wrap */
-  .pp-back-link { padding: 7px 12px; font-size: 12.5px; }
-  .pp-topbar-right { gap: 8px; }
+  .pp-back-link { padding: 7px 14px; font-size: 13px; }
+  .pp-back-link-standalone { margin-bottom: 14px; }
 }

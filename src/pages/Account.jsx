@@ -434,7 +434,6 @@ export default function Account() {
         </Link>
         <div className="studio-bar-right">
           <Link to="/welcome" className="studio-link">Home</Link>
-          <button type="button" className="studio-signout" onClick={signOut}>Sign out</button>
         </div>
       </header>
 

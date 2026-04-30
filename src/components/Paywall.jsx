@@ -18,7 +18,7 @@ const PLANS = ALL_PLANS.map((p) => ({
 
 /** Shown by <RequirePaid> when a logged-in user hasn't subscribed yet. */
 export default function Paywall() {
-  const { profile, user, signOut } = useAuth();
+  const { profile, user } = useAuth();
   const [busy, setBusy]                 = useState(null);
   const [error, setError]               = useState(null);
   const [lifetimeLeft, setLifetimeLeft] = useState(null);
@@ -61,7 +61,6 @@ export default function Paywall() {
     <div className="studio-shell">
       <header className="studio-bar">
         <Link to="/" className="studio-brand"><img src="/images/brand/logo.webp" alt="Trace Mate" /></Link>
-        <button type="button" className="studio-signout" onClick={signOut}>Sign out</button>
       </header>
 
       <main className="studio-paywall">

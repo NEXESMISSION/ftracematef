@@ -18,7 +18,7 @@ import { PLANS } from '../lib/plans.js';
 export default function PricingPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, isPaid, profile, signOut } = useAuth();
+  const { user, isPaid, profile } = useAuth();
   const [busy, setBusy]                 = useState(null);
   const [error, setError]               = useState(null);
   const [lifetimeLeft, setLifetimeLeft] = useState(null);
@@ -75,15 +75,15 @@ export default function PricingPage() {
         <Link to="/" className="pp-brand">
           <img src="/images/brand/logo.webp" alt="Trace Mate" />
         </Link>
-        {user && (
-          <div className="pp-topbar-right">
-            <Link to="/account" className="pp-back-link">← Back to account</Link>
-            <button type="button" className="studio-signout" onClick={signOut}>Sign out</button>
-          </div>
-        )}
       </header>
 
       <main className="pp-shell">
+        {user && (
+          <Link to="/account" className="pp-back-link pp-back-link-standalone">
+            ← Back to account
+          </Link>
+        )}
+
         {/* Header copy */}
         <div className="pp-header">
           <span className="pp-eyebrow">
