@@ -1229,6 +1229,68 @@
   box-shadow: 2px 2px 0 var(--ink);
 }
 
+.profile-btn-cancel-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 13.5px;
+  letter-spacing: 0.02em;
+  padding: 10px 18px 10px 14px;
+  background: linear-gradient(180deg, #fff7ec 0%, #ffeed8 100%);
+  color: var(--ink-soft);
+  border: 1.5px dashed rgba(232, 122, 122, 0.55);
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 rgba(232, 122, 122, 0.35);
+  transition: transform 0.18s cubic-bezier(.34,1.56,.64,1),
+              background 0.18s ease,
+              border 0.18s ease,
+              color 0.18s ease,
+              box-shadow 0.18s ease;
+  position: relative;
+}
+.profile-btn-cancel-end-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: rgba(232, 122, 122, 0.16);
+  color: var(--coral);
+  transition: transform 0.25s cubic-bezier(.34,1.56,.64,1),
+              background 0.18s ease;
+}
+.profile-btn-cancel-end:hover {
+  transform: translate(-1px, -1px) rotate(-0.4deg);
+  background: linear-gradient(180deg, #fff1de 0%, #ffe2bf 100%);
+  border-style: solid;
+  border-color: var(--coral);
+  color: var(--ink);
+  box-shadow: 4px 4px 0 rgba(232, 122, 122, 0.55);
+}
+.profile-btn-cancel-end:hover .profile-btn-cancel-end-icon {
+  background: rgba(232, 122, 122, 0.24);
+  transform: rotate(-6deg) scale(1.06);
+}
+.profile-btn-cancel-end:active {
+  transform: translate(0, 0) rotate(0deg);
+  box-shadow: 1px 1px 0 rgba(232, 122, 122, 0.55);
+}
+.profile-btn-cancel-end:focus-visible {
+  outline: none;
+  border-color: var(--coral);
+  box-shadow: 4px 4px 0 rgba(232, 122, 122, 0.55), 0 0 0 3px rgba(232, 122, 122, 0.22);
+}
+.profile-btn-cancel-end:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+  box-shadow: 2px 2px 0 rgba(232, 122, 122, 0.35);
+}
+
 .profile-btn-danger {
   border-color: var(--coral);
   color: var(--coral);

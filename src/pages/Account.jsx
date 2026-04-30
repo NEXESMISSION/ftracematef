@@ -168,8 +168,23 @@ function SubscriptionCard({ subscription, refresh, onChangePlan, email }) {
                   {busy === 'undo-cancel' ? 'Restoring…' : 'Resume subscription'}
                 </button>
               ) : (
-                <button type="button" className="profile-btn-ghost" onClick={() => setConfirm('cancel-end')}>
-                  Cancel at period end
+                <button
+                  type="button"
+                  className="profile-btn-cancel-end"
+                  onClick={() => setConfirm('cancel-end')}
+                  aria-label="Cancel subscription at period end"
+                >
+                  <span className="profile-btn-cancel-end-icon" aria-hidden="true">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                         strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2.5" y="3.5" width="11" height="10" rx="1.5" />
+                      <path d="M2.5 6.5 H13.5" />
+                      <path d="M5.5 2 V5" />
+                      <path d="M10.5 2 V5" />
+                      <path d="M6 10 L10 10" />
+                    </svg>
+                  </span>
+                  <span>Cancel at period end</span>
                 </button>
               )}
             </div>
