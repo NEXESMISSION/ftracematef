@@ -16,3 +16,13 @@ Thumbs.db
 # WebP test output (regeneratable, large)
 public/_webp-test
 
+# Local secrets file consumed by scripts/setup-supabase-secrets.mjs.
+# The script itself is now safe to commit (reads from env / this file).
+.env.secrets
+scripts/setup-supabase-secrets.sh
+
+# Safety net: keep .env.example out of git too, since it tends to get
+# auto-filled with real values during local development.
+# A safe template lives at .env.example.template instead.
+.env.example
+

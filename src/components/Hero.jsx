@@ -1,5 +1,10 @@
 import { Link } from 'react-router-dom';
 
+// Demo YouTube video id. Set when the demo is recorded; the button only
+// renders once a real id is in place — no more dead button shipping a
+// broken `YOUR_VIDEO_ID` embed.
+const DEMO_VIDEO_ID = '';
+
 export default function Hero({ onPlayClick }) {
   return (
     <section className="hero tm-section-pad">
@@ -30,17 +35,19 @@ export default function Hero({ onPlayClick }) {
               <img src="/images/ui/btn-try-now.webp" alt="Try it Now" />
             </Link>
 
-            <button type="button" className="see-action" onClick={() => onPlayClick('YOUR_VIDEO_ID')}>
-              <span className="play-circle" aria-hidden="true">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                  <path d="M3 2 L12 7 L3 12 Z" />
-                </svg>
-              </span>
-              <span className="text">
-                <span className="title">See it in action</span>
-                <span className="sub">30 sec demo</span>
-              </span>
-            </button>
+            {DEMO_VIDEO_ID && (
+              <button type="button" className="see-action" onClick={() => onPlayClick(DEMO_VIDEO_ID)}>
+                <span className="play-circle" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                    <path d="M3 2 L12 7 L3 12 Z" />
+                  </svg>
+                </span>
+                <span className="text">
+                  <span className="title">See it in action</span>
+                  <span className="sub">30 sec demo</span>
+                </span>
+              </button>
+            )}
           </div>
         </div>
 

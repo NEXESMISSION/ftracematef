@@ -6,9 +6,16 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "sb": "supabase",
+    "sb:init": "supabase init --workdir .",
+    "sb:login": "supabase login",
+    "sb:link": "supabase link --project-ref gihmcbggfpogmisxvqyf",
+    "sb:secrets": "node scripts/setup-supabase-secrets.mjs",
+    "sb:deploy": "supabase functions deploy create-checkout && supabase functions deploy create-portal-session && supabase functions deploy subscription-action && supabase functions deploy list-payments && supabase functions deploy dodo-webhook --no-verify-jwt"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2"
@@ -16,6 +23,7 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
     "sharp": "^0.34.5",
+    "supabase": "^2.95.6",
     "vite": "^5.4.8"
   }
 }

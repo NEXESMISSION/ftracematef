@@ -1,0 +1,78 @@
+# Trace Mate — Supabase project config.
+# Generated for the gihmcbggfpogmisxvqyf project.
+# Anything not relevant to local CLI use has been left at sensible defaults.
+
+project_id = "gihmcbggfpogmisxvqyf"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/**", "https://localhost:5173/**"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false
+
+# Edge Functions — declare each one so deploy commands work.
+[functions.create-checkout]
+verify_jwt = false
+
+[functions.create-portal-session]
+verify_jwt = false
+
+[functions.subscription-action]
+verify_jwt = false
+
+[functions.list-payments]
+verify_jwt = false
+
+# Webhook receiver — must NOT verify the supabase JWT (Dodo doesn't send one).
+[functions.dodo-webhook]
+verify_jwt = false
+
+[analytics]
+enabled = false
+port = 54327
+vector_port = 54328
+backend = "postgres"

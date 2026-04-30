@@ -4,6 +4,9 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import './styles/globals.css';
 import './styles/login.css';
+import './styles/upload.css';
+import './styles/trace.css';
+import './styles/auth-app.css';
 
 // Force the page to load at the top — disable browser scroll restoration
 // and clear any leftover hash so it doesn't auto-jump to a section.
@@ -15,7 +18,12 @@ window.scrollTo(0, 0);
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
       <App />
     </BrowserRouter>
   </React.StrictMode>

@@ -1,0 +1,148 @@
+// Supabase Edge Function: subscription-action
+// ─────────────────────────────────────────────────────────────────────────────
+// Single endpoint that performs subscription management actions on behalf of
+// the authenticated user. Verifies the user OWNS the target subscription
+// before calling Dodo Payments — so a user can never act on someone else's
+// subscription even if they spoofed the id.
+//
+// Body shape:
+//   { action: 'cancel-at-period-end' }   → patch cancel_at_next_billing_date=true
+//   { action: 'undo-cancel' }            → patch cancel_at_next_billing_date=false
+//   { action: 'change-plan', plan: 'monthly'|'quarterly' }
+//                                        → subscriptions.changePlan with proration
+//
+// Note: there is intentionally no 'cancel-now' here. Immediate cancellation
+// without a refund prompt is a support-ticket factory; users go through
+// 'cancel-at-period-end' instead. If we ever need it, expose it with proper
+// confirmation copy in the UI.
+//
+// Required Edge Function secrets:
+//   DODO_API_KEY, DODO_ENVIRONMENT,
+//   DODO_PRODUCT_MONTHLY, DODO_PRODUCT_QUARTERLY  (for change-plan)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import DodoPayments from 'npm:dodopayments@1';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { corsHeaders } from '../_shared/cors.ts';
+
+const PLAN_TO_PRODUCT_ENV: Record<string, string> = {
+  monthly:   'DODO_PRODUCT_MONTHLY',
+  quarterly: 'DODO_PRODUCT_QUARTERLY',
+};
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST')    return json({ error: 'Method not allowed' }, 405);
+
+  // 1. Auth
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) return json({ error: 'Missing Authorization' }, 401);
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_ANON_KEY')!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return json({ error: 'Not authenticated' }, 401);
+
+  // Rate limit: 10 actions per 60 seconds per user. The cancel/undo-cancel
+  // pair makes a tight loop trivial without this — protects Dodo's API
+  // quota and our own function invocation budget.
+  const { data: allowed } = await supabase.rpc('check_rate_limit', {
+    bucket_key:     `sub-action:${user.id}`,
+    max_count:      10,
+    window_seconds: 60,
+  });
+  if (allowed === false) {
+    return json({ error: 'Too many requests. Slow down and try again in a minute.' }, 429);
+  }
+
+  // 2. Look up the user's active subscription (RLS already restricts to self)
+  const { data: sub } = await supabase
+    .from('subscriptions')
+    .select('id, plan, status, dodo_subscription_id, dodo_payment_id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (!sub) return json({ error: 'No active subscription' }, 404);
+
+  // Lifetime tier is a one-time purchase — nothing to cancel/change in Dodo.
+  if (sub.plan === 'lifetime') {
+    return json({ error: 'Lifetime plans cannot be cancelled or changed.' }, 409);
+  }
+  if (!sub.dodo_subscription_id) {
+    return json({ error: 'Subscription not linked to a Dodo subscription_id yet — try again in a moment.' }, 409);
+  }
+
+  // 3. Parse body
+  let body: { action?: string; plan?: string } = {};
+  try { body = await req.json(); } catch { /* ignored */ }
+
+  // 4. Init the SDK
+  const apiKey = Deno.env.get('DODO_API_KEY');
+  if (!apiKey) return json({ error: 'Server misconfigured: DODO_API_KEY missing' }, 500);
+
+  const client = new DodoPayments({
+    bearerToken: apiKey,
+    environment: (Deno.env.get('DODO_ENVIRONMENT') ?? 'test_mode') as
+      | 'test_mode'
+      | 'live_mode',
+  });
+
+  try {
+    switch (body.action) {
+      case 'cancel-at-period-end': {
+        const updated = await client.subscriptions.update(sub.dodo_subscription_id, {
+          cancel_at_next_billing_date: true,
+        });
+        return json({ ok: true, subscription: updated });
+      }
+
+      case 'undo-cancel': {
+        const updated = await client.subscriptions.update(sub.dodo_subscription_id, {
+          cancel_at_next_billing_date: false,
+        });
+        return json({ ok: true, subscription: updated });
+      }
+
+      case 'change-plan': {
+        const targetPlan = body.plan;
+        if (!targetPlan || !PLAN_TO_PRODUCT_ENV[targetPlan]) {
+          return json({ error: 'Invalid target plan' }, 400);
+        }
+        if (targetPlan === sub.plan) {
+          return json({ error: 'Already on this plan' }, 409);
+        }
+        const newProductId = Deno.env.get(PLAN_TO_PRODUCT_ENV[targetPlan]);
+        if (!newProductId) return json({ error: 'Server misconfigured: missing product env var' }, 500);
+
+        // changePlan returns 202-style result with status/invoice_id/payment_id
+        const result = await client.subscriptions.changePlan(sub.dodo_subscription_id, {
+          product_id: newProductId,
+          quantity: 1,
+          proration_billing_mode: 'prorated_immediately',
+          on_payment_failure: 'prevent_change',
+        });
+        return json({ ok: true, result });
+      }
+
+      default:
+        return json({ error: 'Unknown action' }, 400);
+    }
+  } catch (err) {
+    // Log the raw error server-side; return a friendly, sanitized message
+    // so internal Dodo identifiers don't end up in the user-facing UI.
+    console.error('Dodo subscription action failed:', err);
+    return json({ error: 'Could not update your subscription. Please try again, or contact support if it persists.' }, 502);
+  }
+});
+
+function json(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}

@@ -456,7 +456,7 @@ main, header, section, footer { position: relative; z-index: 1; }
   justify-content: center;
 }
 .hero-phone .phone-frame img {
-  max-height: 580px;
+  max-height: 820px;
   width: auto;
   max-width: 100%;
 }
@@ -674,24 +674,41 @@ main, header, section, footer { position: relative; z-index: 1; }
 
 .how-grid {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   gap: clamp(8px, 1.2vw, 16px);
   flex-wrap: nowrap;
 }
 
 .how-card {
-  flex: 0 1 auto;
-  transition: transform 0.25s ease;
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  border-radius: 18px;
+  box-shadow: 5px 5px 0 var(--ink);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.how-card:hover {
+  transform: translateY(-6px) rotate(-1deg);
+  box-shadow: 7px 7px 0 var(--ink);
 }
 .how-card img {
   width: 100%;
-  max-width: 230px;
+  max-width: 200px;
+  height: auto;
+  display: block;
 }
-.how-card:hover { transform: translateY(-6px) rotate(-1deg); }
 
 .step-arrow {
   flex: 0 0 auto;
+  align-self: center;
   width: clamp(28px, 3.5vw, 44px);
   height: 20px;
   color: var(--coral);
@@ -848,14 +865,19 @@ main, header, section, footer { position: relative; z-index: 1; }
   flex-wrap: wrap;
 }
 
-/* ============ Pricing Plans (3 tiers: monthly / 3-month / lifetime) ============ */
+/* ============ Pricing Plans (2 tiers side-by-side + gold full-width row) ============ */
 .pricing-plans {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: clamp(16px, 2vw, 28px);
-  max-width: 1080px;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(14px, 2vw, 24px);
+  max-width: 820px;
   margin: 0 auto;
   align-items: stretch;
+}
+/* Gold (lifetime) tier always spans both columns — full-width row on its own. */
+.pricing-plans > .pricing-plan-gold {
+  grid-column: 1 / -1;
+  margin-top: clamp(12px, 1.5vw, 18px);
 }
 
 .pricing-plan {
@@ -1006,14 +1028,49 @@ main, header, section, footer { position: relative; z-index: 1; }
     0 1px 0 rgba(255, 255, 255, 0.8) inset,
     0 0 0 4px rgba(217, 158, 42, 0.10),
     0 18px 40px -14px rgba(217, 158, 42, 0.45);
-  transform: scale(1.02);
 }
 .pricing-plan-gold:hover {
-  transform: translateY(-4px) scale(1.02);
+  transform: translateY(-4px);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.8) inset,
     0 0 0 4px rgba(217, 158, 42, 0.15),
     0 26px 48px -14px rgba(217, 158, 42, 0.55);
+}
+
+/* On wide screens the gold card uses its full width: info + CTA on the left,
+   features split across two columns on the right. */
+@media (min-width: 700px) {
+  .pricing-plan-gold {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.9fr) 1.3fr;
+    grid-template-areas:
+      "name     features"
+      "price    features"
+      "period   features"
+      "badge    features"
+      "cta      features";
+    column-gap: clamp(28px, 4vw, 56px);
+    row-gap: 6px;
+    align-items: start;
+    padding: 32px clamp(28px, 3vw, 40px);
+  }
+  .pricing-plan-gold .pricing-plan-name     { grid-area: name; }
+  .pricing-plan-gold .pricing-plan-price    { grid-area: price; }
+  .pricing-plan-gold .pricing-plan-period   { grid-area: period; }
+  .pricing-plan-gold .pricing-plan-badge    { grid-area: badge; }
+  .pricing-plan-gold .pricing-plan-cta-gold {
+    grid-area: cta;
+    justify-self: stretch;
+    margin-top: 10px;
+  }
+  .pricing-plan-gold .pricing-plan-features {
+    grid-area: features;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 24px;
+    margin: 0;
+    align-self: center;
+  }
 }
 
 .pricing-plan-gold .pricing-plan-name { color: #5c3d10; }
@@ -1090,24 +1147,103 @@ main, header, section, footer { position: relative; z-index: 1; }
 }
 .pricing-foot .reassure-bullet { color: var(--coral); }
 
-/* Responsive */
-@media (max-width: 880px) {
-  .pricing-plans {
-    grid-template-columns: 1fr;
-    max-width: 440px;
+/* Responsive — keep 2 normal plans side-by-side, gold full-width below, at every size.
+   At narrow widths we center-align contents in each card so they read cleanly
+   instead of looking cramped against the left edge. */
+@media (max-width: 700px) {
+  .pricing-plans { gap: 12px; max-width: 480px; }
+
+  /* Center-aligned compact layout for the two narrow side-by-side cards */
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) {
+    padding: 22px 14px 18px;
+    text-align: center;
+    align-items: center;
   }
-  .pricing-plan-gold { transform: none; }
-  .pricing-plan-gold:hover { transform: translateY(-4px); }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-name {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-price {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    row-gap: 0;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-price .num {
+    font-size: 42px;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-price .num .currency {
+    font-size: 22px;
+  }
+  /* Strikethrough is decorative — drop it so the discounted price has room */
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-price .strike {
+    display: none;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-period {
+    font-size: 16px;
+    text-align: center;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-badge {
+    align-self: center;
+    margin: 4px 0 14px;
+    font-size: 10px;
+    padding: 3px 9px;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-features {
+    gap: 8px;
+    margin-bottom: 18px;
+    align-items: flex-start;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-features li {
+    font-size: 13px;
+    text-align: left;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-cta {
+    font-size: 14px;
+    padding: 12px 16px;
+    width: 100%;
+  }
 }
 
-@media (max-width: 560px) {
-  .pricing-plan { padding: 24px 22px 22px; }
-  .pricing-plan-price .num { font-size: 48px; }
-  .pricing-plan-price .num .currency { font-size: 24px; }
-  .pricing-plan-limited {
-    font-size: 10px;
-    padding: 6px 12px;
+@media (max-width: 480px) {
+  .pricing-plans { gap: 10px; }
+
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) {
+    padding: 20px 12px 16px;
+    border-radius: 18px;
   }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-name {
+    font-size: 22px;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-price .num {
+    font-size: 38px;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-price .num .currency {
+    font-size: 20px;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-period {
+    font-size: 15px;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-badge {
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-features li {
+    font-size: 12.5px;
+    gap: 8px;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pc-check {
+    width: 17px;
+    height: 17px;
+  }
+  .pricing-plans > .pricing-plan:not(.pricing-plan-gold) .pricing-plan-cta {
+    font-size: 13px;
+    padding: 11px 12px;
+  }
+
+  /* Gold full-width card at small sizes — give it a touch more room */
+  .pricing-plan-gold { padding: 24px 20px 22px; }
+  .pricing-plan-limited { font-size: 10px; padding: 6px 12px; }
 }
 
 .pricing-ticket {
@@ -2018,16 +2154,15 @@ main, header, section, footer { position: relative; z-index: 1; }
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 18px 14px;
-    max-width: 380px;
+    max-width: 460px;
     margin: 0 auto;
     align-items: stretch;
   }
-  .how-grid > .step-arrow { display: none; }
+  .how-grid .step-arrow { display: none !important; }
   .how-card {
-    display: flex;
-    align-items: center;
-    justify-content: center;
     width: 100%;
+    max-width: none;
+    padding: 12px;
   }
   .how-card img {
     width: 100%;
@@ -2058,38 +2193,58 @@ main, header, section, footer { position: relative; z-index: 1; }
   .headline { font-size: clamp(36px, 11vw, 56px); }
   .sub { font-size: 16px; }
   .hero-eyebrow {
-    font-size: 18px;
-    padding: 8px 18px 9px;
-    gap: 4px 8px;
-    flex-wrap: wrap;
+    font-size: clamp(15px, 4.4vw, 18px);
+    padding: 6px 14px 7px;
+    gap: 6px;
+    flex-wrap: nowrap;
     justify-content: center;
     text-align: center;
-    line-height: 1.15;
-    border-radius: 22px;
-    white-space: normal;
+    line-height: 1.1;
+    border-radius: 999px;
+    white-space: nowrap;
+    max-width: 100%;
   }
-  .hero-eyebrow .eyebrow-sep { display: none; }
+  .hero-eyebrow .eyebrow-sep { margin: 0 2px; }
   .hero-eyebrow .eyebrow-tag {
-    flex-basis: 100%;
-    text-align: center;
-    font-size: 0.85em;
+    font-size: 0.95em;
     color: var(--coral);
-    opacity: 0.95;
+    white-space: nowrap;
   }
   .hero-phone .phone-frame img { max-height: 440px; }
   .hero-spark-l, .hero-spark-r { display: none; }
 
-  .ctas { flex-direction: row; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  /* Hero CTAs: force the two buttons to sit on the same row on phones. */
+  .ctas {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+  }
+  .ctas .img-btn { flex: 0 1 auto; min-width: 0; }
+  .ctas .img-btn img { width: clamp(120px, 38vw, 160px); }
   .wc-btn { padding: 14px 26px; font-size: 17px; }
-  .see-action { gap: 10px; }
-  .see-action .play-circle { width: 46px; height: 46px; }
-  .see-action .text .title { font-size: 15px; }
-  .see-action .text .sub { font-size: 11px; }
+  .see-action {
+    flex: 0 1 auto;
+    min-width: 0;
+    gap: 8px;
+  }
+  .see-action .play-circle { width: 42px; height: 42px; flex-shrink: 0; }
+  .see-action .text { min-width: 0; }
+  .see-action .text .title { font-size: 14px; white-space: nowrap; }
+  .see-action .text .sub   { font-size: 11px; white-space: nowrap; }
 
   .marquee-content { font-size: 24px; gap: 24px; padding-right: 24px; }
 
-  .how-grid { gap: 14px 12px; max-width: 320px; }
-  .how-card img { max-width: 105px; }
+  .how-grid {
+    gap: 14px 10px;
+    max-width: 360px;
+    /* Lock 2-per-row even on the smallest phones — never collapse to 1 col. */
+    grid-template-columns: 1fr 1fr;
+  }
+  .how-card { padding: 10px; border-radius: 16px; }
+  .how-card img { max-width: 100%; }
 
   .gallery-grid {
     grid-template-columns: 1fr 1fr;

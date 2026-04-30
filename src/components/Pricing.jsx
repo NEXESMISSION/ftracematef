@@ -1,54 +1,10 @@
-import { Link } from 'react-router-dom';
-
-const PLANS = [
-  {
-    id: 'monthly',
-    name: 'Monthly',
-    period: '/ month',
-    price: 5,
-    wasPrice: 7,
-    badge: '29% off',
-    cta: 'Start Monthly',
-    features: [
-      'Full quality outlines',
-      'All tools unlocked',
-      'Works on any device',
-      'Cancel anytime',
-    ],
-  },
-  {
-    id: 'quarterly',
-    name: '3 Months',
-    period: '/ 3 months',
-    price: 10,
-    wasPrice: 13,
-    badge: '23% off',
-    cta: 'Get 3 Months',
-    features: [
-      'Full quality outlines',
-      'All tools unlocked',
-      'Works on any device',
-      'Save 33% vs monthly',
-    ],
-  },
-  {
-    id: 'lifetime',
-    name: 'Lifetime',
-    period: 'one-time · forever',
-    price: 15,
-    wasPrice: 20,
-    badge: '25% off',
-    cta: 'Claim Lifetime',
-    gold: true,
-    limited: 'Limited — only 10 spots',
-    features: [
-      'Full quality outlines',
-      'All tools unlocked, forever',
-      'Works on any device',
-      'Lifetime updates included',
-    ],
-  },
-];
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase.js';
+import { useAuth } from '../auth/AuthProvider.jsx';
+import { startCheckout } from '../lib/checkout.js';
+import { PLANS } from '../lib/plans.js';
+import { friendlyError } from '../lib/errors.js';
 
 function Check({ gold }) {
   return (
@@ -61,13 +17,25 @@ function Check({ gold }) {
   );
 }
 
-function PlanCard({ plan }) {
+function PlanCard({ plan, onChoose, busy, lifetimeLeft }) {
+  const limitedText =
+    plan.gold
+      ? lifetimeLeft === null
+        ? 'Limited — only 10 spots'
+        : lifetimeLeft > 0
+          ? `Limited — only ${lifetimeLeft} of 10 spots left`
+          : 'Sold out — waitlist only'
+      : null;
+
+  const soldOut = plan.gold && lifetimeLeft === 0;
+  const disabled = busy === plan.id || soldOut;
+
   return (
     <article className={`pricing-plan${plan.gold ? ' pricing-plan-gold' : ''}`}>
-      {plan.limited && (
+      {limitedText && (
         <div className="pricing-plan-limited">
           <span className="pulse-dot" aria-hidden="true"></span>
-          {plan.limited}
+          {limitedText}
         </div>
       )}
 
@@ -75,9 +43,7 @@ function PlanCard({ plan }) {
 
       <div className="pricing-plan-price">
         <span className="strike">${plan.wasPrice}</span>
-        <span className="num">
-          <span className="currency">$</span>{plan.price}
-        </span>
+        <span className="num"><span className="currency">$</span>{plan.price}</span>
       </div>
       <div className="pricing-plan-period">{plan.period}</div>
       <div className="pricing-plan-badge">{plan.badge}</div>
@@ -88,17 +54,53 @@ function PlanCard({ plan }) {
         ))}
       </ul>
 
-      <Link
+      <button
+        type="button"
         className={`pricing-plan-cta${plan.gold ? ' pricing-plan-cta-gold' : ''}`}
-        to="/login"
+        onClick={() => onChoose(plan.id)}
+        disabled={disabled}
       >
-        {plan.cta} →
-      </Link>
+        {soldOut ? 'Sold out' : busy === plan.id ? 'Opening checkout…' : `${plan.cta} →`}
+      </button>
     </article>
   );
 }
 
 export default function Pricing() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(null);
+  const [error, setError] = useState(null);
+  const [lifetimeLeft, setLifetimeLeft] = useState(null); // null until loaded
+
+  // Live lifetime spots counter — calls the public RPC `lifetime_seats_left()`.
+  useEffect(() => {
+    let cancelled = false;
+    supabase.rpc('lifetime_seats_left').then(({ data, error }) => {
+      if (cancelled || error) return;
+      if (typeof data === 'number') setLifetimeLeft(data);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const onChoose = async (plan) => {
+    setError(null);
+    // Not logged in → send to /login first; we'll come back to checkout after.
+    if (!user) {
+      navigate('/login', { state: { intent: { plan } } });
+      return;
+    }
+    try {
+      setBusy(plan);
+      const url = await startCheckout(plan);
+      window.location.href = url;
+    } catch (e) {
+      console.error(e);
+      setBusy(null);
+      setError(friendlyError(e, 'Could not start checkout.'));
+    }
+  };
+
   return (
     <section id="pricing" className="pricing tm-section-pad">
       <div className="section-head">
@@ -107,9 +109,22 @@ export default function Pricing() {
         <p className="lead">Every plan starts at a discount. Lifetime is capped at 10 spots.</p>
       </div>
 
+      {error && (
+        <div className="paywall-error" role="alert" style={{ maxWidth: 640, margin: '0 auto 24px' }}>
+          <strong>Heads up — </strong>{error}
+          <button type="button" className="paywall-link" onClick={() => setError(null)} style={{ marginLeft: 8 }}>Dismiss</button>
+        </div>
+      )}
+
       <div className="pricing-plans">
         {PLANS.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} />
+          <PlanCard
+            key={plan.id}
+            plan={plan}
+            onChoose={onChoose}
+            busy={busy}
+            lifetimeLeft={plan.gold ? lifetimeLeft : null}
+          />
         ))}
       </div>
 
