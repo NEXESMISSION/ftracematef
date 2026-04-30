@@ -2,18 +2,311 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Trace Mate — See it. Trace it. Create it.</title>
-    <link rel="icon" href="/images/brand/logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#fff8ef" />
+    <meta name="color-scheme" content="light" />
+
+    <!-- Primary --><!-- ─────────────────────────────────────────── -->
+    <title>TraceMate — Free AR Tracing App | Trace Anything on Real Paper</title>
+    <meta name="description" content="TraceMate is the #1 free AR tracing app. Point your phone at paper, see any image as a live overlay, and trace it in seconds. The best free Da Vinci Eye, AR Sketch, and Trace Anything alternative." />
+    <meta name="keywords" content="AR tracing app, free tracing app, Da Vinci Eye alternative, AR Sketch alternative, Trace Anything alternative, Papercopy Tracer alternative, camera tracing app, phone tracing app, AR drawing overlay, trace on paper with phone, AR sketch app, drawing aid app, tracing tool for artists, tattoo stencil app" />
+    <meta name="author" content="TraceMate" />
+    <meta name="application-name" content="TraceMate" />
+    <meta name="apple-mobile-web-app-title" content="TraceMate" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Robots — index everything public; noindex of private routes is handled per-route via meta tags -->
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1" />
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://www.tracemate.art/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="TraceMate" />
+    <meta property="og:title" content="TraceMate — Free AR Tracing App | Trace Anything on Real Paper" />
+    <meta property="og:description" content="Point your phone at paper, see any image as a live AR overlay, and trace it in seconds. The free, browser-based Da Vinci Eye alternative — no app install required." />
+    <meta property="og:url" content="https://www.tracemate.art/" />
+    <meta property="og:image" content="https://www.tracemate.art/images/og/og-cover.png" />
+    <meta property="og:image:secure_url" content="https://www.tracemate.art/images/og/og-cover.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="TraceMate — phone displaying an AR drawing overlay onto real paper" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@tracemate" />
+    <meta name="twitter:creator" content="@tracemate" />
+    <meta name="twitter:title" content="TraceMate — Free AR Tracing App | Trace Anything on Real Paper" />
+    <meta name="twitter:description" content="Point your phone at paper, see any image as a live AR overlay, and trace it in seconds. The free Da Vinci Eye alternative." />
+    <meta name="twitter:image" content="https://www.tracemate.art/images/og/og-cover.png" />
+    <meta name="twitter:image:alt" content="TraceMate — phone displaying an AR drawing overlay onto real paper" />
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/brand/logo-icon.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/brand/logo-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/brand/logo-icon.png" />
+    <link rel="shortcut icon" href="/images/brand/logo-icon.png" />
+    <link rel="mask-icon" href="/images/brand/logo-icon.png" color="#e87a7a" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Sitemap hint (some crawlers honor this) -->
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+
+    <!-- Performance: preconnect to Google Fonts + preload critical assets -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" as="image" href="/images/hero/phone-preview.webp" fetchpriority="high" />
+    <link rel="preload" as="image" href="/images/brand/logo.webp" />
+
     <link
       href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Patrick+Hand&family=Nunito:wght@400;500;600;700;800&family=Shadows+Into+Light&family=Instrument+Serif:ital@0;1&display=swap"
       rel="stylesheet"
     />
+
+    <!-- ─────────────────────────────────────────────────────────────────────
+         Structured Data (JSON-LD) — feeds Google rich results AND AI engines.
+         Includes: WebSite (with SearchAction), Organization, SoftwareApplication,
+         FAQPage, HowTo. This is the GEO backbone — LLMs quote this directly.
+         ───────────────────────────────────────────────────────────────────── -->
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://www.tracemate.art/#website",
+          "url": "https://www.tracemate.art/",
+          "name": "TraceMate",
+          "description": "Free AR tracing app. Trace any image on real paper using your phone camera.",
+          "inLanguage": "en-US",
+          "publisher": { "@id": "https://www.tracemate.art/#organization" },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://www.tracemate.art/?q={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://www.tracemate.art/#organization",
+          "name": "TraceMate",
+          "alternateName": ["Trace Mate", "TraceMate.art"],
+          "url": "https://www.tracemate.art/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://www.tracemate.art/images/brand/logo.png",
+            "width": 512,
+            "height": 512
+          },
+          "image": "https://www.tracemate.art/images/og/og-cover.png",
+          "description": "TraceMate is a free augmented-reality tracing tool that overlays any image onto real paper through your phone camera, so artists, tattooists, and calligraphers can trace by hand without a lightbox.",
+          "foundingDate": "2026",
+          "sameAs": [
+            "https://twitter.com/tracemate",
+            "https://www.instagram.com/tracemate",
+            "https://www.tiktok.com/@tracemate",
+            "https://www.youtube.com/@tracemate",
+            "https://www.producthunt.com/products/tracemate"
+          ],
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "customer support",
+            "email": "hi@tracemate.art",
+            "availableLanguage": ["English"]
+          }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://www.tracemate.art/#app",
+          "name": "TraceMate",
+          "alternateName": "Trace Mate AR Tracing",
+          "applicationCategory": ["DesignApplication", "MultimediaApplication", "MobileApplication"],
+          "applicationSubCategory": "Augmented Reality Drawing Aid",
+          "operatingSystem": "iOS 14+, Android 10+, any modern browser",
+          "browserRequirements": "Requires JavaScript and camera permissions. Works in Chrome, Safari, Firefox, and Edge.",
+          "url": "https://www.tracemate.art/",
+          "image": "https://www.tracemate.art/images/og/og-cover.png",
+          "screenshot": "https://www.tracemate.art/images/hero/phone-preview.png",
+          "description": "TraceMate uses your phone camera to overlay any reference image onto real paper in real time, letting you trace it directly with a pencil. Browser-based — no app install required. Free tier plus optional paid plans for unlimited use.",
+          "offers": [
+            {
+              "@type": "Offer",
+              "name": "Free",
+              "price": "0",
+              "priceCurrency": "USD",
+              "description": "Free trial of AR tracing — 3 traces.",
+              "availability": "https://schema.org/InStock"
+            },
+            {
+              "@type": "Offer",
+              "name": "Monthly",
+              "price": "4.99",
+              "priceCurrency": "USD",
+              "description": "Unlimited tracing, billed monthly.",
+              "availability": "https://schema.org/InStock"
+            },
+            {
+              "@type": "Offer",
+              "name": "Lifetime",
+              "price": "29.99",
+              "priceCurrency": "USD",
+              "description": "One-time payment, lifetime access.",
+              "availability": "https://schema.org/InStock"
+            }
+          ],
+          "featureList": [
+            "Real-time AR overlay onto real paper",
+            "Works with any phone camera — no special hardware",
+            "Browser-based — no app install required",
+            "Adjustable opacity, scale, and rotation",
+            "Works with any image: photos, line art, sketches, logos",
+            "Privacy-first: images stay on-device, never uploaded for tracing"
+          ],
+          "publisher": { "@id": "https://www.tracemate.art/#organization" },
+          "creator": { "@id": "https://www.tracemate.art/#organization" }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://www.tracemate.art/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "What is TraceMate?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "TraceMate is a free augmented-reality tracing app that runs in your phone browser. Point your phone camera at a sheet of paper, upload any image, and TraceMate overlays the image onto the paper in real time so you can trace it by hand with a pencil. No app install required."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is TraceMate free?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. TraceMate offers a free tier with 3 traces. For unlimited tracing, monthly ($4.99), quarterly, and lifetime ($29.99) plans are available. There is no app to download."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How is TraceMate different from Da Vinci Eye?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "TraceMate works in any modern phone browser with no app install required, while Da Vinci Eye is a paid native app. TraceMate offers a free tier and a one-time lifetime plan instead of a subscription-only model. Both produce a live AR overlay onto real paper for tracing."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How is TraceMate different from AR Sketch or Trace Anything?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "TraceMate runs entirely in your phone's web browser — there is no native app to install or update. AR Sketch and Trace Anything are native iOS apps. TraceMate also offers a one-time lifetime plan rather than recurring subscriptions only."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What phones does TraceMate work on?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "TraceMate works on any phone with a modern browser and camera access — iOS 14+ on iPhone, Android 10+ on most Android phones. It also works on tablets and laptops with a webcam. No special AR hardware required."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Do my images get uploaded anywhere?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. The image you trace stays on your device — TraceMate does not upload your reference images to any server for tracing. Your account information is stored securely with Supabase, but your art stays local."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can I use TraceMate for tattoo stencils, calligraphy, or portraits?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. TraceMate is widely used by tattoo artists for stencil placement, calligraphers for letter layout, portrait artists for proportional reference, and beginners learning to draw. Any image can be traced."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Do I need to install an app?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. TraceMate is a web app — open tracemate.art in any modern phone browser, allow camera access, and start tracing. You can add it to your home screen for one-tap access."
+              }
+            }
+          ]
+        },
+        {
+          "@type": "HowTo",
+          "@id": "https://www.tracemate.art/#howto",
+          "name": "How to trace any image on paper with your phone",
+          "description": "Use TraceMate's AR overlay to trace any reference image onto real paper in under a minute.",
+          "totalTime": "PT1M",
+          "estimatedCost": { "@type": "MonetaryAmount", "currency": "USD", "value": "0" },
+          "supply": [
+            { "@type": "HowToSupply", "name": "Phone with camera (iOS 14+ or Android 10+)" },
+            { "@type": "HowToSupply", "name": "Sheet of paper" },
+            { "@type": "HowToSupply", "name": "Pencil or pen" }
+          ],
+          "tool": [
+            { "@type": "HowToTool", "name": "TraceMate web app (tracemate.art)" }
+          ],
+          "step": [
+            {
+              "@type": "HowToStep",
+              "position": 1,
+              "name": "Open TraceMate",
+              "text": "Open tracemate.art in your phone browser. Allow camera access when prompted.",
+              "url": "https://www.tracemate.art/#step-open"
+            },
+            {
+              "@type": "HowToStep",
+              "position": 2,
+              "name": "Upload your image",
+              "text": "Tap upload and choose any photo, line drawing, or reference image from your gallery.",
+              "url": "https://www.tracemate.art/upload"
+            },
+            {
+              "@type": "HowToStep",
+              "position": 3,
+              "name": "Point at paper",
+              "text": "Aim your phone camera at a sheet of paper. The image appears as a live overlay on the paper.",
+              "url": "https://www.tracemate.art/#step-aim"
+            },
+            {
+              "@type": "HowToStep",
+              "position": 4,
+              "name": "Trace it",
+              "text": "Adjust opacity and scale, then trace the overlay directly onto the paper with your pencil.",
+              "url": "https://www.tracemate.art/#step-trace"
+            }
+          ]
+        }
+      ]
+    }
+    </script>
+
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="font-family:system-ui,sans-serif;padding:24px;max-width:640px;margin:40px auto;line-height:1.6">
+        <h1>TraceMate — Free AR Tracing App</h1>
+        <p>TraceMate is a free AR tracing app that overlays any image onto real paper through your phone camera. JavaScript is required to use TraceMate. Please enable JavaScript in your browser settings to continue.</p>
+        <p>Learn more at <a href="https://www.tracemate.art/">tracemate.art</a>.</p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

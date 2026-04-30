@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+
+  <url>
+    <loc>https://www.tracemate.art/</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://www.tracemate.art/images/hero/phone-preview.png</image:loc>
+      <image:title>TraceMate AR tracing app preview</image:title>
+      <image:caption>TraceMate showing a live AR drawing overlay on real paper through a phone camera.</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://www.tracemate.art/images/og/og-cover.png</image:loc>
+      <image:title>TraceMate — Free AR Tracing App</image:title>
+    </image:image>
+  </url>
+
+  <url>
+    <loc>https://www.tracemate.art/welcome</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://www.tracemate.art/pricing</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>https://www.tracemate.art/upload</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://www.tracemate.art/login</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+</urlset>
