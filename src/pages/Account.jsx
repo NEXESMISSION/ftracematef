@@ -543,19 +543,38 @@ export default function Account() {
         <StatsGrid stats={stats} memberSince={profile?.created_at} />
 
         {/* ── Live Preview: stream the camera between two devices on this account ── */}
-        <section className="profile-live-card" aria-labelledby="live-card-title">
+        <section className={`profile-live-card ${isPaid ? '' : 'is-locked'}`} aria-labelledby="live-card-title">
           <span className="profile-live-icon" aria-hidden="true">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 7 H7 L9 5 H15 L17 7 H21 a1 1 0 0 1 1 1 V18 a1 1 0 0 1 -1 1 H3 a1 1 0 0 1 -1 -1 V8 a1 1 0 0 1 1 -1 Z" />
-              <circle cx="12" cy="13" r="3.5" />
-            </svg>
+            {isPaid ? (
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 7 H7 L9 5 H15 L17 7 H21 a1 1 0 0 1 1 1 V18 a1 1 0 0 1 -1 1 H3 a1 1 0 0 1 -1 -1 V8 a1 1 0 0 1 1 -1 Z" />
+                <circle cx="12" cy="13" r="3.5" />
+              </svg>
+            ) : (
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="11" width="14" height="9" rx="2" />
+                <path d="M8 11 V7.5 a4 4 0 0 1 8 0 V11" />
+              </svg>
+            )}
           </span>
           <div className="profile-live-text">
-            <h2 id="live-card-title">Live Preview</h2>
-            <p>Stream the camera between two devices signed into this account — pick which one broadcasts and which one watches.</p>
+            <h2 id="live-card-title">
+              Live Preview
+              {!isPaid && <span className="profile-live-badge">Paid</span>}
+            </h2>
+            <p>
+              {isPaid
+                ? 'Stream the camera between two devices signed into this account — pick which one broadcasts and which one watches.'
+                : 'Stream the camera between two devices signed into this account. Available on any paid plan.'}
+            </p>
           </div>
-          <Link to="/live" className="profile-live-cta">Open</Link>
+          {isPaid ? (
+            <Link to="/live" className="profile-live-cta">Open</Link>
+          ) : (
+            <Link to="/pricing" className="profile-live-cta profile-live-cta-upgrade">Upgrade</Link>
+          )}
         </section>
 
         {/* ── Subscription (now folds in account email) ── */}

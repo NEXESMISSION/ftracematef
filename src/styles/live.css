@@ -303,6 +303,34 @@
   box-shadow: 1px 1px 0 var(--ink);
 }
 
+/* Locked state for free users — clearly says this is a paid feature. */
+.profile-live-card.is-locked .profile-live-icon {
+  background: rgba(43, 33, 24, 0.65);
+}
+.profile-live-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--coral);
+  background: rgba(232, 122, 122, 0.12);
+  border: 1px solid var(--coral);
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.profile-live-cta-upgrade {
+  background: var(--coral);
+  color: #fff;
+  border-color: var(--coral);
+}
+.profile-live-cta-upgrade:hover {
+  background: #f08a8a;
+  border-color: #f08a8a;
+}
+
 @media (max-width: 520px) {
   .profile-live-card {
     flex-direction: column;

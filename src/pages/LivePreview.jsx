@@ -10,6 +10,8 @@ import {
   isIdentity,
   screenDeltaToLocal,
 } from '../lib/perspectiveWarp.js';
+import Paywall from '../components/Paywall.jsx';
+import { freeTrialState } from '../lib/freeTrial.js';
 
 const STATUS_LABEL = {
   idle:         'Idle',
@@ -1265,10 +1267,15 @@ function BroadcasterStage({ userId, onChangeRole }) {
 /* ─────────────────────────── Page ─────────────────────────── */
 
 export default function LivePreview() {
-  const { user } = useAuth();
+  const { user, profile, isPaid } = useAuth();
   const [role, setRole] = useState(null); // null | 'broadcaster' | 'viewer'
 
   if (!user) return null;
+  // Live Preview is a paid feature — no trial bypass. Free users hit the
+  // paywall whether they navigated here directly or tapped the locked card
+  // on /account.
+  if (!isPaid) return <Paywall trialUsed={freeTrialState(profile) === 'used'} />;
+
   if (!role) return <RolePicker onPick={setRole} />;
   if (role === 'viewer') {
     return <ViewerStage userId={user.id} onChangeRole={() => setRole(null)} />;

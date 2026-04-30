@@ -57,13 +57,21 @@ export function cssMatrix3d(width, height, corners) {
     [corners.tl, corners.tr, corners.br, corners.bl],
   );
   if (!M) return '';
+  // The projection matrix from solveProjection is correct projectively but
+  // its overall scale (≈ det(src)·det(dst)) can be enormous. CSS does the
+  // perspective division at render time, but float precision in matrix3d
+  // breaks down well before that. Normalize by M[2][2] — that's what the
+  // CSS spec calls the homogeneous-w of the (0,0) point — so values stay
+  // around O(1).
+  const k = M[2][2];
+  if (!Number.isFinite(k) || Math.abs(k) < 1e-12) return '';
   // CSS matrix3d is column-major. We're working in 2D + perspective so
   // the third column/row is just the identity z-axis.
   return `matrix3d(`
-    + `${M[0][0]},${M[1][0]},0,${M[2][0]},`
-    + `${M[0][1]},${M[1][1]},0,${M[2][1]},`
+    + `${M[0][0]/k},${M[1][0]/k},0,${M[2][0]/k},`
+    + `${M[0][1]/k},${M[1][1]/k},0,${M[2][1]/k},`
     + `0,0,1,0,`
-    + `${M[0][2]},${M[1][2]},0,${M[2][2]})`;
+    + `${M[0][2]/k},${M[1][2]/k},0,1)`;
 }
 
 // Mesh-warp `img` onto the destination quad in canvas coords. The 2D
