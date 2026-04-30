@@ -9,7 +9,9 @@ import {
   loadPendingImage,
   clearPendingImage,
   hasPendingImage,
+  ALLOWED_IMAGE_MIME,
 } from '../lib/pendingImage.js';
+import { beginTrialSession, canUseFreeTrial } from '../lib/freeTrial.js';
 
 /**
  * /upload — public entry. Anyone can upload an image without signing in.
@@ -20,7 +22,7 @@ import {
  */
 export default function Upload() {
   const navigate = useNavigate();
-  const { user, isPaid, loading } = useAuth();
+  const { user, profile, isPaid, loading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const inputRef = useRef(null);
@@ -86,8 +88,12 @@ export default function Upload() {
 
   const acceptFile = async (file) => {
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setError('Please pick an image file (JPG, PNG, WebP, etc).');
+    // Strict allowlist of raster image MIME types. SVG is NOT accepted —
+    // it's an XML format that can carry foreignObject/scripts and isn't
+    // useful as an AR overlay reference anyway. Same allowlist is enforced
+    // in lib/pendingImage.js when reading back.
+    if (!ALLOWED_IMAGE_MIME.has(file.type)) {
+      setError('Please pick a JPG, PNG, WebP, GIF, HEIC, or AVIF image (no SVG).');
       return;
     }
     if (file.size > 25 * 1024 * 1024) {
@@ -141,11 +147,21 @@ export default function Upload() {
       setLoginOpen(true);            // not signed in → modal
       return;
     }
-    if (!isPaid) {
-      navigate('/pricing');          // signed in but no plan → pricing
+    // Signed in + paid → straight to trace.
+    // Signed in + free WITH unused/active free trial → also straight to trace
+    // (the trial gets stamped inside <Trace /> on first mount).
+    // Signed in + free + trial used → /pricing.
+    if (!isPaid && !canUseFreeTrial(profile)) {
+      navigate('/pricing');
       return;
     }
-    // Signed in + paid → straight to trace.
+    // Free user using their one shot — mark this tab as the active trial
+    // session BEFORE we navigate so RequirePaid's first render (and every
+    // render after the post-stamp profile update) resolves to 'active'
+    // rather than 'used'. RequirePaid does this defensively too, but doing
+    // it here as well covers the path where the navigation completes
+    // before RequirePaid's render cycle has run.
+    if (!isPaid) beginTrialSession();
     navigate('/trace', { state: { imageUrl: preview, fileName } });
   };
 
@@ -186,7 +202,7 @@ export default function Upload() {
               <input
                 ref={inputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,image/avif,image/bmp"
                 onChange={onPick}
                 className="upload-input"
               />

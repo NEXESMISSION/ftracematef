@@ -1,7 +1,9 @@
-import { Routes, Route } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthProvider.jsx';
 import RequireAuth from './auth/RequireAuth.jsx';
 import RequirePaid from './auth/RequirePaid.jsx';
+import { endTrialSession } from './lib/freeTrial.js';
 
 import Home from './pages/Home.jsx';
 import Landing from './pages/Landing.jsx';
@@ -14,9 +16,28 @@ import CheckoutSuccess from './pages/CheckoutSuccess.jsx';
 import PricingPage from './pages/PricingPage.jsx';
 import NotFound from './pages/NotFound.jsx';
 
+// One-shot free trial: the moment a free user navigates AWAY from /trace,
+// their single session is consumed for good. Doing this at the route layer
+// (rather than in Trace.jsx's unmount cleanup) is deliberate — unmount also
+// fires on a page refresh, which would lock the user out for accidentally
+// hitting F5 mid-session. A pathname change in react-router only fires for
+// SPA navigation, never for refresh, so this is the right hook.
+function TrialSessionTracker() {
+  const { pathname } = useLocation();
+  const prev = useRef(pathname);
+  useEffect(() => {
+    if (prev.current === '/trace' && pathname !== '/trace') {
+      endTrialSession();
+    }
+    prev.current = pathname;
+  }, [pathname]);
+  return null;
+}
+
 export default function App() {
   return (
     <AuthProvider>
+      <TrialSessionTracker />
       <Routes>
         {/* Public — anyone can browse + start an upload */}
         <Route path="/"              element={<Home />} />
