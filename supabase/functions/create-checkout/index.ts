@@ -135,8 +135,17 @@ Deno.serve(async (req) => {
   } catch (err) {
     // Log full detail server-side; return a generic message to the client so
     // we don't leak internal Dodo IDs / debug strings into a production UI.
+    // TEMP DEBUG: also surface the Dodo error message + status so the client
+    // toast tells us what's actually wrong. Lock this back down once
+    // checkout works end-to-end (replace `details` with just the generic msg).
     console.error('Dodo checkout failed:', err);
-    return json({ error: 'Could not start checkout. Please try again in a moment.' }, 502);
+    const detail = err instanceof Error ? err.message : String(err);
+    const status = (err && typeof err === 'object' && 'status' in err && typeof err.status === 'number') ? err.status : null;
+    return json({
+      error:   'Could not start checkout. Please try again in a moment.',
+      details: detail,
+      dodo_status: status,
+    }, 502);
   }
 });
 

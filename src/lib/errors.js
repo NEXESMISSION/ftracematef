@@ -10,7 +10,9 @@ export async function unwrapFunctionError(err) {
   if (ctx && typeof ctx.json === 'function') {
     try {
       const body = await ctx.clone().json();
-      if (body?.error) return body.error;
+      // Prefer the more specific debug detail if the server included it.
+      if (body?.details) return `${body.error ?? 'Error'} — ${body.details}`;
+      if (body?.error)   return body.error;
     } catch { /* response wasn't JSON — fall through */ }
     try {
       const text = await ctx.clone().text();
