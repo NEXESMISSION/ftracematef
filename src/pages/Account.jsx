@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { startCheckout } from '../lib/checkout.js';
 import {
@@ -392,7 +392,6 @@ function StatsGrid({ userId, memberSince }) {
 
 export default function Account() {
   const { user, profile, subscription, signOut, refresh, isPaid, loading } = useAuth();
-  const navigate = useNavigate();
   const [showChange, setShowChange] = useState(false);
   const [stats, setStats] = useState(() => getStats(user?.id));
 
@@ -406,11 +405,6 @@ export default function Account() {
       window.removeEventListener('storage', refreshStats);
     };
   }, [user?.id]);
-
-  const onSignOut = async () => {
-    await signOut();
-    navigate('/');
-  };
 
   const greeting = profile?.display_name?.split(' ')[0] || user?.email?.split('@')[0] || 'there';
 
@@ -450,7 +444,7 @@ export default function Account() {
         </Link>
         <div className="studio-bar-right">
           <Link to="/welcome" className="studio-link">Home</Link>
-          <button type="button" className="studio-signout" onClick={onSignOut}>Sign out</button>
+          <button type="button" className="studio-signout" onClick={signOut}>Sign out</button>
         </div>
       </header>
 
@@ -519,7 +513,7 @@ export default function Account() {
 
         {/* ── Sign out ── */}
         <div className="profile-foot">
-          <button type="button" className="profile-btn profile-btn-ghost" onClick={onSignOut}>
+          <button type="button" className="profile-btn profile-btn-ghost" onClick={signOut}>
             Sign out
           </button>
         </div>

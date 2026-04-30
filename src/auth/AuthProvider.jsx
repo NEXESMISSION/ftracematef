@@ -170,6 +170,9 @@ export function AuthProvider({ children }) {
       window.sessionStorage.removeItem('tm:intent-plan');
     } catch { /* ignore quota / private mode */ }
     await supabase.auth.signOut();
+    // Hard-replace so we land on /login fresh, history is clean, and any
+    // protected page that was rendered behind the user can't be back-buttoned to.
+    window.location.replace('/login');
   }, [session?.user?.id]);
 
   const refresh = useCallback(
