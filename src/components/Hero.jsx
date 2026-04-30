@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../auth/AuthProvider.jsx';
 
 // Demo YouTube video id. Set when the demo is recorded; the button only
 // renders once a real id is in place — no more dead button shipping a
@@ -6,6 +7,7 @@ import { Link } from 'react-router-dom';
 const DEMO_VIDEO_ID = '';
 
 export default function Hero({ onPlayClick }) {
+  const { user } = useAuth();
   return (
     <section className="hero tm-section-pad">
       <div className="hero-grid">
@@ -31,9 +33,15 @@ export default function Hero({ onPlayClick }) {
           </p>
 
           <div className="ctas">
-            <Link className="img-btn" to="/login" aria-label="Try it Now">
-              <img src="/images/ui/btn-try-now.webp" alt="Try it Now" />
-            </Link>
+            {user ? (
+              <Link className="hero-account-cta" to="/account" aria-label="See my profile">
+                See my profile →
+              </Link>
+            ) : (
+              <Link className="img-btn" to="/login" aria-label="Try it Now">
+                <img src="/images/ui/btn-try-now.webp" alt="Try it Now" />
+              </Link>
+            )}
 
             {DEMO_VIDEO_ID && (
               <button type="button" className="see-action" onClick={() => onPlayClick(DEMO_VIDEO_ID)}>

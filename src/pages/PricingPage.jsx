@@ -76,7 +76,10 @@ export default function PricingPage() {
           <img src="/images/brand/logo.webp" alt="Trace Mate" />
         </Link>
         {user && (
-          <button type="button" className="studio-signout" onClick={signOut}>Sign out</button>
+          <div className="pp-topbar-right">
+            <Link to="/account" className="pp-back-link">← Back to account</Link>
+            <button type="button" className="studio-signout" onClick={signOut}>Sign out</button>
+          </div>
         )}
       </header>
 

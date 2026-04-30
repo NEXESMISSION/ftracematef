@@ -475,14 +475,9 @@ export default function Account() {
                 </Link>
               </>
             ) : (
-              <>
-                <Link to="/pricing" className="profile-cta profile-cta-primary">
-                  Choose a plan →
-                </Link>
-                <Link to="/welcome" className="profile-cta profile-cta-ghost">
-                  See landing page
-                </Link>
-              </>
+              <Link to="/pricing" className="profile-cta profile-cta-primary">
+                Choose a plan →
+              </Link>
             )}
           </div>
         </section>

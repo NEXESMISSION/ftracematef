@@ -2034,3 +2034,54 @@
 @media (max-width: 480px) {
   .dev-meta { grid-template-columns: 1fr; }
 }
+
+/* ── Signed-in CTAs (replaces "Try it Now" image with a text-styled button) ── */
+.nav-account-cta {
+  display: inline-block;
+  padding: 9px 18px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  text-decoration: none;
+  letter-spacing: 0.2px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 4px 10px -4px rgba(0,0,0,0.35);
+}
+.nav-account-cta:hover { transform: translateY(-1px); box-shadow: 0 8px 16px -6px rgba(0,0,0,0.4); }
+
+.hero-account-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 28px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 17px;
+  text-decoration: none;
+  letter-spacing: 0.3px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 8px 18px -8px rgba(0,0,0,0.45);
+}
+.hero-account-cta:hover { transform: translateY(-2px); box-shadow: 0 14px 26px -10px rgba(0,0,0,0.55); }
+
+/* ── Pricing topbar — signed-in nav row ── */
+.pp-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.pp-back-link {
+  font-family: 'Nunito', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.pp-back-link:hover { color: var(--ink); }

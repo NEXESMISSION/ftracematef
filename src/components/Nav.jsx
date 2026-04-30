@@ -18,8 +18,8 @@ export default function Nav() {
       </nav>
 
       {user ? (
-        <Link className="img-btn img-btn-sm" to="/account" aria-label="Your account">
-          <img src="/images/ui/btn-try-now.webp" alt="Account" />
+        <Link className="nav-account-cta" to="/account" aria-label="See my profile">
+          See my profile →
         </Link>
       ) : (
         <Link className="img-btn img-btn-sm" to="/login" aria-label="Try it Now">
