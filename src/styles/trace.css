@@ -274,6 +274,18 @@ body:has(.trace-stage) {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
+.trace-slider-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  min-width: 44px;
+}
+.trace-slider input[type="range"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 /* ----- Action buttons ----- */
 .trace-toggles {

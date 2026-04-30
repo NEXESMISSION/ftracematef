@@ -41,6 +41,9 @@ export default function Trace() {
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn]               = useState(false);
   const [controlsHidden, setControlsHidden] = useState(false);
+  const [flickerOn, setFlickerOn]           = useLocalState('tm:flickerOn', false);
+  const [flickerSpeed, setFlickerSpeed]     = useLocalState('tm:flickerSpeed', 3);
+  const [flickerOpacity, setFlickerOpacity] = useState(0);
 
   // No image? Bounce back to upload.
   useEffect(() => {
@@ -132,6 +135,24 @@ export default function Trace() {
     const t = setTimeout(() => setShowHint(false), 4500);
     return () => clearTimeout(t);
   }, []);
+
+  // Flicker: smoothly oscillate overlay opacity 0 → 1 → 0 while enabled.
+  // flickerSpeed is a 1–10 dial; period in seconds = 6 / flickerSpeed.
+  useEffect(() => {
+    if (!flickerOn) return;
+    let rafId;
+    let startTs = null;
+    const periodSec = 6 / Math.max(0.5, flickerSpeed);
+    const tick = (ts) => {
+      if (startTs == null) startTs = ts;
+      const elapsed = (ts - startTs) / 1000;
+      const phase = (elapsed / periodSec) * 2 * Math.PI;
+      setFlickerOpacity((1 - Math.cos(phase)) / 2);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [flickerOn, flickerSpeed]);
 
   // ===== Track tracing time =====
   // Accumulate active seconds (paused when tab is hidden) and persist on exit.
@@ -288,7 +309,9 @@ export default function Trace() {
       `translate(${transform.x}px, ${transform.y}px) ` +
       `scale(${transform.flip ? -transform.scale : transform.scale}, ${transform.scale}) ` +
       `rotate(${transform.rotation}deg)`,
-    opacity,
+    opacity: flickerOn ? flickerOpacity : opacity,
+    // Skip the 0.15s opacity easing while flickering — rAF already drives a smooth curve.
+    transition: flickerOn ? 'transform 0.15s ease, filter 0.2s ease' : undefined,
   };
 
   return (
@@ -393,13 +416,46 @@ export default function Trace() {
                 step="0.01"
                 value={opacity}
                 onChange={(e) => setOpacity(parseFloat(e.target.value))}
+                disabled={flickerOn}
                 aria-label="Opacity"
                 style={{ '--tm-slider-fill': `${(opacity - 0.05) / 0.95 * 100}%` }}
               />
               <span className="trace-slider-value">{Math.round(opacity * 100)}%</span>
             </div>
 
+            {flickerOn && (
+              <div className="trace-slider">
+                <span className="trace-slider-label" aria-hidden="true">Speed</span>
+                <input
+                  id="flicker-speed"
+                  type="range"
+                  min="1"
+                  max="10"
+                  step="0.5"
+                  value={flickerSpeed}
+                  onChange={(e) => setFlickerSpeed(parseFloat(e.target.value))}
+                  aria-label="Flicker speed"
+                  style={{ '--tm-slider-fill': `${(flickerSpeed - 1) / 9 * 100}%` }}
+                />
+                <span className="trace-slider-value">{flickerSpeed.toFixed(1)}×</span>
+              </div>
+            )}
+
             <div className="trace-toggles">
+              <button
+                type="button"
+                className={`trace-action-btn ${flickerOn ? 'is-active' : ''}`}
+                onClick={() => setFlickerOn((v) => !v)}
+                aria-pressed={flickerOn}
+                aria-label={flickerOn ? 'Turn flicker off' : 'Turn flicker on'}
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M2 10 L5 10 L7 5 L10 15 L13 5 L15 10 L18 10" />
+                </svg>
+                <span>Flicker</span>
+              </button>
+
               <button
                 type="button"
                 className="trace-action-btn"
