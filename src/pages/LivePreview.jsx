@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { useAuthGate } from '../auth/AuthGate.jsx';
 import { useLocalState } from '../lib/useLocalState.js';
 import { startBroadcaster, startViewer } from '../lib/livePreview.js';
 import {
@@ -1373,7 +1374,17 @@ function BroadcasterStage({ userId, onChangeRole }) {
 
 export default function LivePreview() {
   const { user, profile, isPaid } = useAuth();
+  const gate = useAuthGate();
   const [role, setRole] = useState(null); // null | 'broadcaster' | 'viewer'
+
+  // Wait for auth to settle (spinner + 12s stuck-redirect to /login) BEFORE
+  // evaluating the paid/unpaid gate. Without this, a paid user navigating
+  // directly to /live would see a Paywall flash for the brief window where
+  // session is set but `subscription` hasn't loaded yet (`isPaid === false`
+  // by default). They'd then often click "Upgrade" thinking they need to
+  // re-pay — same false-celebration shape as the original /checkout/success
+  // bug, just on the deny side.
+  if (gate.element) return gate.element;
 
   if (!user) return null;
   // Live Preview is a paid feature — no trial bypass. Free users hit the

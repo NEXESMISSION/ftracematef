@@ -79,17 +79,30 @@ function parseEnvInt(name: string): number | null {
 // Throws if `amount` / `currency` don't match what we expect for `plan`.
 // Pre-tax amounts can be slightly less than the headline price in regions
 // that add tax on top, so we treat the env value as a *minimum*.
+//
+// FAIL CLOSED on missing env vars. Previously a missing
+// DODO_PRICE_<PLAN>_CENTS just logged a warning and skipped validation,
+// which means a misconfigured deploy (env var rotation, brand-new project,
+// typo in the secret name) silently disabled this check and re-opened
+// the unauthorized-grant path. The rest of the webhook treats validation
+// failures as critical (throw → land in webhook_events.error_message →
+// ops investigates), so config gaps must do the same. There is no opt-out
+// — every paid plan MUST have a positive DODO_PRICE_<PLAN>_CENTS set.
 function assertExpectedAmount(plan: string, amountCents: unknown, currency: unknown) {
   const expectedCents = EXPECTED_AMOUNT_CENTS[plan];
   if (expectedCents == null) {
-    console.warn(`[webhook] No DODO_PRICE_${plan.toUpperCase()}_CENTS set — amount validation skipped`);
-  } else {
-    const got = typeof amountCents === 'number' ? amountCents : Number(amountCents);
-    if (!Number.isFinite(got) || got < expectedCents) {
-      throw new Error(
-        `Amount validation failed for plan ${plan}: got ${amountCents}, expected >= ${expectedCents}`,
-      );
-    }
+    throw new Error(
+      `Amount validation refused for plan ${plan}: ` +
+      `DODO_PRICE_${plan.toUpperCase()}_CENTS env var is not set or non-positive. ` +
+      `Set it on the Supabase project secrets and redeploy. ` +
+      `Refusing to process payment events without a price floor.`,
+    );
+  }
+  const got = typeof amountCents === 'number' ? amountCents : Number(amountCents);
+  if (!Number.isFinite(got) || got < expectedCents) {
+    throw new Error(
+      `Amount validation failed for plan ${plan}: got ${amountCents}, expected >= ${expectedCents}`,
+    );
   }
   if (currency != null) {
     const got = String(currency).toUpperCase();
