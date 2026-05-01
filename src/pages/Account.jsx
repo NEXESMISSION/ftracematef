@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { startCheckout, markPreCheckout } from '../lib/checkout.js';
+import { startCheckout, markPreCheckout, clearPreCheckoutSnapshot } from '../lib/checkout.js';
 import {
   subscriptionAction,
   listPayments,
@@ -216,7 +216,7 @@ const UPGRADE_LIFETIME = {
   period: 'forever',
 };
 
-function ChangePlanModal({ currentPlan, subscription, onClose, refresh, onError }) {
+function ChangePlanModal({ currentPlan, subscription, userId, onClose, refresh, onError }) {
   const [busy, setBusy] = useState(null);
 
   const swapPlans = SWAP_PLANS.filter((p) => p.id !== currentPlan);
@@ -245,10 +245,11 @@ function ChangePlanModal({ currentPlan, subscription, onClose, refresh, onError 
     setBusy('lifetime');
     try {
       // Snapshot BEFORE the await — see Paywall.jsx for the why.
-      markPreCheckout(subscription);
+      markPreCheckout(subscription, userId);
       const url = await startCheckout('lifetime');
       window.location.href = url;
     } catch (e) {
+      clearPreCheckoutSnapshot();
       fail(e, 'Could not open checkout.', "Couldn't open checkout");
     }
   };
@@ -461,7 +462,7 @@ export default function Account() {
 
   const greeting = profile?.display_name?.split(' ')[0] || user?.email?.split('@')[0] || 'there';
 
-  if (loading || !profile) {
+  if (loading) {
     return (
       <div className="studio-shell">
         <header className="studio-bar">
@@ -472,6 +473,49 @@ export default function Account() {
         <main className="profile-loading">
           <span className="profile-spinner" aria-hidden="true" />
           <p className="profile-loading-text">Loading your studio…</p>
+        </main>
+      </div>
+    );
+  }
+
+  // Auth has settled but we still don't have a profile row. Most often:
+  // (a) the signup trigger silently failed for this account, (b) RLS
+  // briefly rejected the SELECT (network blip), or (c) the profiles row
+  // was deleted out from under the user. Render a clear escape hatch
+  // instead of hanging the spinner forever — the user can retry the
+  // fetch or sign out and back in cleanly.
+  if (!profile) {
+    return (
+      <div className="studio-shell">
+        <header className="studio-bar">
+          <Link to="/welcome" className="studio-brand" aria-label="Trace Mate home">
+            <img src="/images/brand/logo.webp" alt="Trace Mate" />
+          </Link>
+        </header>
+        <main className="profile-loading">
+          <p className="profile-loading-text" style={{ marginBottom: 18 }}>
+            We couldn't load your profile.
+          </p>
+          <p style={{ color: 'var(--ink-soft)', fontSize: 14, marginBottom: 24, textAlign: 'center', maxWidth: 360, lineHeight: 1.5 }}>
+            This usually fixes itself on a refresh. If it doesn't, sign out
+            and sign back in — that re-creates the profile cleanly.
+          </p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              type="button"
+              className="profile-btn profile-btn-primary"
+              onClick={() => refresh()}
+            >
+              Try again
+            </button>
+            <button
+              type="button"
+              className="profile-btn profile-btn-ghost"
+              onClick={signOut}
+            >
+              Sign out
+            </button>
+          </div>
         </main>
       </div>
     );
@@ -610,6 +654,7 @@ export default function Account() {
         <ChangePlanModal
           currentPlan={subscription?.plan}
           subscription={subscription}
+          userId={user?.id}
           onClose={() => setShowChange(false)}
           refresh={refresh}
           onError={setAlert}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { startCheckout, markPreCheckout } from '../lib/checkout.js';
+import { startCheckout, markPreCheckout, clearPreCheckoutSnapshot } from '../lib/checkout.js';
 import { supabase } from '../lib/supabase.js';
 import { PLANS as ALL_PLANS } from '../lib/plans.js';
 import { friendlyError } from '../lib/errors.js';
@@ -39,10 +39,15 @@ export default function Paywall({ trialUsed = false }) {
       // seconds, during which a renewal webhook could mutate the row out
       // from under us. We want "what we knew when the user clicked", not
       // "what we knew when Dodo replied".
-      markPreCheckout(subscription);
+      markPreCheckout(subscription, user?.id);
       const url = await startCheckout(plan);
       window.location.href = url;
     } catch (e) {
+      // startCheckout threw — drop the snapshot so it can't poison a
+      // future /checkout/success visit. Without this clear, an aborted
+      // attempt's snapshot survives until the next successful checkout
+      // (or 6h expiry) and skews the row-changed comparison.
+      clearPreCheckoutSnapshot();
       setBusy(null);
       setError(friendlyError(e, 'Could not start checkout.'));
     }

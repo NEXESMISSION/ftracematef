@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { startCheckout, markPreCheckout } from '../lib/checkout.js';
+import { startCheckout, markPreCheckout, clearPreCheckoutSnapshot } from '../lib/checkout.js';
 import { PLANS } from '../lib/plans.js';
 import { friendlyError } from '../lib/errors.js';
 
@@ -93,10 +93,11 @@ export default function Pricing() {
     try {
       setBusy(plan);
       // Snapshot BEFORE the await — see Paywall.jsx for the why.
-      markPreCheckout(subscription);
+      markPreCheckout(subscription, user?.id);
       const url = await startCheckout(plan);
       window.location.href = url;
     } catch (e) {
+      clearPreCheckoutSnapshot();
       setBusy(null);
       setError(friendlyError(e, 'Could not start checkout.'));
     }

@@ -31,13 +31,20 @@ const VERIFY_TIMEOUT_MS = 30000;
 export default function CheckoutSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isPaid, subscription } = useAuth();
+  const { isPaid, subscription, user } = useAuth();
   const [timedOut, setTimedOut] = useState(false);
 
   // Snapshot of the user's subscription state from immediately before the
   // redirect to Dodo. Read once on mount and dropped from sessionStorage so
-  // a refresh of /checkout/success can't replay a stale comparison.
-  const preCheckout = useMemo(() => consumePreCheckoutSnapshot(), []);
+  // a refresh of /checkout/success can't replay a stale comparison. The
+  // consume call validates the snapshot's stored user_id against the
+  // current user — a snapshot stamped by a different user (shared device,
+  // sibling-tab sign-in race) is rejected as "no snapshot" and the
+  // no-snapshot bounce-to-/account fires instead of a false celebration.
+  const preCheckout = useMemo(
+    () => consumePreCheckoutSnapshot(user?.id),
+    [user?.id],
+  );
   const wasPaidBefore =
     preCheckout?.status === 'active' &&
     preCheckout?.plan && preCheckout.plan !== 'free';
@@ -88,17 +95,13 @@ export default function CheckoutSuccess() {
     ? '/pricing?checkout=cancelled'
     : '/account';
 
-  // Bounce-to-failure path. Four triggers:
-  //   1. Explicit failure status on the URL.
-  //   2. Verification timeout (no isPaid flip within 30s).
-  //   3. We have a snapshot, user was already paid, nothing changed
-  //      (their existing access is unchanged; the new payment didn't go
-  //      through).
-  //   4. No snapshot at all → unconditionally route to /account. We can't
-  //      prove this checkout produced a payment, regardless of isPaid, so
-  //      we don't celebrate AND we don't hang the spinner. /account renders
-  //      the user's real subscription state (paid or not) without false
-  //      signals either way.
+  // Bounce-to-failure path. Order matches the code below:
+  //   1. Explicit failure on the URL OR verification timeout fired.
+  //   2. No snapshot at all → can't prove this checkout produced anything,
+  //      route to /account where the user sees their real state (paid or
+  //      not) without any false signals.
+  //   3. Snapshot exists, user was already paid, row didn't change → the
+  //      new payment didn't go through; existing access is unaffected.
   useEffect(() => {
     if (explicitFailure || timedOut) {
       navigate(cancelDestination, { replace: true });
@@ -107,12 +110,12 @@ export default function CheckoutSuccess() {
     if (!preCheckout) {
       // No-snapshot guard. We have no evidence *this* checkout produced
       // anything — could be a stale tab, a manually-typed URL, a refresh
-      // that wiped the snapshot, the back button after the celebration.
-      // Send them to /account where they can see their actual state.
+      // that wiped the snapshot, the back button after the celebration,
+      // or a snapshot that didn't belong to this user. Send to /account.
       navigate('/account', { replace: true });
       return;
     }
-    if (wasPaidBefore && subscriptionChanged === false) {
+    if (wasPaidBefore && !subscriptionChanged) {
       navigate(cancelDestination, { replace: true });
     }
   }, [

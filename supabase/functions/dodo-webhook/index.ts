@@ -517,12 +517,16 @@ async function upsertActiveSubscription(
       // 'failed' is intentionally NOT terminal — PSPs sometimes retry a failed
       // charge successfully, and we must re-activate. BUT a metadata-only
       // `subscription.updated` arriving for a failed sub used to silently
-      // re-activate it without amount validation. Tighten: failed → active
-      // is only allowed when (a) the event explicitly represents a charge
-      // (subscription.active or subscription.renewed) AND (b) the event
-      // carries an amount we can validate. Anything else is treated as
-      // metadata noise and skipped — the failed row stays failed until a
-      // genuine retry charge arrives.
+      // re-activate it without amount validation. Tighten the path:
+      //   - The inbound event must explicitly represent a charge
+      //     (subscription.active or subscription.renewed).
+      //   - We must have an amount we can validate. Dodo's payloads are
+      //     inconsistent — re-activation events sometimes omit
+      //     recurring_pre_tax_amount entirely. Fall back to the amount
+      //     already stored on the failed row (we trust it because it was
+      //     amount-validated at insert time). Without this fallback, a
+      //     legitimate retry-success would leave the user permanently
+      //     paywalled.
       const TERMINAL = new Set(['cancelled', 'expired']);
       if (TERMINAL.has(existing.status)) {
         console.warn(
@@ -533,12 +537,23 @@ async function upsertActiveSubscription(
       const reactivatingFailed = existing.status === 'failed';
       const isChargeEvent =
         eventType === 'subscription.active' || eventType === 'subscription.renewed';
-      if (reactivatingFailed && (!isChargeEvent || amountCents == null)) {
-        console.warn(
-          `Skipping failed→active for sub ${subId}: event=${eventType} amount=${amountCents}. ` +
-          `Failed rows can only be re-activated by a charge event with an amount.`,
-        );
-        return;
+      if (reactivatingFailed) {
+        if (!isChargeEvent) {
+          console.warn(
+            `Skipping failed→active for sub ${subId}: non-charge event ${eventType}`,
+          );
+          return;
+        }
+        const validateCents    = amountCents ?? existing.amount_cents;
+        const validateCurrency = currency ?? existing.currency;
+        if (validateCents == null) {
+          console.warn(
+            `Skipping failed→active for sub ${subId}: no amount on event or stored row`,
+          );
+          return;
+        }
+        // Throws if the (event-or-stored) amount doesn't match expected.
+        assertExpectedAmount(plan, validateCents, validateCurrency);
       }
 
       // Build the patch conditionally so a partial event can't NULL out a

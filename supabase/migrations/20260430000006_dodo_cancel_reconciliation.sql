@@ -19,7 +19,7 @@
 --   - `needs_dodo_cancel boolean` flag set by the webhook when the Dodo
 --     cancel call fails. Indexed for cheap "show me everything that needs
 --     a retry" queries.
---   - `retry_pending_dodo_cancels()` RPC that retrieves the list of
+--   - `list_pending_dodo_cancels()` RPC that retrieves the list of
 --     subscriptions still flagged. The webhook handler / a future cron
 --     job can iterate this list, retry the Dodo cancel, and clear the
 --     flag on success.
