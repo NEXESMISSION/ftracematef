@@ -168,11 +168,11 @@ function Timeline({ activity }) {
 /* Traffic panel — embeds the Plausible/Umami shared dashboard */
 
 function TrafficPanel() {
-  const providerLabel = ANALYTICS_PROVIDER === 'plausible'
-    ? 'Plausible'
-    : ANALYTICS_PROVIDER === 'umami'
-      ? 'Umami'
-      : null;
+  const providerLabel =
+    ANALYTICS_PROVIDER === 'plausible'   ? 'Plausible'   :
+    ANALYTICS_PROVIDER === 'umami'       ? 'Umami'       :
+    ANALYTICS_PROVIDER === 'goatcounter' ? 'GoatCounter' :
+    null;
 
   // No provider configured at build time → friendly setup prompt instead of
   // a broken iframe. Operator just needs to set the env vars and rebuild.
@@ -185,9 +185,38 @@ function TrafficPanel() {
         </header>
         <p className="admin-traffic-help">
           Set <code>VITE_PLAUSIBLE_DOMAIN</code> + <code>VITE_PLAUSIBLE_EMBED_URL</code>{' '}
-          (or the <code>VITE_UMAMI_*</code> equivalents) in <code>.env.local</code>{' '}
-          and rebuild to see your visitor dashboard here.
+          (or the <code>VITE_UMAMI_*</code> / <code>VITE_GOATCOUNTER_URL</code>{' '}
+          equivalents) in your environment and rebuild to see your visitor
+          dashboard here.
         </p>
+      </section>
+    );
+  }
+
+  // GoatCounter's hosted dashboard sends `X-Frame-Options: DENY`, so the
+  // iframe path always shows "refused to connect". Render a clean call-to-
+  // action that opens the live dashboard in a new tab instead.
+  if (ANALYTICS_PROVIDER === 'goatcounter') {
+    return (
+      <section className="admin-traffic admin-traffic-cta">
+        <header className="admin-traffic-head">
+          <h2>Traffic</h2>
+          <span className="admin-traffic-status">{providerLabel}</span>
+        </header>
+        <div className="admin-traffic-cta-body">
+          <p>
+            GoatCounter's hosted dashboard refuses to be embedded — open the
+            live stats in a new tab.
+          </p>
+          <a
+            href={ANALYTICS_EMBED_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="admin-traffic-cta-btn"
+          >
+            Open analytics ↗
+          </a>
+        </div>
       </section>
     );
   }

@@ -193,6 +193,38 @@
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
+/* Call-to-action variant — used when the provider blocks iframes
+   (GoatCounter sends X-Frame-Options: DENY). */
+.admin-shell .admin-traffic-cta-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 22px 18px;
+}
+.admin-shell .admin-traffic-cta-body p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+.admin-shell .admin-traffic-cta-btn {
+  display: inline-block;
+  padding: 8px 16px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 6px;
+  border: 1.5px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--coral);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.admin-shell .admin-traffic-cta-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--coral);
+}
+
 /* ── Controls ────────────────────────────────────────────────────────────── */
 .admin-shell .admin-controls {
   display: flex;
