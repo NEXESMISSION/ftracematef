@@ -492,6 +492,40 @@
   border-top: 1.5px dashed var(--line);
 }
 
+/* compact stats tiles inside the activity drawer (mirrors the /account
+   scrapbook). Sits above the timeline; collapses to 2-up on narrow widths. */
+.admin-shell .admin-trace-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+.admin-shell .admin-trace-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--cream);
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+}
+.admin-shell .admin-trace-tile-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+}
+.admin-shell .admin-trace-tile-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+@media (max-width: 760px) {
+  .admin-shell .admin-trace-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 .admin-shell .admin-activity-loading {
   display: flex;
   align-items: center;

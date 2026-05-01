@@ -5,6 +5,7 @@ import { listAllUsers, getUserActivity } from '../lib/admin.js';
 import { friendlyError } from '../lib/errors.js';
 import { PLAN_LABEL } from '../lib/plans.js';
 import { ANALYTICS_PROVIDER, ANALYTICS_EMBED_URL } from '../lib/analytics.js';
+import { formatDuration, formatRelative as formatTraceRelative } from '../lib/traceStats.js';
 
 // Anyone seen pinging the heartbeat within this window is treated as "in the
 // app right now". Tab visibility throttles the heartbeat to 60s, so 2 minutes
@@ -244,6 +245,46 @@ function TrafficPanel() {
         className="admin-traffic-frame"
       />
     </section>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
+/* Trace stats tiles — mirrors the /account scrapbook tiles, but compact.
+   Data is already on the user row (admin-list-users selects the 4 columns),
+   so no extra fetch is needed when the activity drawer opens. */
+
+function TraceStatsTiles({ user }) {
+  const tiles = [
+    {
+      key: 'time',
+      label: 'Time traced',
+      value: formatDuration(user.total_trace_seconds || 0),
+    },
+    {
+      key: 'sessions',
+      label: 'Sessions',
+      value: user.trace_sessions || 0,
+    },
+    {
+      key: 'last',
+      label: 'Last session',
+      value: user.last_trace_at ? formatTraceRelative(user.last_trace_at) : 'never',
+    },
+    {
+      key: 'member',
+      label: 'Member since',
+      value: user.created_at ? formatDate(user.created_at) : '—',
+    },
+  ];
+  return (
+    <ul className="admin-trace-tiles">
+      {tiles.map((t) => (
+        <li key={t.key} className="admin-trace-tile">
+          <span className="admin-trace-tile-label">{t.label}</span>
+          <span className="admin-trace-tile-value">{t.value}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -502,6 +543,7 @@ export default function AdminDashboard() {
 
                   {isOpen && (
                     <div id={`admin-activity-${u.id}`} className="admin-row-activity">
+                      <TraceStatsTiles user={u} />
                       <ActivityPanel userId={u.id} />
                     </div>
                   )}

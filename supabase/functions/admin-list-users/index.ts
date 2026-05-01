@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
   // about than the foreign-key embed magic.
   const { data: profiles, error: profErr } = await admin
     .from('profiles')
-    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at, dodo_customer_id')
+    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at, dodo_customer_id, total_trace_seconds, trace_sessions, first_trace_at, last_trace_at')
     .order('created_at', { ascending: false })
     .limit(2000);
   if (profErr) return json({ error: profErr.message }, 500);
@@ -188,6 +188,13 @@ Deno.serve(async (req) => {
       sub_updated_at:      sub?.updated_at ?? null,
       cancelled_at:        sub?.cancelled_at ?? null,
       is_paid:             isPaidNow(sub ?? undefined),
+      // Trace stats — server-side mirror of the user's /account scrapbook
+      // tiles. Written by the record_trace_session RPC; nullable when the
+      // user hasn't traced yet (seeded via column defaults to 0/null).
+      total_trace_seconds: p.total_trace_seconds ?? 0,
+      trace_sessions:      p.trace_sessions ?? 0,
+      first_trace_at:      p.first_trace_at ?? null,
+      last_trace_at:       p.last_trace_at ?? null,
     };
   });
 

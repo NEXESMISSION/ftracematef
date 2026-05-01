@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useLocalState } from '../lib/useLocalState.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { addSession } from '../lib/traceStats.js';
+import { supabase } from '../lib/supabase.js';
 import { loadPendingImage } from '../lib/pendingImage.js';
 import { markFreeTrialStarted } from '../lib/freeTrial.js';
 import {
@@ -263,7 +264,19 @@ export default function Trace() {
 
     const persist = () => {
       flushActive();
-      addSession(user?.id, elapsedMs / 1000);
+      const seconds = elapsedMs / 1000;
+      // localStorage write — fast, drives the user's own /account scrapbook.
+      addSession(user?.id, seconds);
+      // Server-side mirror so the admin dashboard can see these. Fire-and-
+      // forget: a network error here must not break unmount/pagehide. The
+      // RPC drops sub-5s sessions itself (matches MIN_SESSION_SECONDS).
+      if (user?.id && seconds >= 5) {
+        supabase
+          .rpc('record_trace_session', { duration_seconds: Math.round(seconds) })
+          .then(({ error }) => {
+            if (error) console.warn('[trace] record_trace_session failed:', error.message);
+          });
+      }
       elapsedMs = 0;
     };
 
