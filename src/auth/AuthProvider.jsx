@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { endTrialSession } from '../lib/freeTrial.js';
 
@@ -259,6 +259,35 @@ export function AuthProvider({ children }) {
       }
     };
   }, [session?.user?.id, loadUserData]);
+
+  // Cross-user state hygiene. Every per-user side store on the device
+  // (trial session flag, pre-checkout snapshot, pending image, intent plan,
+  // cached trace stats) gets wiped whenever the authenticated user-id
+  // transitions from one value to another WITHOUT going through signOut().
+  // Without this, a token swap (sibling-tab session change, signInWithIdToken,
+  // an OAuth re-bind that doesn't fire SIGNED_OUT in between) would leave
+  // user A's stale flags in place for user B — most visibly, B's freeTrial
+  // state reads "active" because A's inMemoryFlag is still set.
+  //
+  // Skips the very first transition (null → first user-id) so we don't wipe
+  // legitimately-pending state for the user who just signed in.
+  const prevUserIdRef = useRef(null);
+  useEffect(() => {
+    const currentId = session?.user?.id ?? null;
+    const prevId    = prevUserIdRef.current;
+    prevUserIdRef.current = currentId;
+
+    if (prevId && currentId && prevId !== currentId) {
+      try {
+        window.localStorage.removeItem(`tm:traceStats:${prevId}`);
+        window.localStorage.removeItem('tm:traceStats:anon');
+        window.sessionStorage.removeItem('tm:pending-image');
+        window.sessionStorage.removeItem('tm:intent-plan');
+        window.sessionStorage.removeItem('tm:checkout:before');
+      } catch { /* ignore quota / private mode */ }
+      endTrialSession();
+    }
+  }, [session?.user?.id]);
 
   // Presence heartbeat: stamp profiles.last_seen_at every ~60s while the tab
   // is visible. Powers the "online now" green dot on the admin dashboard.

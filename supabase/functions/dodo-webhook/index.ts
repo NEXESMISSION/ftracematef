@@ -411,17 +411,37 @@ async function processEvent(event: any, supabase: any) {
       }
 
       // Granted. Cancel any prior recurring sub remotely at Dodo so the card
-      // stops getting charged after the upgrade. Best-effort: log and continue
-      // on failure — the local cancel was already done atomically by the SQL
-      // function, and ops can clean up the Dodo side from the audit log.
+      // stops getting charged after the upgrade. The local cancel is already
+      // done by the SQL function; this handles the remote side.
+      //
+      // If the Dodo API call fails (network blip, rate limit, expired key,
+      // Dodo outage), flag the row with `needs_dodo_cancel = true` so a
+      // reconciliation pass can pick it up later (see migration 06 +
+      // list_pending_dodo_cancels RPC). Without the flag, ops had to read
+      // function logs to find orphans — and customers kept getting charged
+      // for the plan they thought they replaced.
       if (priorActive?.dodo_subscription_id) {
         try {
           await cancelDodoSubscription(priorActive.dodo_subscription_id);
         } catch (err) {
           console.error(
-            `Failed to cancel Dodo sub ${priorActive.dodo_subscription_id} on lifetime upgrade:`,
+            `Failed to cancel Dodo sub ${priorActive.dodo_subscription_id} on lifetime upgrade — flagging for reconciliation:`,
             err,
           );
+          try {
+            await supabase
+              .from('subscriptions')
+              .update({ needs_dodo_cancel: true })
+              .eq('id', priorActive.id);
+          } catch (flagErr) {
+            // Last-ditch: log loudly. We'd rather have a noisy error than a
+            // silent orphan, but at this point ops is going to have to fix
+            // it manually anyway.
+            console.error(
+              `CRITICAL: failed to flag sub ${priorActive.id} for Dodo-cancel reconciliation:`,
+              flagErr,
+            );
+          }
         }
       }
       return;
