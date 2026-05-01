@@ -134,6 +134,65 @@
   50%      { box-shadow: 0 0 0 7px rgba(43, 191, 106, 0.05); }
 }
 
+/* ── Traffic (Plausible / Umami embed) ───────────────────────────────────── */
+.admin-shell .admin-traffic {
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 4px 4px 0 var(--ink);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.admin-shell .admin-traffic-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 1.5px solid var(--ink);
+  background: var(--cream-deep);
+}
+.admin-shell .admin-traffic-head h2 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+.admin-shell .admin-traffic-status {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+.admin-shell a.admin-traffic-status:hover { color: var(--ink); }
+.admin-shell .admin-traffic-frame {
+  display: block;
+  width: 1px;
+  min-width: 100%;
+  /* Plausible recommends ~1600px so its single-page dashboard never scrolls
+     internally — instead the page itself scrolls. Umami embeds are shorter
+     but still benefit from a tall canvas. */
+  height: 1600px;
+  border: 0;
+  background: var(--paper);
+}
+.admin-shell .admin-traffic-empty {
+  padding: 0;
+}
+.admin-shell .admin-traffic-empty .admin-traffic-help {
+  padding: 18px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+.admin-shell .admin-traffic-empty code {
+  background: var(--cream-deep);
+  border: 1px solid var(--line);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
 /* ── Controls ────────────────────────────────────────────────────────────── */
 .admin-shell .admin-controls {
   display: flex;
@@ -230,10 +289,6 @@
 }
 
 .admin-shell .admin-row {
-  display: grid;
-  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 2fr);
-  gap: 18px;
-  align-items: center;
   background: var(--paper);
   border: 1.5px solid var(--ink);
   border-radius: 10px;
@@ -241,7 +296,7 @@
   box-shadow: 4px 4px 0 var(--ink);
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
-.admin-shell .admin-row:hover {
+.admin-shell .admin-row:not(.is-open):hover {
   transform: translate(-1px, -1px);
   box-shadow: 5px 5px 0 var(--ink);
 }
@@ -367,11 +422,123 @@
   font-size: 12px;
 }
 
+/* row layout: switch to flex so the activity panel can sit below cleanly */
+.admin-shell .admin-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.admin-shell .admin-row-main {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 2fr) auto;
+  gap: 18px;
+  align-items: center;
+}
+
+.admin-shell .admin-row-toggle {
+  align-self: center;
+  background: transparent;
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: background 120ms ease;
+}
+.admin-shell .admin-row-toggle:hover { background: var(--cream-deep); }
+.admin-shell .admin-row.is-open .admin-row-toggle {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* activity drawer */
+.admin-shell .admin-row-activity {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1.5px dashed var(--line);
+}
+
+.admin-shell .admin-activity-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  padding: 16px 0;
+}
+.admin-shell .admin-activity-loading .admin-spinner {
+  width: 18px; height: 18px; border-width: 2px;
+}
+
+.admin-shell .admin-timeline-empty {
+  color: var(--ink-muted);
+  font-size: 13px;
+  padding: 12px 0;
+}
+
+.admin-shell .admin-timeline {
+  position: relative;
+  margin: 0;
+  padding: 0 0 0 18px;
+  list-style: none;
+  border-left: 2px solid var(--cream-deep);
+}
+
+.admin-shell .admin-timeline-item {
+  position: relative;
+  padding: 8px 0 8px 8px;
+}
+
+.admin-shell .admin-timeline-dot {
+  position: absolute;
+  left: -25px;
+  top: 14px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ink-muted);
+  border: 1.5px solid var(--paper);
+  box-shadow: 0 0 0 1.5px var(--ink-muted);
+}
+
+.admin-shell .admin-timeline-sub       .admin-timeline-dot { background: #6c8cff; box-shadow: 0 0 0 1.5px #6c8cff; }
+.admin-shell .admin-timeline-event     .admin-timeline-dot { background: #2bbf6a; box-shadow: 0 0 0 1.5px #2bbf6a; }
+.admin-shell .admin-timeline-event-bad .admin-timeline-dot { background: var(--coral); box-shadow: 0 0 0 1.5px var(--coral); }
+.admin-shell .admin-timeline-auth      .admin-timeline-dot { background: var(--yellow-deep); box-shadow: 0 0 0 1.5px var(--yellow-deep); }
+
+.admin-shell .admin-timeline-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.admin-shell .admin-timeline-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.admin-shell .admin-timeline-when {
+  font-size: 11px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  cursor: help;
+}
+.admin-shell .admin-timeline-detail {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  word-break: break-word;
+}
+
 /* responsive collapse — stacks the row at narrow widths */
 @media (max-width: 760px) {
-  .admin-shell .admin-row {
+  .admin-shell .admin-row-main {
     grid-template-columns: 1fr;
     gap: 10px;
   }
   .admin-shell .admin-row-plan { flex-direction: row; flex-wrap: wrap; }
+  .admin-shell .admin-row-toggle { align-self: flex-start; }
 }

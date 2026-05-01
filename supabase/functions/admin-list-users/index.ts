@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
   // about than the foreign-key embed magic.
   const { data: profiles, error: profErr } = await admin
     .from('profiles')
-    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at')
+    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at, dodo_customer_id')
     .order('created_at', { ascending: false })
     .limit(2000);
   if (profErr) return json({ error: profErr.message }, 500);
@@ -96,6 +96,29 @@ Deno.serve(async (req) => {
     .select('user_id, plan, status, current_period_end, cancel_at_next_billing_date, amount_cents, currency, dodo_subscription_id, created_at, updated_at, cancelled_at')
     .order('created_at', { ascending: false });
   if (subsErr) return json({ error: subsErr.message }, 500);
+
+  // Pull auth.users.last_sign_in_at so users who haven't pinged the heartbeat
+  // since the column was added still show a meaningful "last seen". This is
+  // Supabase's built-in stamp on every successful sign-in, so it's always
+  // populated for anyone who's logged in at least once.
+  // Paginate defensively: admin.listUsers() caps at 1000 per call. Two pages
+  // covers the same 2000-row ceiling we use on profiles above; if you outgrow
+  // that, raise both ceilings together.
+  const lastSignIn = new Map<string, string | null>();
+  for (const page of [1, 2]) {
+    const { data: pageData, error: authErr } = await admin.auth.admin.listUsers({
+      page,
+      perPage: 1000,
+    });
+    if (authErr) {
+      console.warn('[admin-list-users] auth.listUsers page', page, 'failed:', authErr);
+      break;
+    }
+    for (const u of pageData?.users ?? []) {
+      lastSignIn.set(u.id, u.last_sign_in_at ?? null);
+    }
+    if ((pageData?.users?.length ?? 0) < 1000) break;
+  }
 
   // Index the most-recent active row per user. The unique-active partial
   // index guarantees at most one matches, but we walk the array defensively
@@ -145,6 +168,8 @@ Deno.serve(async (req) => {
       is_admin:            !!p.is_admin,
       created_at:          p.created_at,
       last_seen_at:        p.last_seen_at,
+      last_sign_in_at:     lastSignIn.get(p.id) ?? null,
+      dodo_customer_id:    p.dodo_customer_id ?? null,
       trial_used:          !!p.free_trial_started_at,
       // Subscription view (null when the user has no row yet, which can
       // only happen if the signup trigger failed for some reason).

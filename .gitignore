@@ -32,3 +32,8 @@ assets/
 capacitor.config.production.json
 capacitor.config.local.json
 
+# Native Android project — kept out of the web app repo. Regenerated locally
+# via `npx cap add android`; the tree contains machine-specific Gradle /
+# SDK paths and is large enough to bloat clones.
+/android/
+

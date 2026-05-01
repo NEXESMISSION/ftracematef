@@ -29,3 +29,17 @@ export async function listAllUsers() {
   if (data?.error) throw new Error(data.error);
   return data?.users ?? [];
 }
+
+/**
+ * Per-user activity log: subscription history, webhook events, sign-ins.
+ * Returns { user, sub_history, events, sign_ins }.
+ */
+export async function getUserActivity(userId) {
+  const { data, error } = await supabase.functions.invoke('admin-user-activity', {
+    method: 'POST',
+    body: { user_id: userId },
+  });
+  if (error) throw new Error(await unwrapFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return data;
+}

@@ -6,7 +6,7 @@
   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-ceEZ9cvEXsX4Th6DCIlqkBm4zGZq3Q+Jc51Ca5sRRTc='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://gihmcbggfpogmisxvqyf.supabase.co wss://gihmcbggfpogmisxvqyf.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-ceEZ9cvEXsX4Th6DCIlqkBm4zGZq3Q+Jc51Ca5sRRTc=' https://plausible.io https://cloud.umami.is https://gc.zgo.at; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://gihmcbggfpogmisxvqyf.supabase.co wss://gihmcbggfpogmisxvqyf.supabase.co https://plausible.io https://cloud.umami.is https://*.goatcounter.com; frame-src https://plausible.io https://cloud.umami.is https://*.goatcounter.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable

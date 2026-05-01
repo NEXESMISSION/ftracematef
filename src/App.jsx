@@ -5,6 +5,7 @@ import RequireAuth from './auth/RequireAuth.jsx';
 import RequirePaid from './auth/RequirePaid.jsx';
 import RequireAdmin from './auth/RequireAdmin.jsx';
 import { endTrialSession } from './lib/freeTrial.js';
+import { trackPageview } from './lib/analytics.js';
 
 import Home from './pages/Home.jsx';
 import Landing from './pages/Landing.jsx';
@@ -42,6 +43,17 @@ function TrialSessionTracker() {
   return null;
 }
 
+// Drives route-change pageviews into the analytics provider. No-op for
+// Plausible / Umami (their v2 scripts auto-track pushState); required for
+// GoatCounter, which only counts the initial load otherwise.
+function AnalyticsRouteTracker() {
+  const { pathname, search } = useLocation();
+  useEffect(() => {
+    trackPageview();
+  }, [pathname, search]);
+  return null;
+}
+
 // Native-only: listens for `tm:deeplink` events fired by lib/native.js when
 // Android delivers a tracemate.art URL to the app (App Link, payment redirect,
 // magic-link from email, etc.). Navigates the SPA to the inner path so the
@@ -68,6 +80,7 @@ export default function App() {
   return (
     <AuthProvider>
       <TrialSessionTracker />
+      <AnalyticsRouteTracker />
       <DeepLinkRouter />
       <Routes>
         {/* Public — anyone can browse + start an upload */}
