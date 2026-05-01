@@ -101,17 +101,35 @@ function assertExpectedAmount(plan: string, amountCents: unknown, currency: unkn
   }
 }
 
+// Event types that REPRESENT real money moving (or first-time activation).
+// These are the only events allowed to BIND a fresh dodo_customer_id to a
+// profile. A subscription.failed / subscription.updated arriving first
+// must NOT be allowed to perform first-time linkage — without this filter,
+// a signed-but-crafted-metadata event whose `supabase_user_id` points at a
+// victim's profile could bind the attacker's customer_id to the victim,
+// routing all subsequent portal/payment lookups through the wrong account.
+const POSITIVE_BIND_EVENTS = new Set([
+  'subscription.active',
+  'subscription.renewed',
+  'payment.succeeded',
+]);
+
 // Reject events whose `customer_id` doesn't match a customer we've already
 // linked to this profile. Once a profile has a `dodo_customer_id`, every
 // subsequent event for that user MUST carry the same id — otherwise we're
 // being asked to act on behalf of a different paying customer (most likely a
-// replay/forged-metadata attempt). The first event ever for a user has no
-// recorded customer_id, so we accept and persist it; from that point forward
-// the binding is enforced.
+// replay/forged-metadata attempt).
+//
+// First-time linkage is now restricted to POSITIVE_BIND_EVENTS — see the
+// comment on that set. Lifecycle/failure events that arrive for a not-yet-
+// bound profile are silently allowed to proceed without binding (the next
+// positive event will do the linkage), since they neither grant access nor
+// move money.
 async function bindAndCheckCustomer(
   supabase: any,
   userId: string,
   eventCustomerId: string | null | undefined,
+  eventType: string,
 ) {
   const { data: profile } = await supabase
     .from('profiles')
@@ -125,7 +143,7 @@ async function bindAndCheckCustomer(
       `Customer mismatch for user ${userId}: profile=${existing} event=${eventCustomerId}`,
     );
   }
-  if (!existing && eventCustomerId) {
+  if (!existing && eventCustomerId && POSITIVE_BIND_EVENTS.has(eventType)) {
     // First-time linkage. Use `is null` as the WHERE so a concurrent webhook
     // for the same user can't overwrite an already-set value.
     await supabase
@@ -297,14 +315,14 @@ async function processEvent(event: any, supabase: any) {
   // misrouted event and the handler throws (event ends up in
   // webhook_events.error_message for ops review, not silently honored).
   const customerId = data.customer?.customer_id ?? data.customer_id ?? null;
-  await bindAndCheckCustomer(supabase, userId, customerId);
+  await bindAndCheckCustomer(supabase, userId, customerId, type);
 
   switch (type) {
     case 'subscription.active':
     case 'subscription.renewed':
     case 'subscription.plan_changed':
     case 'subscription.updated': {
-      await upsertActiveSubscription(data, userId, supabase);
+      await upsertActiveSubscription(type, data, userId, supabase);
       return;
     }
 
@@ -415,28 +433,49 @@ async function processEvent(event: any, supabase: any) {
   }
 }
 
-async function upsertActiveSubscription(data: any, userId: string, supabase: any) {
+async function upsertActiveSubscription(
+  eventType: string,
+  data: any,
+  userId: string,
+  supabase: any,
+) {
   const productId   = data.product_id ?? data.product?.product_id;
   const plan        = PLAN_FROM_PRODUCT[productId];
   if (!plan) {
     console.warn(`Unknown product_id ${productId} — skipping`);
     return;
   }
+
+  // Lifetime grants are one-time payments, not subscriptions — they MUST go
+  // through `payment.succeeded` → grant_lifetime_subscription RPC, which
+  // does the seat-cap check and dedupe atomically. A subscription.* event
+  // arriving with a Lifetime product_id is either a Dodo bug, a misrouted
+  // event, or an attacker exploiting #5 (resurrect a failed row as Lifetime
+  // via a metadata-only update with no amount field). Refuse the path
+  // entirely — throwing here lands the event in webhook_events.error_message
+  // for ops review, and no row is mutated.
+  if (plan === 'lifetime') {
+    throw new Error(
+      `Refusing Lifetime grant via subscription event ${eventType}: ` +
+      `Lifetime must be granted through payment.succeeded only`,
+    );
+  }
+
   const periodEnd     = data.next_billing_date ?? data.current_period_end ?? null;
   const subId         = data.subscription_id ?? data.id ?? null;
   const amountCents   = data.recurring_pre_tax_amount ?? data.amount ?? null;
-  const currency      = data.currency ?? 'USD';
+  const currency      = data.currency ?? null;
   const status        = (data.status ?? 'active') as string;
   const cancelAtEnd   = !!data.cancel_at_next_billing_date;
 
   // Validate the amount/currency against what we expect for this plan
   // *before* writing anything. This is the only check that catches the
-  // "subscription.updated event flips the plan to Lifetime without the
-  // user paying the upgrade price" class of bug. Throwing here aborts the
-  // upsert and the event ends up in webhook_events.error_message.
+  // "subscription.updated event flips the plan to a paid tier without the
+  // user paying" class of bug. Throwing here aborts the upsert and the
+  // event ends up in webhook_events.error_message.
   // We only validate when there's actually an amount on the event — some
   // subscription.* events (e.g. on a metadata-only update) may legitimately
-  // omit it.
+  // omit it. The "failed → active without amount" gap is closed below.
   if (amountCents != null) {
     assertExpectedAmount(plan, amountCents, currency);
   }
@@ -445,21 +484,25 @@ async function upsertActiveSubscription(data: any, userId: string, supabase: any
   // BUT refuse to resurrect rows that have already reached a terminal state.
   // A stale retry of a "subscription.active" arriving after the user cancelled
   // (or after a Lifetime upgrade replaced the row) must not flip them back.
-  // C3's idempotency dedupes same-webhook retries, so the only way we hit
-  // this path is a *different* webhook carrying old data.
+  // The webhook_events idempotency dedupes same-webhook retries, so the only
+  // way we hit this path is a *different* webhook carrying old data.
   if (subId) {
     const { data: existing } = await supabase
       .from('subscriptions')
-      .select('id, status')
+      .select('id, status, current_period_end, amount_cents, currency')
       .eq('dodo_subscription_id', subId)
       .maybeSingle();
 
     if (existing) {
-      // 'failed' is intentionally NOT terminal here. PSPs (including Dodo) will
-      // sometimes retry a failed charge successfully — when that happens the
-      // user must be re-activated, not stuck locked out. 'cancelled' and
-      // 'expired' remain terminal because re-activating from those would
-      // contradict an explicit user/system intent.
+      // 'failed' is intentionally NOT terminal — PSPs sometimes retry a failed
+      // charge successfully, and we must re-activate. BUT a metadata-only
+      // `subscription.updated` arriving for a failed sub used to silently
+      // re-activate it without amount validation. Tighten: failed → active
+      // is only allowed when (a) the event explicitly represents a charge
+      // (subscription.active or subscription.renewed) AND (b) the event
+      // carries an amount we can validate. Anything else is treated as
+      // metadata noise and skipped — the failed row stays failed until a
+      // genuine retry charge arrives.
       const TERMINAL = new Set(['cancelled', 'expired']);
       if (TERMINAL.has(existing.status)) {
         console.warn(
@@ -467,16 +510,35 @@ async function upsertActiveSubscription(data: any, userId: string, supabase: any
         );
         return;
       }
+      const reactivatingFailed = existing.status === 'failed';
+      const isChargeEvent =
+        eventType === 'subscription.active' || eventType === 'subscription.renewed';
+      if (reactivatingFailed && (!isChargeEvent || amountCents == null)) {
+        console.warn(
+          `Skipping failed→active for sub ${subId}: event=${eventType} amount=${amountCents}. ` +
+          `Failed rows can only be re-activated by a charge event with an amount.`,
+        );
+        return;
+      }
+
+      // Build the patch conditionally so a partial event can't NULL out a
+      // valid value. Specifically: a subscription.updated whose payload is
+      // missing next_billing_date/current_period_end used to overwrite the
+      // existing timestamp with null, which then made AuthProvider.isPaid
+      // fail closed for the (still-paying) user. Same defensive treatment
+      // for amount_cents and currency.
+      const update: Record<string, unknown> = {
+        status: normalizeStatus(status),
+        plan,
+        cancel_at_next_billing_date: cancelAtEnd,
+      };
+      if (periodEnd != null)   update.current_period_end = periodEnd;
+      if (amountCents != null) update.amount_cents       = amountCents;
+      if (currency != null)    update.currency           = currency;
+
       await supabase
         .from('subscriptions')
-        .update({
-          status: normalizeStatus(status),
-          plan,
-          current_period_end: periodEnd,
-          cancel_at_next_billing_date: cancelAtEnd,
-          amount_cents: amountCents,
-          currency,
-        })
+        .update(update)
         .eq('id', existing.id);
       return;
     }
@@ -499,7 +561,7 @@ async function upsertActiveSubscription(data: any, userId: string, supabase: any
     cancel_at_next_billing_date: cancelAtEnd,
     dodo_subscription_id: subId,
     amount_cents: amountCents,
-    currency,
+    currency: currency ?? 'USD',
   });
 }
 
@@ -544,8 +606,32 @@ async function markSubscriptionInactive(
     // event that would have inserted it. In that case the user's *existing*
     // active row (e.g. their signup-trigger free/active) is unrelated and
     // must NOT be flipped to failed/cancelled — that would lock them out of
-    // free tier on a failed paid attempt. Insert a standalone audit row for
-    // the failed sub so we still have a record of the attempt, then return.
+    // free tier on a failed paid attempt.
+    //
+    // Insert a standalone audit row ONLY when the user has no active
+    // subscription right now. With an existing active row the standalone
+    // insert was confusing the admin dashboard's `latestByUser` lookup
+    // (the new failed row's created_at = now() made it the "latest" view
+    // of that user, mis-reporting their state). When there's no active
+    // row it's safe to insert — there's nothing to overshadow, and the
+    // audit trail is genuinely useful.
+    const { data: hasActive } = await supabase
+      .from('subscriptions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .limit(1)
+      .maybeSingle();
+
+    if (hasActive) {
+      console.warn(
+        `Skipping standalone ${eventType} insert for unknown sub ${subId}: ` +
+        `user ${userId} already has an active subscription. Event recorded ` +
+        `in webhook_events for audit.`,
+      );
+      return;
+    }
+
     const productId  = data.product_id ?? data.product?.product_id;
     const failedPlan = PLAN_FROM_PRODUCT[productId] ?? 'free';
     await supabase.from('subscriptions').insert({
