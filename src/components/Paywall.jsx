@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { startCheckout } from '../lib/checkout.js';
+import { startCheckout, markPreCheckout } from '../lib/checkout.js';
 import { supabase } from '../lib/supabase.js';
 import { PLANS as ALL_PLANS } from '../lib/plans.js';
 import { friendlyError } from '../lib/errors.js';
@@ -18,7 +18,7 @@ const PLANS = ALL_PLANS.map((p) => ({
 
 /** Shown by <RequirePaid> when a logged-in user hasn't subscribed yet. */
 export default function Paywall({ trialUsed = false }) {
-  const { profile, user } = useAuth();
+  const { profile, user, subscription } = useAuth();
   const [busy, setBusy]                 = useState(null);
   const [error, setError]               = useState(null);
   const [lifetimeLeft, setLifetimeLeft] = useState(null);
@@ -36,6 +36,7 @@ export default function Paywall({ trialUsed = false }) {
     setBusy(plan);
     try {
       const url = await startCheckout(plan);
+      markPreCheckout(subscription);
       window.location.href = url;
     } catch (e) {
       setBusy(null);

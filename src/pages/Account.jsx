@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { startCheckout } from '../lib/checkout.js';
+import { startCheckout, markPreCheckout } from '../lib/checkout.js';
 import {
   subscriptionAction,
   listPayments,
@@ -216,7 +216,7 @@ const UPGRADE_LIFETIME = {
   period: 'forever',
 };
 
-function ChangePlanModal({ currentPlan, onClose, refresh, onError }) {
+function ChangePlanModal({ currentPlan, subscription, onClose, refresh, onError }) {
   const [busy, setBusy] = useState(null);
 
   const swapPlans = SWAP_PLANS.filter((p) => p.id !== currentPlan);
@@ -245,6 +245,7 @@ function ChangePlanModal({ currentPlan, onClose, refresh, onError }) {
     setBusy('lifetime');
     try {
       const url = await startCheckout('lifetime');
+      markPreCheckout(subscription);
       window.location.href = url;
     } catch (e) {
       fail(e, 'Could not open checkout.', "Couldn't open checkout");
@@ -607,6 +608,7 @@ export default function Account() {
       {showChange && (
         <ChangePlanModal
           currentPlan={subscription?.plan}
+          subscription={subscription}
           onClose={() => setShowChange(false)}
           refresh={refresh}
           onError={setAlert}

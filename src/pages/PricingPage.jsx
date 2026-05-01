@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import SvgDefs from '../components/SvgDefs.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { supabase } from '../lib/supabase.js';
-import { startCheckout } from '../lib/checkout.js';
+import { startCheckout, markPreCheckout } from '../lib/checkout.js';
 import { hasPendingImage } from '../lib/pendingImage.js';
 import { friendlyError } from '../lib/errors.js';
 import { PLANS } from '../lib/plans.js';
@@ -18,7 +18,7 @@ import { PLANS } from '../lib/plans.js';
 export default function PricingPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, isPaid, profile } = useAuth();
+  const { user, isPaid, profile, subscription } = useAuth();
   const [busy, setBusy]                 = useState(null);
   const [error, setError]               = useState(null);
   const [lifetimeLeft, setLifetimeLeft] = useState(null);
@@ -56,6 +56,7 @@ export default function PricingPage() {
     try {
       setBusy(planId);
       const url = await startCheckout(planId);
+      markPreCheckout(subscription);
       window.location.href = url;
     } catch (e) {
       setBusy(null);

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { startCheckout } from '../lib/checkout.js';
+import { startCheckout, markPreCheckout } from '../lib/checkout.js';
 import { PLANS } from '../lib/plans.js';
 import { friendlyError } from '../lib/errors.js';
 
@@ -67,7 +67,7 @@ function PlanCard({ plan, onChoose, busy, lifetimeLeft }) {
 }
 
 export default function Pricing() {
-  const { user } = useAuth();
+  const { user, subscription } = useAuth();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
@@ -93,6 +93,7 @@ export default function Pricing() {
     try {
       setBusy(plan);
       const url = await startCheckout(plan);
+      markPreCheckout(subscription);
       window.location.href = url;
     } catch (e) {
       setBusy(null);
