@@ -244,8 +244,9 @@ function ChangePlanModal({ currentPlan, subscription, onClose, refresh, onError 
   const upgradeToLifetime = async () => {
     setBusy('lifetime');
     try {
-      const url = await startCheckout('lifetime');
+      // Snapshot BEFORE the await — see Paywall.jsx for the why.
       markPreCheckout(subscription);
+      const url = await startCheckout('lifetime');
       window.location.href = url;
     } catch (e) {
       fail(e, 'Could not open checkout.', "Couldn't open checkout");

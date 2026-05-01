@@ -35,8 +35,12 @@ export default function Paywall({ trialUsed = false }) {
     setError(null);
     setBusy(plan);
     try {
-      const url = await startCheckout(plan);
+      // Stamp the snapshot BEFORE the network call — the await can take
+      // seconds, during which a renewal webhook could mutate the row out
+      // from under us. We want "what we knew when the user clicked", not
+      // "what we knew when Dodo replied".
       markPreCheckout(subscription);
+      const url = await startCheckout(plan);
       window.location.href = url;
     } catch (e) {
       setBusy(null);

@@ -92,8 +92,9 @@ export default function Pricing() {
     }
     try {
       setBusy(plan);
-      const url = await startCheckout(plan);
+      // Snapshot BEFORE the await — see Paywall.jsx for the why.
       markPreCheckout(subscription);
+      const url = await startCheckout(plan);
       window.location.href = url;
     } catch (e) {
       setBusy(null);

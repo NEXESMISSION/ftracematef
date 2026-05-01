@@ -55,8 +55,9 @@ export default function PricingPage() {
     if (!user) { navigate('/login', { state: { intent: { plan: planId } } }); return; }
     try {
       setBusy(planId);
-      const url = await startCheckout(planId);
+      // Snapshot BEFORE the await — see Paywall.jsx for the why.
       markPreCheckout(subscription);
+      const url = await startCheckout(planId);
       window.location.href = url;
     } catch (e) {
       setBusy(null);

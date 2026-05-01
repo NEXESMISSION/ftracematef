@@ -101,6 +101,11 @@ export function AuthProvider({ children }) {
             window.localStorage.removeItem('tm:traceStats:anon');
             window.sessionStorage.removeItem('tm:pending-image');
             window.sessionStorage.removeItem('tm:intent-plan');
+            // Drop the pre-checkout snapshot too — otherwise the next user
+            // who signs in on this device could land on /checkout/success
+            // and have their subscription compared against the previous
+            // user's stamp, falsely registering as "row changed".
+            window.sessionStorage.removeItem('tm:checkout:before');
           } catch { /* ignore quota / private mode */ }
           endTrialSession();
           return null;
@@ -311,6 +316,11 @@ export function AuthProvider({ children }) {
       // doesn't get attributed to whoever signs in next.
       window.sessionStorage.removeItem('tm:pending-image');
       window.sessionStorage.removeItem('tm:intent-plan');
+      // And the pre-checkout snapshot — see the matching cleanup in the
+      // ghost-session path. A stale snapshot from a previous user would
+      // make the next user's /checkout/success think their row "changed"
+      // and falsely celebrate.
+      window.sessionStorage.removeItem('tm:checkout:before');
     } catch { /* ignore quota / private mode */ }
     // End any live free-trial session in this tab so the next signed-in
     // user doesn't inherit it. The DB stamp is per-account so it's already

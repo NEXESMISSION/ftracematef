@@ -1,0 +1,23 @@
+-- =============================================================================
+-- Trace Mate — lock down direct UPDATE of profiles.is_admin
+-- =============================================================================
+-- The `profiles_self_update` policy in 20260430000000_init.sql lets users
+-- UPDATE their own row, with no column-level restriction. Migrations 03
+-- and 04 already revoke UPDATE on `free_trial_started_at` and
+-- `last_seen_at` for the same reason. `is_admin` (added in 02) was missed,
+-- so an authenticated user could:
+--
+--   update profiles set is_admin = true where id = auth.uid()
+--
+-- via PostgREST and self-promote. Server-side admin endpoints still gate
+-- on ADMIN_EMAILS env, so this can't escalate to actual admin powers — but
+-- the UI shell (RequireAdmin reads profile.is_admin) was rendering, and
+-- in environments where ADMIN_EMAILS is loose (e.g. shared staging) it
+-- could go further.
+--
+-- Same treatment as the other admin-controlled columns: revoke UPDATE on
+-- this specific column from regular roles. Service role retains full
+-- access, so set_admin_by_email() still works for ops.
+-- =============================================================================
+
+revoke update (is_admin) on public.profiles from authenticated, anon;

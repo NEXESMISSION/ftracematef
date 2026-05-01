@@ -62,53 +62,90 @@ export default function CheckoutSuccess() {
   // (a) updates the existing active row in place — bumps updated_at — or
   // (b) inserts a new row and cancels the old — id changes. Either case
   // means money moved; same id + same updated_at means nothing happened.
+  //
+  // No snapshot at all means we can't make this comparison safely. Don't
+  // fall back to "trust isPaid" — that was the original bug, just hidden
+  // behind the null branch. A user who lands here without a snapshot got
+  // here through a non-checkout path (bookmarked URL, hard refresh that
+  // ate the snapshot, browser back-button on a closed flow, expired stamp)
+  // and we have no business celebrating their existing paid status as a
+  // fresh purchase. Bounce them to /account where they can see their real
+  // subscription state.
   const subscriptionChanged = (() => {
-    if (!preCheckout) return null; // no snapshot — fall back to legacy behavior
+    if (!preCheckout) return false; // no snapshot — refuse to celebrate
     if (!subscription) return false;
     if (subscription.id !== preCheckout.sub_id) return true;
     if (subscription.updated_at !== preCheckout.updated_at) return true;
     return false;
   })();
 
-  // Bounce-to-failure path. Adds: was-already-paid AND nothing changed →
-  // user came back without a new charge → /pricing?checkout=cancelled.
+  // Where do we send a user who came back without a confirmed new payment?
+  // - If we have a snapshot AND they were paid before → /pricing?checkout=cancelled
+  //   (familiar cancel-modal flow, doesn't imply they have access)
+  // - If we have no snapshot at all → /account (they may or may not have
+  //   access; the page shows it correctly, no false signals either way)
+  const cancelDestination = preCheckout
+    ? '/pricing?checkout=cancelled'
+    : '/account';
+
+  // Bounce-to-failure path. Three triggers:
+  //   1. Explicit failure status on the URL.
+  //   2. Verification timeout (no isPaid flip within 30s).
+  //   3. We have a snapshot, user was already paid, nothing changed
+  //      (their existing access is unchanged; the new payment didn't go
+  //      through) — OR — we have no snapshot at all (defensive: we can't
+  //      prove anything happened, so don't celebrate).
   useEffect(() => {
     if (explicitFailure || timedOut) {
-      navigate('/pricing?checkout=cancelled', { replace: true });
+      navigate(cancelDestination, { replace: true });
+      return;
+    }
+    if (!preCheckout && isPaid) {
+      // No-snapshot guard. The user is paid, but we have no evidence
+      // *this* checkout caused it — could be a stale tab, a manual URL,
+      // a refresh that wiped the snapshot. Send them to /account.
+      navigate('/account', { replace: true });
       return;
     }
     if (wasPaidBefore && subscriptionChanged === false) {
-      navigate('/pricing?checkout=cancelled', { replace: true });
+      navigate(cancelDestination, { replace: true });
     }
-  }, [explicitFailure, timedOut, wasPaidBefore, subscriptionChanged, navigate]);
+  }, [
+    explicitFailure, timedOut, wasPaidBefore, subscriptionChanged,
+    preCheckout, isPaid, cancelDestination, navigate,
+  ]);
 
-  // Verification timeout — only arms while we're still waiting (not paid yet,
-  // OR paid-before-but-waiting-for-the-row-to-update from this checkout).
+  // Verification timeout — only arms while we're still waiting for a
+  // confirmed new payment. With a snapshot present, that means
+  // subscriptionChanged flipping true. Without a snapshot, the no-snapshot
+  // guard above already routed away, so we don't re-arm here.
   useEffect(() => {
     if (explicitFailure) return;
-    if (isPaid && subscriptionChanged === true) return; // confirmed
-    if (isPaid && subscriptionChanged === null) return; // legacy: no snapshot, trust isPaid
+    if (!preCheckout) return;                  // no-snapshot guard handles it
+    if (isPaid && subscriptionChanged) return; // confirmed new payment
     const t = setTimeout(() => setTimedOut(true), VERIFY_TIMEOUT_MS);
     return () => clearTimeout(t);
-  }, [isPaid, subscriptionChanged, explicitFailure]);
+  }, [isPaid, subscriptionChanged, explicitFailure, preCheckout]);
 
-  // Confirmed paid → /upload?welcome=1. We only fire when:
-  //  - isPaid is true, AND
-  //  - the subscription row actually changed since pre-checkout (genuine
-  //    new payment), OR there was no snapshot at all (legacy callers /
-  //    direct nav — fall back to old behavior).
+  // Confirmed paid → /upload?welcome=1. Strict: we only fire when isPaid is
+  // true AND the subscription row genuinely changed since pre-checkout. The
+  // no-snapshot case is handled above (route to /account, no celebration).
   useEffect(() => {
     if (!isPaid) return;
-    if (subscriptionChanged === false) return; // wasPaidBefore handler already routed
+    if (!subscriptionChanged) return;
     navigate('/upload?welcome=1', { replace: true });
   }, [isPaid, subscriptionChanged, navigate]);
 
   // If we already know the outcome, don't render the verifying modal at all
   // — the redirect effect above is about to fire on the next tick. Without
   // this short-circuit the modal flashes for one frame on the way out.
-  const confirmedNew = isPaid && subscriptionChanged !== false;
-  const confirmedNothingChanged = wasPaidBefore && subscriptionChanged === false;
-  if (explicitFailure || timedOut || confirmedNew || confirmedNothingChanged) return null;
+  const confirmedNew = isPaid && subscriptionChanged;
+  const confirmedNothingChanged = wasPaidBefore && !subscriptionChanged;
+  const noSnapshotPaid = !preCheckout && isPaid;
+  if (
+    explicitFailure || timedOut || confirmedNew ||
+    confirmedNothingChanged || noSnapshotPaid
+  ) return null;
 
   // Verifying state — small, unobtrusive card while the webhook lands.
   return (
