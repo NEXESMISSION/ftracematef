@@ -88,22 +88,27 @@ export default function CheckoutSuccess() {
     ? '/pricing?checkout=cancelled'
     : '/account';
 
-  // Bounce-to-failure path. Three triggers:
+  // Bounce-to-failure path. Four triggers:
   //   1. Explicit failure status on the URL.
   //   2. Verification timeout (no isPaid flip within 30s).
   //   3. We have a snapshot, user was already paid, nothing changed
   //      (their existing access is unchanged; the new payment didn't go
-  //      through) — OR — we have no snapshot at all (defensive: we can't
-  //      prove anything happened, so don't celebrate).
+  //      through).
+  //   4. No snapshot at all → unconditionally route to /account. We can't
+  //      prove this checkout produced a payment, regardless of isPaid, so
+  //      we don't celebrate AND we don't hang the spinner. /account renders
+  //      the user's real subscription state (paid or not) without false
+  //      signals either way.
   useEffect(() => {
     if (explicitFailure || timedOut) {
       navigate(cancelDestination, { replace: true });
       return;
     }
-    if (!preCheckout && isPaid) {
-      // No-snapshot guard. The user is paid, but we have no evidence
-      // *this* checkout caused it — could be a stale tab, a manual URL,
-      // a refresh that wiped the snapshot. Send them to /account.
+    if (!preCheckout) {
+      // No-snapshot guard. We have no evidence *this* checkout produced
+      // anything — could be a stale tab, a manually-typed URL, a refresh
+      // that wiped the snapshot, the back button after the celebration.
+      // Send them to /account where they can see their actual state.
       navigate('/account', { replace: true });
       return;
     }
@@ -112,7 +117,7 @@ export default function CheckoutSuccess() {
     }
   }, [
     explicitFailure, timedOut, wasPaidBefore, subscriptionChanged,
-    preCheckout, isPaid, cancelDestination, navigate,
+    preCheckout, cancelDestination, navigate,
   ]);
 
   // Verification timeout — only arms while we're still waiting for a
@@ -141,10 +146,9 @@ export default function CheckoutSuccess() {
   // this short-circuit the modal flashes for one frame on the way out.
   const confirmedNew = isPaid && subscriptionChanged;
   const confirmedNothingChanged = wasPaidBefore && !subscriptionChanged;
-  const noSnapshotPaid = !preCheckout && isPaid;
   if (
     explicitFailure || timedOut || confirmedNew ||
-    confirmedNothingChanged || noSnapshotPaid
+    confirmedNothingChanged || !preCheckout
   ) return null;
 
   // Verifying state — small, unobtrusive card while the webhook lands.
