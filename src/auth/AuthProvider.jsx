@@ -22,6 +22,17 @@ export function AuthProvider({ children }) {
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading]           = useState(true);
 
+  // Tracks the user id whose profile/subscription we've already fetched.
+  // Used by settle() (in the auth effect below) to decide whether to flip
+  // `loading` back to true before re-running loadUserData. Token refreshes
+  // (same user.id) keep loading=false so consumers don't see a spinner
+  // flash mid-session; genuine user changes (sign-in, sign-out, swap) set
+  // loading=true so gates like RequireAuth / RequirePaid show the spinner
+  // instead of briefly evaluating against the previous user's stale data.
+  // The undefined sentinel (vs null) distinguishes "we've never loaded"
+  // from "we've loaded the signed-out state".
+  const fetchedForUidRef = useRef(undefined);
+
   // Returns true on success, false on error (so callers can decide).
   const loadUserData = useCallback(async (userId) => {
     if (!userId) {
@@ -126,9 +137,17 @@ export function AuthProvider({ children }) {
       if (!mounted) return;
       const next = validate ? await validateOrClear(newSession) : newSession;
       if (!mounted) return;
+      const newUid = next?.user?.id ?? null;
+      const needsLoad = fetchedForUidRef.current !== newUid;
       setSession(next);
+      // User changed — show the spinner while we refetch. Without this,
+      // a fresh sign-in renders /account with session set but profile
+      // still null, and the "We couldn't load your profile" screen
+      // flashes for one frame before loadUserData resolves.
+      if (needsLoad && mounted) setLoading(true);
       try {
         await loadUserData(next?.user?.id);
+        fetchedForUidRef.current = newUid;
       } catch (err) {
         // loadUserData already handles its own errors, but belt-and-braces.
         console.error('[AuthProvider] settle failed:', err);
