@@ -31,7 +31,7 @@ const VERIFY_TIMEOUT_MS = 30000;
 export default function CheckoutSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isPaid, subscription, user } = useAuth();
+  const { isPaid, subscription, user, loading } = useAuth();
   const [timedOut, setTimedOut] = useState(false);
 
   // Snapshot of the user's subscription state from immediately before the
@@ -96,13 +96,21 @@ export default function CheckoutSuccess() {
     : '/account';
 
   // Bounce-to-failure path. Order matches the code below:
-  //   1. Explicit failure on the URL OR verification timeout fired.
-  //   2. No snapshot at all → can't prove this checkout produced anything,
+  //   1. Wait for auth to settle. Without this, the no-snapshot branch
+  //      fires on the very first render — when user.id is still null and
+  //      consumePreCheckoutSnapshot(null) deliberately returns null —
+  //      and the user gets shoved to /account before we even know if
+  //      a snapshot existed for them. That's how a failed Dodo payment
+  //      ended up on the "We couldn't load your profile" screen instead
+  //      of /pricing?checkout=cancelled.
+  //   2. Explicit failure on the URL OR verification timeout fired.
+  //   3. No snapshot at all → can't prove this checkout produced anything,
   //      route to /account where the user sees their real state (paid or
   //      not) without any false signals.
-  //   3. Snapshot exists, user was already paid, row didn't change → the
+  //   4. Snapshot exists, user was already paid, row didn't change → the
   //      new payment didn't go through; existing access is unaffected.
   useEffect(() => {
+    if (loading) return; // auth not settled yet — wait
     if (explicitFailure || timedOut) {
       navigate(cancelDestination, { replace: true });
       return;
@@ -119,7 +127,7 @@ export default function CheckoutSuccess() {
       navigate(cancelDestination, { replace: true });
     }
   }, [
-    explicitFailure, timedOut, wasPaidBefore, subscriptionChanged,
+    loading, explicitFailure, timedOut, wasPaidBefore, subscriptionChanged,
     preCheckout, cancelDestination, navigate,
   ]);
 
@@ -128,30 +136,35 @@ export default function CheckoutSuccess() {
   // subscriptionChanged flipping true. Without a snapshot, the no-snapshot
   // guard above already routed away, so we don't re-arm here.
   useEffect(() => {
+    if (loading) return;                       // wait for auth to settle
     if (explicitFailure) return;
     if (!preCheckout) return;                  // no-snapshot guard handles it
     if (isPaid && subscriptionChanged) return; // confirmed new payment
     const t = setTimeout(() => setTimedOut(true), VERIFY_TIMEOUT_MS);
     return () => clearTimeout(t);
-  }, [isPaid, subscriptionChanged, explicitFailure, preCheckout]);
+  }, [loading, isPaid, subscriptionChanged, explicitFailure, preCheckout]);
 
   // Confirmed paid → /upload?welcome=1. Strict: we only fire when isPaid is
   // true AND the subscription row genuinely changed since pre-checkout. The
   // no-snapshot case is handled above (route to /account, no celebration).
   useEffect(() => {
+    if (loading) return;
     if (!isPaid) return;
     if (!subscriptionChanged) return;
     navigate('/upload?welcome=1', { replace: true });
-  }, [isPaid, subscriptionChanged, navigate]);
+  }, [loading, isPaid, subscriptionChanged, navigate]);
 
   // If we already know the outcome, don't render the verifying modal at all
   // — the redirect effect above is about to fire on the next tick. Without
   // this short-circuit the modal flashes for one frame on the way out.
+  // While auth is still loading we always render the verifying modal —
+  // the !preCheckout short-circuit only fires once auth has settled.
   const confirmedNew = isPaid && subscriptionChanged;
   const confirmedNothingChanged = wasPaidBefore && !subscriptionChanged;
+  const noSnapshotPostLoad = !loading && !preCheckout;
   if (
     explicitFailure || timedOut || confirmedNew ||
-    confirmedNothingChanged || !preCheckout
+    confirmedNothingChanged || noSnapshotPostLoad
   ) return null;
 
   // Verifying state — small, unobtrusive card while the webhook lands.
