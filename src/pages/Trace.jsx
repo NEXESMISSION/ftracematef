@@ -271,8 +271,8 @@ export default function Trace() {
       addSession(user?.id, seconds);
       // Server-side mirror so the admin dashboard can see these. Fire-and-
       // forget: a network error here must not break unmount/pagehide. The
-      // RPC drops sub-5s sessions itself (matches MIN_SESSION_SECONDS).
-      if (user?.id && seconds >= 5) {
+      // RPC drops sub-1s sessions itself (matches MIN_SESSION_SECONDS).
+      if (user?.id && seconds >= 1) {
         supabase
           .rpc('record_trace_session', { duration_seconds: Math.round(seconds) })
           .then(({ error }) => {
@@ -467,13 +467,19 @@ export default function Trace() {
         )}
       </div>
 
-      {/* Top bar — back button only */}
+      {/* Top bar — explicit "End session" button. Renamed from a back arrow
+          because users read the back arrow as "I might come back later" and
+          bounced out before the time-tracking effect's persist() flushed,
+          leaving brief sessions uncounted in the /account stats. The button
+          still calls exitTrace → navigate('/upload') → unmount → persist,
+          so behaviour is identical; only the label changed. */}
       <header className="trace-topbar">
-        <button type="button" className="trace-icon-btn" onClick={exitTrace} aria-label="Back to upload">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor"
-               strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 3 L5 9 L11 15 M5 9 H16" />
+        <button type="button" className="trace-end-btn" onClick={exitTrace} aria-label="End session">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+               strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="10" height="10" rx="1.5" />
           </svg>
+          <span>End session</span>
         </button>
       </header>
 

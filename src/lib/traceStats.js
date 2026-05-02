@@ -1,7 +1,11 @@
 // Trace stats tracker — stored in localStorage, scoped per user.
 // Schema: { totalSeconds, sessions, firstSessionAt, lastSessionAt }
 const KEY_PREFIX = 'tm:traceStats:';
-const MIN_SESSION_SECONDS = 5; // sessions shorter than this are ignored
+// Sub-1s entries are still dropped so a routing glitch (mount → immediate
+// unmount on a stale /trace visit with no image) can't inflate the count,
+// but anything the user actually sat in front of for a moment counts. Must
+// stay in lock-step with the server-side floor in record_trace_session.
+const MIN_SESSION_SECONDS = 1;
 
 const empty = () => ({
   totalSeconds: 0,
