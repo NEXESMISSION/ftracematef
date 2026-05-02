@@ -133,14 +133,15 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } },
   );
 
-  // Profile-level mutation: reset the free-trial stamp. Admin-only convenience
-  // for testing the post-trial paywall flow without spinning up a fresh account.
-  // Allowed in combination with subscription mutations (e.g. "Reset to free +
-  // restore trial") or as a standalone call.
+  // Profile-level mutation: reset the free-trial stamp AND zero the session
+  // counter. Admin-only convenience for testing the post-trial paywall flow
+  // without spinning up a fresh account. Allowed in combination with
+  // subscription mutations (e.g. "Reset to free + restore trial") or as a
+  // standalone call.
   if (body.reset_free_trial) {
     const { error: trialErr } = await admin
       .from('profiles')
-      .update({ free_trial_started_at: null })
+      .update({ free_trial_started_at: null, free_sessions_used: 0 })
       .eq('id', user.id);
     if (trialErr) return json({ error: `reset_free_trial failed: ${trialErr.message}` }, 500);
 

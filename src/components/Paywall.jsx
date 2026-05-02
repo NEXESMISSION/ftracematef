@@ -83,7 +83,7 @@ export default function Paywall({ trialUsed = false }) {
         </h1>
         <p className="lead">
           {trialUsed
-            ? 'You already used your one free studio session. Any plan unlocks unlimited tracing — full quality, every tool, every device.'
+            ? 'You used your free studio sessions. Any plan unlocks unlimited tracing — full quality, every tool, every device.'
             : 'All plans unlock full quality outlines, every tool, every device.'}
         </p>
 

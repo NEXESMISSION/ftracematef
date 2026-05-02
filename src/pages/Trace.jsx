@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { addSession } from '../lib/traceStats.js';
 import { supabase } from '../lib/supabase.js';
 import { loadPendingImage } from '../lib/pendingImage.js';
-import { markFreeTrialStarted } from '../lib/freeTrial.js';
+import { consumeFreeSession, trialAlreadyConsumedThisVisit } from '../lib/freeTrial.js';
 import {
   cssMatrix3d,
   identityCorners,
@@ -61,25 +61,27 @@ export default function Trace() {
     if (!imageUrl) navigate('/upload', { replace: true });
   }, [imageUrl, navigate]);
 
-  // Free-tier users get one tracing session before the paywall. Stamp the
-  // trial start when they actually have an image to trace — guarding on
-  // imageUrl prevents a stale /trace visit (no image, immediately redirected
-  // to /upload) from silently burning the user's free trial.
+  // Free-tier users get FREE_SESSION_LIMIT tracing sessions before the
+  // paywall. Burn one per fresh /trace visit (a refresh inside the studio
+  // doesn't double-consume — see trialAlreadyConsumedThisVisit). Guarding
+  // on imageUrl prevents a stale /trace visit (no image, immediately
+  // redirected to /upload) from silently burning the user's count.
   //
-  // Stamp regardless of paid status. A paid user "consumes" the column too;
-  // it's harmless while they're paid and prevents a paid → free transition
-  // (refund, expired sub, admin dev-mutate) from handing the same account a
-  // second free trial. Idempotent server-side via start_free_trial_if_unused.
+  // Consume regardless of paid status. A paid user burns the counter too;
+  // it's harmless while they're paid (the cap is silent — RPC just returns
+  // the current count once at 5) and prevents a paid → free transition
+  // (refund, expired sub, admin dev-mutate) from handing the same account
+  // 5 fresh sessions on top of whatever they already used.
   useEffect(() => {
     if (!imageUrl) return;
     if (!user?.id) return;
-    if (profile?.free_trial_started_at) return;
+    if (trialAlreadyConsumedThisVisit()) return;
     let cancelled = false;
-    markFreeTrialStarted()
-      .then(() => { if (!cancelled) refresh(); })
-      .catch((err) => console.warn('[trace] could not stamp free trial:', err));
+    consumeFreeSession()
+      .then((count) => { if (!cancelled && count !== null) refresh(); })
+      .catch((err) => console.warn('[trace] could not consume free session:', err));
     return () => { cancelled = true; };
-  }, [imageUrl, user?.id, profile?.free_trial_started_at, refresh]);
+  }, [imageUrl, user?.id, refresh]);
 
   // Revoke the object URL when leaving the trace page so we don't leak it.
   useEffect(() => {

@@ -23,14 +23,15 @@ export default function RequirePaid({ children }) {
   }
 
   if (!isPaid) {
-    // One free pass: a signed-in free user gets a single tracing session
-    // before the paywall locks the studio. The trial flag is stamped inside
-    // <Trace /> on first mount via the start_free_trial_if_unused RPC.
+    // Free pass budget: a signed-in free user gets FREE_SESSION_LIMIT tracing
+    // sessions before the paywall locks the studio. Each fresh /trace visit
+    // burns one (consume_free_session RPC fires from <Trace /> on mount).
     if (canUseFreeTrial(profile)) {
       // Lock in this tab as the active trial session BEFORE <Trace /> mounts
-      // and writes the DB stamp. Without this, the post-stamp profile-update
-      // re-render would see no session flag and flip the state to 'used',
-      // immediately kicking the user back out of the studio they just entered.
+      // and burns the count. Without this, the post-consume profile-update
+      // re-render would see no session flag and — on the user's last
+      // available session — flip the state to 'used', kicking them back out
+      // of the studio they just entered.
       beginTrialSession();
       return children;
     }

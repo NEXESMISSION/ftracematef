@@ -75,7 +75,7 @@ export default function DevPanel() {
         <div><dt>plan</dt>           <dd>{subscription?.plan ?? '—'}</dd></div>
         <div><dt>status</dt>         <dd>{subscription?.status ?? '—'}</dd></div>
         <div><dt>period_end</dt>     <dd>{subscription?.current_period_end ?? '—'}</dd></div>
-        <div><dt>trial</dt>          <dd>{profile?.free_trial_started_at ? 'used' : 'available'}</dd></div>
+        <div><dt>free sessions</dt> <dd>{profile?.free_sessions_used ?? 0} / 5</dd></div>
         <div><dt>email</dt>          <dd className="dev-mono">{user?.email}</dd></div>
       </dl>
 

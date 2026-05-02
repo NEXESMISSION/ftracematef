@@ -11,7 +11,7 @@ import { PLANS, PLAN_LABEL } from '../lib/plans.js';
 import { friendlyError } from '../lib/errors.js';
 import { getStats, formatDuration, formatRelative } from '../lib/traceStats.js';
 import { isAdminUser } from '../lib/admin.js';
-import { canUseFreeTrial } from '../lib/freeTrial.js';
+import { canUseFreeTrial, freeSessionsLeft } from '../lib/freeTrial.js';
 import Alert from '../components/Alert.jsx';
 
 // DevPanel is admin-only and ships about ~3 KB of presets + dev UI. Lazy-load
@@ -521,18 +521,21 @@ export default function Account() {
     );
   }
 
-  // Free users get one free studio session before the paywall. Compute it
-  // once per render — localStorage reads are cheap and the answer can change
-  // between renders (e.g. trial just expired in the background).
+  // Free users get a budget of free studio sessions before the paywall.
+  // Compute it once per render — localStorage reads are cheap and the answer
+  // can change between renders (e.g. trial just expired in the background).
   const trialAvailable = !isPaid && canUseFreeTrial(profile);
   const canEnterStudio = isPaid || trialAvailable;
+  const sessionsLeft   = !isPaid ? freeSessionsLeft(profile) : null;
 
   // Friendly contextual sub-line under the greeting.
   let subLine;
   if (!isPaid && !trialAvailable) {
     subLine = "Pick a plan to unlock the studio and start tracing.";
   } else if (!isPaid && trialAvailable) {
-    subLine = "First tracing's on us — try the studio, then pick a plan to keep going.";
+    subLine = sessionsLeft === 1
+      ? "Last free tracing's on us — try the studio, then pick a plan to keep going."
+      : `${sessionsLeft} free tracings on us — try the studio, then pick a plan to keep going.`;
   } else if (!stats.sessions) {
     subLine = "Your studio's warm. Let's trace your first line.";
   } else if (stats.sessions === 1) {
