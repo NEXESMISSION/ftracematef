@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useLocalState } from '../lib/useLocalState.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { addSession } from '../lib/traceStats.js';
-import { supabase } from '../lib/supabase.js';
 import { loadPendingImage } from '../lib/pendingImage.js';
 import { consumeFreeSession, trialAlreadyConsumedThisVisit } from '../lib/freeTrial.js';
 import {
@@ -18,7 +17,7 @@ const INITIAL_TRANSFORM = { x: 0, y: 0, scale: 1, rotation: 0, flip: false };
 export default function Trace() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile, refresh } = useAuth();
+  const { user, profile, session, refresh } = useAuth();
 
   // Prefer the freshly-passed blob URL from /upload (instant).
   // Fall back to the persisted base64 from sessionStorage (post-OAuth + post-payment).
@@ -244,10 +243,22 @@ export default function Trace() {
 
   // ===== Track tracing time =====
   // Accumulate active seconds (paused when tab is hidden) and persist on exit.
+  // Persist must work in three exit paths: clicking End session (react-router
+  // unmount), browser back (also unmount), and tab close / app kill (pagehide).
+  // The first two leave the JS context alive; the last one tears it down, so
+  // the server RPC must use `fetch({ keepalive: true })` — the supabase JS
+  // client uses regular fetch which the browser cancels mid-flight on unload,
+  // which is why sessions ended without the End session button were missing
+  // from server-side stats.
+  //
+  // Guarded by a ref so a stray pagehide racing with the unmount cleanup can't
+  // double-record the same session.
+  const persistedRef = useRef(false);
   useEffect(() => {
     if (!imageUrl) return;
     let elapsedMs = 0;
     let activeSince = document.visibilityState === 'visible' ? Date.now() : null;
+    persistedRef.current = false;
 
     const flushActive = () => {
       if (activeSince != null) {
@@ -265,19 +276,35 @@ export default function Trace() {
     };
 
     const persist = () => {
+      if (persistedRef.current) return;
+      persistedRef.current = true;
       flushActive();
       const seconds = elapsedMs / 1000;
-      // localStorage write — fast, drives the user's own /account scrapbook.
+      // localStorage write — synchronous, drives the user's own /account scrapbook.
       addSession(user?.id, seconds);
-      // Server-side mirror so the admin dashboard can see these. Fire-and-
-      // forget: a network error here must not break unmount/pagehide. The
+      // Server-side mirror so the admin dashboard can see these. Use a
+      // keepalive fetch so the request survives tab close / app kill — the
+      // supabase JS client doesn't expose keepalive, so we hit the REST RPC
+      // endpoint directly. Auth header carries the user's access token; the
       // RPC drops sub-1s sessions itself (matches MIN_SESSION_SECONDS).
-      if (user?.id && seconds >= 1) {
-        supabase
-          .rpc('record_trace_session', { duration_seconds: Math.round(seconds) })
-          .then(({ error }) => {
-            if (error) console.warn('[trace] record_trace_session failed:', error.message);
-          });
+      const accessToken = session?.access_token;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (user?.id && seconds >= 1 && accessToken && supabaseUrl && anonKey) {
+        try {
+          fetch(`${supabaseUrl}/rest/v1/rpc/record_trace_session`, {
+            method: 'POST',
+            keepalive: true,
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': anonKey,
+              'Authorization': `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({ duration_seconds: Math.round(seconds) }),
+          }).catch((err) => console.warn('[trace] record_trace_session failed:', err));
+        } catch (err) {
+          console.warn('[trace] record_trace_session threw:', err);
+        }
       }
       elapsedMs = 0;
     };
@@ -290,7 +317,7 @@ export default function Trace() {
       window.removeEventListener('pagehide', persist);
       persist();
     };
-  }, [imageUrl, user?.id]);
+  }, [imageUrl, user?.id, session?.access_token]);
 
   // Toggle torch on the active video track. Wrapped in a try because not all
   // devices support it even when `caps.torch` is true (Safari quirks).
