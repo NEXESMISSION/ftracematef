@@ -585,6 +585,11 @@ export default function Account() {
                 Start tracing →
               </Link>
             )}
+            {isAdminUser(profile) && (
+              <Link to="/admin-me" className="profile-cta profile-cta-ghost" aria-label="Open admin dashboard">
+                Admin
+              </Link>
+            )}
           </div>
         </section>
 
