@@ -1,11 +1,14 @@
 // Trace stats tracker — stored in localStorage, scoped per user.
 // Schema: { totalSeconds, sessions, firstSessionAt, lastSessionAt }
+//
+// Two-phase accounting:
+//   - startSession() runs the moment the user enters the trace studio with an
+//     image. It bumps `sessions` and stamps first/lastSessionAt. The count is
+//     a "did the user open a tracing session?" metric, not a "did they trace
+//     for ≥ N seconds?" metric — opening counts even if they walk away.
+//   - addSessionDuration() runs on exit and only accumulates `totalSeconds`.
+//     Never touches the count or timestamps.
 const KEY_PREFIX = 'tm:traceStats:';
-// Sub-1s entries are still dropped so a routing glitch (mount → immediate
-// unmount on a stale /trace visit with no image) can't inflate the count,
-// but anything the user actually sat in front of for a moment counts. Must
-// stay in lock-step with the server-side floor in record_trace_session.
-const MIN_SESSION_SECONDS = 1;
 
 const empty = () => ({
   totalSeconds: 0,
@@ -15,7 +18,7 @@ const empty = () => ({
 });
 
 function keyFor(userId) {
-  // No fallback to a shared "anon" bucket — see addSession() for why. We
+  // No fallback to a shared "anon" bucket — see startSession() for why. We
   // return null when there's no user, and getStats short-circuits to an
   // empty record. Reading this way is harmless; it's writing without a
   // userId that would leak data across accounts on a shared device.
@@ -35,7 +38,7 @@ export function getStats(userId) {
   }
 }
 
-export function addSession(userId, durationSec) {
+export function startSession(userId) {
   // Refuse to write without a user id. Previously a falsy userId was
   // bucketed into `tm:traceStats:anon` — that bucket survived sign-out and
   // mixed with whichever user signed in next on the same device. Better to
@@ -43,15 +46,29 @@ export function addSession(userId, durationSec) {
   // RequirePaid, so this branch is only reachable in narrow races (session
   // expiring mid-trace) where losing the count is the right trade-off.
   if (!userId) return null;
-  if (!Number.isFinite(durationSec) || durationSec < MIN_SESSION_SECONDS) return null;
   const key = keyFor(userId);
   const now = new Date().toISOString();
   const stats = getStats(userId);
   const next = {
-    totalSeconds:    Math.round(stats.totalSeconds + durationSec),
+    ...stats,
     sessions:        stats.sessions + 1,
     firstSessionAt:  stats.firstSessionAt ?? now,
     lastSessionAt:   now,
+  };
+  try {
+    window.localStorage.setItem(key, JSON.stringify(next));
+  } catch { /* quota / private mode — ignore */ }
+  return next;
+}
+
+export function addSessionDuration(userId, durationSec) {
+  if (!userId) return null;
+  if (!Number.isFinite(durationSec) || durationSec <= 0) return null;
+  const key = keyFor(userId);
+  const stats = getStats(userId);
+  const next = {
+    ...stats,
+    totalSeconds: Math.round(stats.totalSeconds + durationSec),
   };
   try {
     window.localStorage.setItem(key, JSON.stringify(next));

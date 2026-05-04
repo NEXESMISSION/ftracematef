@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLocalState } from '../lib/useLocalState.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { addSession } from '../lib/traceStats.js';
+import { startSession, addSessionDuration } from '../lib/traceStats.js';
 import { loadPendingImage } from '../lib/pendingImage.js';
 import { consumeFreeSession, trialAlreadyConsumedThisVisit } from '../lib/freeTrial.js';
 import {
@@ -241,24 +241,57 @@ export default function Trace() {
     return () => cancelAnimationFrame(rafId);
   }, [flickerOn, flickerSpeed]);
 
-  // ===== Track tracing time =====
-  // Accumulate active seconds (paused when tab is hidden) and persist on exit.
+  // ===== Track tracing sessions =====
+  // Two-phase accounting: bump the session count the moment the studio opens
+  // with an image (a session = "user opened tracing", regardless of how long
+  // they sat there), then accumulate active duration in the background and
+  // persist it on exit. Previously the count itself was gated on duration,
+  // so a user who opened tracing but didn't actively work would not get a
+  // session credited — that was the bug.
+  //
   // Persist must work in three exit paths: clicking End session (react-router
   // unmount), browser back (also unmount), and tab close / app kill (pagehide).
   // The first two leave the JS context alive; the last one tears it down, so
   // the server RPC must use `fetch({ keepalive: true })` — the supabase JS
-  // client uses regular fetch which the browser cancels mid-flight on unload,
-  // which is why sessions ended without the End session button were missing
-  // from server-side stats.
+  // client uses regular fetch which the browser cancels mid-flight on unload.
   //
-  // Guarded by a ref so a stray pagehide racing with the unmount cleanup can't
-  // double-record the same session.
+  // Guards: startedRef prevents double-counting the start (StrictMode dev
+  // double-mount, or any future re-run of the effect with the same imageUrl);
+  // persistedRef prevents a stray pagehide racing with the unmount cleanup
+  // from double-recording duration.
+  const startedRef   = useRef(false);
   const persistedRef = useRef(false);
   useEffect(() => {
     if (!imageUrl) return;
+    if (!user?.id) return;
     let elapsedMs = 0;
     let activeSince = document.visibilityState === 'visible' ? Date.now() : null;
     persistedRef.current = false;
+
+    const accessToken = session?.access_token;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey     = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    // Bump count + timestamps locally and on the server, once.
+    if (!startedRef.current) {
+      startedRef.current = true;
+      startSession(user.id);
+      if (accessToken && supabaseUrl && anonKey) {
+        try {
+          fetch(`${supabaseUrl}/rest/v1/rpc/start_trace_session`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': anonKey,
+              'Authorization': `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({}),
+          }).catch((err) => console.warn('[trace] start_trace_session failed:', err));
+        } catch (err) {
+          console.warn('[trace] start_trace_session threw:', err);
+        }
+      }
+    }
 
     const flushActive = () => {
       if (activeSince != null) {
@@ -280,17 +313,14 @@ export default function Trace() {
       persistedRef.current = true;
       flushActive();
       const seconds = elapsedMs / 1000;
+      if (seconds <= 0) return;
       // localStorage write — synchronous, drives the user's own /account scrapbook.
-      addSession(user?.id, seconds);
+      addSessionDuration(user.id, seconds);
       // Server-side mirror so the admin dashboard can see these. Use a
       // keepalive fetch so the request survives tab close / app kill — the
       // supabase JS client doesn't expose keepalive, so we hit the REST RPC
-      // endpoint directly. Auth header carries the user's access token; the
-      // RPC drops sub-1s sessions itself (matches MIN_SESSION_SECONDS).
-      const accessToken = session?.access_token;
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      if (user?.id && seconds >= 1 && accessToken && supabaseUrl && anonKey) {
+      // endpoint directly.
+      if (accessToken && supabaseUrl && anonKey) {
         try {
           fetch(`${supabaseUrl}/rest/v1/rpc/record_trace_session`, {
             method: 'POST',
