@@ -12,6 +12,7 @@ import {
   sendSupportMessage,
   markSupportThreadRead,
   subscribeToAllSupportMessages,
+  adminStartSupportThreadForUser,
 } from '../lib/chat.js';
 
 // Anyone seen pinging the heartbeat within this window is treated as "in the
@@ -352,6 +353,13 @@ function SupportInbox() {
   const [sending, setSending]       = useState(false);
   const [error, setError]           = useState(null);
 
+  // Picker state — for starting a new conversation with a user who hasn't
+  // initiated one yet. Lazy-fetches the user list on first open.
+  const [pickerOpen, setPickerOpen]     = useState(false);
+  const [pickerUsers, setPickerUsers]   = useState(null);
+  const [pickerQuery, setPickerQuery]   = useState('');
+  const [pickerError, setPickerError]   = useState(null);
+
   const messagesEndRef = useRef(null);
   // Live ref to activeId so the realtime handler always reads the latest
   // value without needing to re-subscribe on every selection change.
@@ -471,6 +479,62 @@ function SupportInbox() {
     [threads],
   );
 
+  /* ── Picker: lazy-load users on open + filter ── */
+
+  const togglePicker = useCallback(async () => {
+    setPickerOpen((cur) => {
+      const next = !cur;
+      if (next) setPickerError(null);
+      return next;
+    });
+    if (!pickerUsers) {
+      try {
+        const users = await listAllUsers();
+        setPickerUsers(users);
+      } catch (e) {
+        setPickerError(friendlyError(e, "Couldn't load users."));
+      }
+    }
+  }, [pickerUsers]);
+
+  // Users without an existing thread bubble to the top — those are the
+  // candidates for "starting a new conversation". Users with a thread are
+  // still shown (clicking them just opens the existing one) so the picker
+  // doubles as a search across every customer.
+  const filteredPickerUsers = useMemo(() => {
+    if (!pickerUsers) return [];
+    const existingThreadUserIds = new Set(
+      (threads ?? []).map((t) => t.user_id),
+    );
+    const q = pickerQuery.trim().toLowerCase();
+    const matches = pickerUsers.filter((u) => {
+      if (!q) return true;
+      return (u.email ?? '').toLowerCase().includes(q)
+          || (u.display_name ?? '').toLowerCase().includes(q);
+    });
+    // New-thread candidates first, then existing-thread users.
+    return matches.sort((a, b) => {
+      const aHas = existingThreadUserIds.has(a.id);
+      const bHas = existingThreadUserIds.has(b.id);
+      if (aHas === bHas) return 0;
+      return aHas ? 1 : -1;
+    });
+  }, [pickerUsers, pickerQuery, threads]);
+
+  const onPickUser = useCallback(async (userRow) => {
+    try {
+      const t = await adminStartSupportThreadForUser(userRow.id);
+      // Refresh inbox so the new (or existing) thread shows up in the
+      // sidebar even if no messages have been sent yet.
+      await loadThreads();
+      setActiveId(t.id);
+      setPickerOpen(false);
+      setPickerQuery('');
+    } catch (e) {
+      setPickerError(friendlyError(e, "Couldn't start a thread for that user."));
+    }
+  }, [loadThreads]);
+
   const activeThread = useMemo(
     () => (threads ?? []).find((t) => t.thread_id === activeId) ?? null,
     [threads, activeId],
@@ -480,10 +544,60 @@ function SupportInbox() {
     <section className="admin-support" aria-labelledby="admin-support-title">
       <header className="admin-support-head">
         <h2 id="admin-support-title">Support inbox</h2>
-        <span className={`admin-support-count ${totalUnread > 0 ? 'has-unread' : ''}`}>
-          {totalUnread > 0 ? `${totalUnread} unread` : `${threads?.length ?? 0} threads`}
-        </span>
+        <div className="admin-support-head-right">
+          <span className={`admin-support-count ${totalUnread > 0 ? 'has-unread' : ''}`}>
+            {totalUnread > 0 ? `${totalUnread} unread` : `${threads?.length ?? 0} threads`}
+          </span>
+          <button
+            type="button"
+            className="admin-support-newbtn"
+            onClick={togglePicker}
+            aria-expanded={pickerOpen}
+          >
+            {pickerOpen ? 'Cancel' : '+ New message'}
+          </button>
+        </div>
       </header>
+
+      {pickerOpen && (
+        <div className="admin-support-picker">
+          <input
+            type="search"
+            className="admin-support-picker-search"
+            placeholder="Search users by email or name…"
+            value={pickerQuery}
+            onChange={(e) => setPickerQuery(e.target.value)}
+            autoFocus
+          />
+          {pickerError && <p className="admin-error" style={{ margin: '0 0 8px' }}>{pickerError}</p>}
+          {pickerUsers === null && !pickerError && (
+            <div className="admin-support-picker-empty">
+              <span className="cb-spinner" aria-hidden="true" />
+            </div>
+          )}
+          {pickerUsers && filteredPickerUsers.length === 0 && (
+            <div className="admin-support-picker-empty">No users match.</div>
+          )}
+          {pickerUsers && filteredPickerUsers.length > 0 && (
+            <div className="admin-support-picker-list" role="listbox">
+              {filteredPickerUsers.slice(0, 50).map((u) => (
+                <button
+                  key={u.id}
+                  type="button"
+                  role="option"
+                  className="admin-support-picker-item"
+                  onClick={() => onPickUser(u)}
+                >
+                  {u.email ?? '—'}
+                  {u.display_name && (
+                    <span className="admin-support-picker-item-name">· {u.display_name}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {error && <p className="admin-error" style={{ margin: 12 }}>{error}</p>}
 

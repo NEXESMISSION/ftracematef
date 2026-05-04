@@ -91,7 +91,78 @@ export function subscribeToThreadMessages(threadId, onInsert) {
   };
 }
 
+/**
+ * Subscribe to the caller's own support thread row coming into existence.
+ * Used by the user-facing chat bubble: when the operator initiates a chat
+ * via adminStartSupportThreadForUser, the user's open page learns about
+ * the new thread without a refresh and can immediately subscribe to
+ * messages on it.
+ *
+ * The filter is by user_id rather than relying on RLS alone so we avoid
+ * picking up unrelated thread inserts (admins seeing every user's thread
+ * appear) on this channel — that's what subscribeToAllSupportMessages is
+ * for on the admin side.
+ */
+export function subscribeToOwnSupportThread(userId, onInsert) {
+  const channel = supabase
+    .channel(`support-thread:${userId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'support_threads',
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => {
+        try { onInsert(payload.new); }
+        catch (e) { console.error('[chat] subscribeToOwnSupportThread handler threw:', e); }
+      },
+    )
+    .subscribe();
+  return () => {
+    try { supabase.removeChannel(channel); }
+    catch (e) { console.warn('[chat] removeChannel failed:', e); }
+  };
+}
+
+/**
+ * SELECT-only version of startSupportThread — returns the existing thread
+ * row or null without creating one. The user-facing bubble uses this on
+ * mount so a passive page view doesn't spawn an empty thread for every
+ * customer who happens to land on /account.
+ *
+ * Filtering on user_id explicitly (rather than relying on RLS alone) makes
+ * the call safe for admin callers too: an admin lands on their own
+ * /account page, this returns their thread, not someone else's.
+ */
+export async function getExistingSupportThread(userId) {
+  if (!userId) return null;
+  const { data, error } = await supabase
+    .from('support_threads')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
 /* ─────────────────────────── Admin-facing helpers ───────────────────────── */
+
+/**
+ * Create or return a support thread for the given user. Admin-only at the
+ * server level — non-admins calling this get an authorization error rather
+ * than a thread for someone else's account. Used by the operator's "Message
+ * a user" picker so a chat can be initiated before the user ever opens the
+ * widget themselves.
+ */
+export async function adminStartSupportThreadForUser(userId) {
+  const { data, error } = await supabase.rpc('admin_start_support_thread_for_user', {
+    p_user_id: userId,
+  });
+  if (error) throw error;
+  return data;
+}
 
 /**
  * One-call inbox view for the admin dashboard: every thread joined with the

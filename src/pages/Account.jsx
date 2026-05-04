@@ -13,6 +13,7 @@ import { getStats, formatDuration, formatRelative } from '../lib/traceStats.js';
 import { isAdminUser } from '../lib/admin.js';
 import { canUseFreeTrial, freeSessionsLeft } from '../lib/freeTrial.js';
 import Alert from '../components/Alert.jsx';
+import ChatBubble from '../components/ChatBubble.jsx';
 
 // DevPanel is admin-only and ships about ~3 KB of presets + dev UI. Lazy-load
 // it so the panel and its preset payload aren't in every visitor's bundle —
@@ -631,16 +632,6 @@ export default function Account() {
           )}
         </section>
 
-        {/* ── Help / TRACE AI chat entry point ── */}
-        <section className="profile-help-card" aria-labelledby="profile-help-title">
-          <span className="profile-help-icon" aria-hidden="true">✦</span>
-          <div className="profile-help-text">
-            <h3 id="profile-help-title">Need a hand? Talk to TRACE AI</h3>
-            <p>Questions about your account, billing, or how to get the best results — ask away.</p>
-          </div>
-          <Link to="/chat" className="profile-help-cta">Open chat →</Link>
-        </section>
-
         {/* ── Subscription (now folds in account email) ── */}
         <SubscriptionCard
           subscription={subscription}
@@ -685,6 +676,11 @@ export default function Account() {
         title={alert?.title ?? 'Heads up'}
         message={alert?.message ?? ''}
       />
+
+      {/* Floating "TRACE AI" chat bubble — hidden for admins (they have the
+          dedicated support inbox at /admin-me). For everyone else, mounted
+          here so it's visible on the account page. */}
+      {!isAdminUser(profile) && <ChatBubble />}
     </div>
   );
 }
