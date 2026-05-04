@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { listAllUsers, getUserActivity } from '../lib/admin.js';
@@ -6,6 +6,13 @@ import { friendlyError } from '../lib/errors.js';
 import { PLAN_LABEL } from '../lib/plans.js';
 import { ANALYTICS_PROVIDER, ANALYTICS_EMBED_URL } from '../lib/analytics.js';
 import { formatDuration, formatRelative as formatTraceRelative } from '../lib/traceStats.js';
+import {
+  listSupportThreads,
+  fetchSupportMessages,
+  sendSupportMessage,
+  markSupportThreadRead,
+  subscribeToAllSupportMessages,
+} from '../lib/chat.js';
 
 // Anyone seen pinging the heartbeat within this window is treated as "in the
 // app right now". Tab visibility throttles the heartbeat to 60s, so 2 minutes
@@ -318,6 +325,282 @@ function ActivityPanel({ userId }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
+/* Support inbox — operator side of the user-facing /chat page. Customer
+   sees the conversation as "TRACE AI"; we see it for what it is. */
+
+function formatChatClock(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return '';
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) {
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  }
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function SupportInbox() {
+  const [threads, setThreads]       = useState(null);
+  const [activeId, setActiveId]     = useState(null);
+  const [messages, setMessages]     = useState([]);
+  const [msgsLoading, setMsgsLoading] = useState(false);
+  const [draft, setDraft]           = useState('');
+  const [sending, setSending]       = useState(false);
+  const [error, setError]           = useState(null);
+
+  const messagesEndRef = useRef(null);
+  // Live ref to activeId so the realtime handler always reads the latest
+  // value without needing to re-subscribe on every selection change.
+  const activeIdRef = useRef(null);
+  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
+
+  /* Load thread list + 30s refresh, mirroring the user list cadence. */
+  const loadThreads = useCallback(async () => {
+    try {
+      const rows = await listSupportThreads();
+      setThreads(rows);
+      setError(null);
+    } catch (e) {
+      setError(friendlyError(e, "Couldn't load support threads."));
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => { if (!cancelled) await loadThreads(); })();
+    const id = setInterval(() => { if (!cancelled) loadThreads(); }, 30_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [loadThreads]);
+
+  /* Realtime: refresh inbox + push messages into the open thread. */
+  useEffect(() => {
+    const unsub = subscribeToAllSupportMessages((msg) => {
+      // Always refresh the sidebar — preview + unread flag may have changed.
+      // Cheap (one RPC); no point reimplementing the join client-side.
+      loadThreads();
+      // If the new message belongs to the currently-open thread, append it
+      // (deduped) so the operator sees the user's reply land live.
+      if (msg.thread_id && msg.thread_id === activeIdRef.current) {
+        setMessages((prev) => (
+          prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
+        ));
+        // If the user just sent something while we have the thread open,
+        // count it as read on our side too.
+        if (msg.sender_role === 'user') {
+          markSupportThreadRead(activeIdRef.current).catch(() => {});
+        }
+      }
+    });
+    return unsub;
+  }, [loadThreads]);
+
+  /* Load messages for the selected thread. */
+  useEffect(() => {
+    if (!activeId) {
+      setMessages([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setMsgsLoading(true);
+      try {
+        const msgs = await fetchSupportMessages(activeId);
+        if (!cancelled) setMessages(msgs);
+        // Mark read after we load — user sees the unread badge clear.
+        markSupportThreadRead(activeId).catch(() => {});
+        // Refresh inbox so the unread flag drops in the sidebar too.
+        loadThreads();
+      } catch (e) {
+        if (!cancelled) setError(friendlyError(e, "Couldn't load messages."));
+      } finally {
+        if (!cancelled) setMsgsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeId, loadThreads]);
+
+  /* Auto-scroll on new content. */
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages.length]);
+
+  const onSend = useCallback(async () => {
+    if (!activeId || sending) return;
+    const body = draft.trim();
+    if (!body) return;
+    setSending(true);
+    try {
+      const id = await sendSupportMessage(activeId, body);
+      // Optimistic insert; the realtime broadcast will be deduped by id.
+      setMessages((prev) => (
+        prev.some((m) => m.id === id) ? prev : [
+          ...prev,
+          {
+            id,
+            thread_id:   activeId,
+            sender_role: 'admin',
+            body,
+            created_at: new Date().toISOString(),
+          },
+        ]
+      ));
+      setDraft('');
+      // Bump the local thread row so the sidebar updates immediately
+      // without waiting for the next 30s refresh.
+      loadThreads();
+    } catch (e) {
+      setError(friendlyError(e, "Couldn't send. Try again."));
+    } finally {
+      setSending(false);
+    }
+  }, [activeId, draft, loadThreads, sending]);
+
+  const onKeyDown = useCallback((e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      onSend();
+    }
+  }, [onSend]);
+
+  const totalUnread = useMemo(
+    () => (threads ?? []).filter((t) => t.unread_for_admin).length,
+    [threads],
+  );
+
+  const activeThread = useMemo(
+    () => (threads ?? []).find((t) => t.thread_id === activeId) ?? null,
+    [threads, activeId],
+  );
+
+  return (
+    <section className="admin-support" aria-labelledby="admin-support-title">
+      <header className="admin-support-head">
+        <h2 id="admin-support-title">Support inbox</h2>
+        <span className={`admin-support-count ${totalUnread > 0 ? 'has-unread' : ''}`}>
+          {totalUnread > 0 ? `${totalUnread} unread` : `${threads?.length ?? 0} threads`}
+        </span>
+      </header>
+
+      {error && <p className="admin-error" style={{ margin: 12 }}>{error}</p>}
+
+      <div className="admin-support-body">
+        <div className="admin-support-list">
+          {threads === null && (
+            <div className="admin-support-empty">
+              <span className="chat-spinner" aria-hidden="true" />
+            </div>
+          )}
+          {threads && threads.length === 0 && (
+            <div className="admin-support-empty">No support threads yet.</div>
+          )}
+          {threads && threads.map((t) => {
+            const isActive = t.thread_id === activeId;
+            const unread   = t.unread_for_admin && !isActive;
+            const previewPrefix =
+              t.last_message_role === 'admin' ? 'You: ' :
+              t.last_message_role === 'user'  ? '' : '';
+            return (
+              <button
+                key={t.thread_id}
+                type="button"
+                className={`admin-support-thread ${isActive ? 'is-active' : ''} ${unread ? 'is-unread' : ''}`}
+                onClick={() => setActiveId(t.thread_id)}
+              >
+                <div className="admin-support-thread-head">
+                  <span className="admin-support-thread-email">{t.email ?? '—'}</span>
+                  <span className="admin-support-thread-time">
+                    {formatChatClock(t.last_message_at)}
+                  </span>
+                </div>
+                <div className="admin-support-thread-preview">
+                  {t.last_message_body
+                    ? `${previewPrefix}${t.last_message_body}`
+                    : <em>No messages yet</em>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="admin-support-panel">
+          {!activeId ? (
+            <div className="admin-support-noselect">
+              Select a thread on the left to view the conversation.
+            </div>
+          ) : (
+            <>
+              <header className="admin-support-panel-head">
+                <div className="admin-support-panel-head-id">
+                  <span className="admin-support-panel-email">
+                    {activeThread?.email ?? '—'}
+                  </span>
+                  <span className="admin-support-panel-meta">
+                    {activeThread?.display_name || ''}
+                    {activeThread?.last_seen_at
+                      ? ` · seen ${formatChatClock(activeThread.last_seen_at)}`
+                      : ''}
+                  </span>
+                </div>
+              </header>
+
+              <div className="admin-support-messages">
+                {msgsLoading && (
+                  <div className="admin-support-empty">
+                    <span className="chat-spinner" aria-hidden="true" />
+                  </div>
+                )}
+                {!msgsLoading && messages.length === 0 && (
+                  <div className="admin-support-empty">No messages in this thread yet.</div>
+                )}
+                {messages.map((m) => (
+                  <div
+                    key={m.id}
+                    className={`admin-support-msg admin-support-msg-from-${m.sender_role}`}
+                  >
+                    {m.body}
+                    <span className="admin-support-msg-meta">
+                      {formatChatClock(m.created_at)}
+                    </span>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} aria-hidden="true" />
+              </div>
+
+              <form
+                className="admin-support-composer"
+                onSubmit={(e) => { e.preventDefault(); onSend(); }}
+              >
+                <textarea
+                  className="admin-support-input"
+                  placeholder="Reply as TRACE AI…"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  rows={2}
+                  maxLength={4000}
+                  aria-label="Reply"
+                />
+                <button
+                  type="submit"
+                  className="admin-support-send"
+                  disabled={sending || !draft.trim()}
+                >
+                  {sending ? '…' : 'Send'}
+                </button>
+              </form>
+            </>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
 
 export default function AdminDashboard() {
   const { user, signOut } = useAuth();
@@ -416,6 +699,8 @@ export default function AdminDashboard() {
             <span className="admin-summary-value">{counts.online}</span>
           </div>
         </section>
+
+        <SupportInbox />
 
         <TrafficPanel />
 

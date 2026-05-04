@@ -15,6 +15,7 @@ import Upload from './pages/Upload.jsx';
 import Trace from './pages/Trace.jsx';
 import LivePreview from './pages/LivePreview.jsx';
 import Account from './pages/Account.jsx';
+import Chat from './pages/Chat.jsx';
 import CheckoutSuccess from './pages/CheckoutSuccess.jsx';
 import PricingPage from './pages/PricingPage.jsx';
 import Terms from './pages/Terms.jsx';
@@ -95,6 +96,7 @@ export default function App() {
 
         {/* Auth required (free users allowed) */}
         <Route path="/account"          element={<RequireAuth><Account /></RequireAuth>} />
+        <Route path="/chat"             element={<RequireAuth><Chat /></RequireAuth>} />
         <Route path="/live"             element={<RequireAuth><LivePreview /></RequireAuth>} />
         <Route path="/checkout/success" element={<RequireAuth><CheckoutSuccess /></RequireAuth>} />
 

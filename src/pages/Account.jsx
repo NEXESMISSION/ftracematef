@@ -631,6 +631,16 @@ export default function Account() {
           )}
         </section>
 
+        {/* ── Help / TRACE AI chat entry point ── */}
+        <section className="profile-help-card" aria-labelledby="profile-help-title">
+          <span className="profile-help-icon" aria-hidden="true">✦</span>
+          <div className="profile-help-text">
+            <h3 id="profile-help-title">Need a hand? Talk to TRACE AI</h3>
+            <p>Questions about your account, billing, or how to get the best results — ask away.</p>
+          </div>
+          <Link to="/chat" className="profile-help-cta">Open chat →</Link>
+        </section>
+
         {/* ── Subscription (now folds in account email) ── */}
         <SubscriptionCard
           subscription={subscription}
