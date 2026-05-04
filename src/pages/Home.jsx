@@ -1,11 +1,11 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import Landing from './Landing.jsx';
+import { useAuth } from '../auth/AuthProvider.jsx';
 
-// Root route always renders the marketing site. Signed-in users are NOT
-// auto-redirected to /account — the Nav component on Landing handles
-// "where do I go next" via account-aware buttons. Treating `/` as a
-// dedicated landing surface means anyone (including paying customers
-// linking to the homepage) sees the same marketing-first experience.
+// Root route serves the marketing landing to visitors and bounces signed-in
+// users straight to /account — most returning users want their dashboard, not
+// the marketing page. The dedicated `/welcome` route still renders Landing
+// for users (paid or not) who deliberately want the marketing surface.
 //
 // Defensive exception: if Supabase's Redirect URL allowlist isn't set up
 // for /auth/callback, the OAuth round-trip lands here with `?code=…` in
@@ -42,8 +42,23 @@ function filterAllowed(rawSearchOrHash) {
   return s ? `?${s}` : '';
 }
 
+// Synchronous check — same trick as Hero.jsx and Nav.jsx. The AuthProvider
+// takes a beat to hydrate `user`; without this, a returning user would see
+// Landing flicker for one frame before the redirect to /account fires.
+// Reading sb-* keys out of localStorage is safe and synchronous.
+function hasPersistedSession() {
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) return true;
+    }
+  } catch { /* private mode / disabled storage */ }
+  return false;
+}
+
 export default function Home() {
   const location = useLocation();
+  const { user, loading } = useAuth();
   const params = new URLSearchParams(location.search);
   const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''));
   // We only auto-forward when there's a PKCE `code` or an OAuth `error`.
@@ -63,5 +78,12 @@ export default function Home() {
     const safeQuery = filterAllowed(location.search);
     return <Navigate to={`/auth/callback${safeQuery}`} replace />;
   }
+
+  // Signed in (or about to be — persisted session detected): straight to
+  // /account. The persisted-session branch avoids a flash of Landing on
+  // first paint while AuthProvider is still hydrating.
+  if (user) return <Navigate to="/account" replace />;
+  if (loading && hasPersistedSession()) return null;
+
   return <Landing />;
 }
