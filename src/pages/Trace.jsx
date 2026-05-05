@@ -324,7 +324,6 @@ export default function Trace() {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const anonKey     = import.meta.env.VITE_SUPABASE_ANON_KEY;
     const haveSupabaseEnv = !!(supabaseUrl && anonKey);
-    const canHitRest = () => haveSupabaseEnv && !!accessTokenRef.current;
 
     // Tell the AuthProvider's presence stream we're in the trace studio
     // even before the run RPC lands — that way the next 60s heartbeat

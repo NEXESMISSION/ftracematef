@@ -336,11 +336,20 @@ export function AuthProvider({ children }) {
       // nice-to-have, not a correctness signal. The supabase builder is
       // thenable but not a real Promise, so we await it inside try/catch
       // rather than chaining .catch (which doesn't exist on the builder).
+      //
+      // Map module nulls to empty strings, NOT JSON null. The server's
+      // touch_last_seen() treats null as "leave the column alone" and ''
+      // as "explicitly clear it". After a tab-kill on /trace the server
+      // still has page='trace' + image_label='puppy.jpg' from the last
+      // heartbeat; on the user's next page load we want the very first
+      // heartbeat to clear that stale state, not preserve it. Pages with
+      // usePresence still send their declared page string, which then
+      // overrides the empty.
       const { page, imageLabel } = currentPresence();
       try {
         await supabase.rpc('touch_last_seen', {
-          p_page:  page  ?? null,
-          p_image: imageLabel ?? null,
+          p_page:  page  || '',
+          p_image: imageLabel || '',
         });
       } catch { /* ignore */ }
     };
