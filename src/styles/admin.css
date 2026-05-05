@@ -117,6 +117,7 @@
 
 .admin-shell .admin-summary-card-paid { background: #eef9f1; }
 .admin-shell .admin-summary-card-online { background: #f1faff; padding-left: 28px; }
+.admin-shell .admin-summary-card-tracing { background: #fff6e5; }
 .admin-shell .admin-summary-dot {
   position: absolute;
   left: 12px;
@@ -355,6 +356,21 @@
 }
 .admin-shell .admin-presence.is-offline {
   background: var(--cream-deep);
+}
+/* Tracing dot — orange + faster pulse so the operator's eye snaps to
+   actively-engaged users without losing the green=online convention for
+   everyone else. */
+.admin-shell .admin-presence.is-tracing {
+  background: #f59332;
+  box-shadow: 0 0 0 3px rgba(245, 147, 50, 0.28);
+  animation: admin-pulse-trace 1.4s ease-in-out infinite;
+}
+@keyframes admin-pulse-trace {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(245, 147, 50, 0.28); }
+  50%      { box-shadow: 0 0 0 6px rgba(245, 147, 50, 0.08); }
+}
+.admin-shell .admin-row.is-tracing {
+  background: linear-gradient(90deg, rgba(245, 147, 50, 0.06), transparent 40%);
 }
 
 .admin-shell .admin-row-who {

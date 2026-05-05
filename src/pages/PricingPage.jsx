@@ -7,6 +7,7 @@ import { startCheckout, markPreCheckout, clearPreCheckoutSnapshot } from '../lib
 import { hasPendingImage } from '../lib/pendingImage.js';
 import { friendlyError } from '../lib/errors.js';
 import { PLANS } from '../lib/plans.js';
+import { usePresence } from '../hooks/usePresence.js';
 
 /**
  * Dedicated pricing page (/pricing) — what users see after signing in.
@@ -19,6 +20,7 @@ export default function PricingPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, isPaid, profile, subscription } = useAuth();
+  usePresence('pricing');
   const [busy, setBusy]                 = useState(null);
   const [error, setError]               = useState(null);
   const [lifetimeLeft, setLifetimeLeft] = useState(null);

@@ -80,13 +80,27 @@ Deno.serve(async (req) => {
     return json({ error: 'Too many requests. Slow down and try again in a minute.' }, 429);
   }
 
+  // Reconcile any zombie trace_session_runs first — the operator should
+  // never see a phantom "still tracing" row for a user whose tab was killed
+  // hours ago. Closes any run whose heartbeat has been silent for >2 min,
+  // crediting the duration up to the last heartbeat. Idempotent — safe to
+  // call on every request, only touches rows that need it.
+  const { error: reconcileErr } = await admin.rpc('reconcile_trace_runs', {
+    p_stale_seconds: 120,
+  });
+  if (reconcileErr) {
+    // Non-fatal: presence data is still useful even if the sweep failed.
+    // Log and continue rather than failing the whole dashboard read.
+    console.warn('[admin-list-users] reconcile_trace_runs failed:', reconcileErr);
+  }
+
   // Pull profiles + subscriptions separately and stitch in-memory. Two flat
   // queries are cheaper than a join via PostgREST's nested select on small-
   // to-medium account counts (a few thousand rows) and easier to reason
   // about than the foreign-key embed magic.
   const { data: profiles, error: profErr } = await admin
     .from('profiles')
-    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at, dodo_customer_id, total_trace_seconds, trace_sessions, first_trace_at, last_trace_at')
+    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at, dodo_customer_id, total_trace_seconds, trace_sessions, first_trace_at, last_trace_at, current_page, current_image_label, current_run_id')
     .order('created_at', { ascending: false })
     .limit(2000);
   if (profErr) return json({ error: profErr.message }, 500);
@@ -195,6 +209,13 @@ Deno.serve(async (req) => {
       trace_sessions:      p.trace_sessions ?? 0,
       first_trace_at:      p.first_trace_at ?? null,
       last_trace_at:       p.last_trace_at ?? null,
+      // Live presence — what page the user is on right now, and the image
+      // they're tracing if they're in the studio. Only meaningful when the
+      // user is also "online" (last_seen_at within the heartbeat window);
+      // the dashboard UI gates on online-ness before rendering these.
+      current_page:        p.current_page ?? null,
+      current_image_label: p.current_image_label ?? null,
+      current_run_id:      p.current_run_id ?? null,
     };
   });
 

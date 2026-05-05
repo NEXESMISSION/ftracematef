@@ -12,6 +12,7 @@ import {
   ALLOWED_IMAGE_MIME,
 } from '../lib/pendingImage.js';
 import { beginTrialSession, canUseFreeTrial } from '../lib/freeTrial.js';
+import { usePresence } from '../hooks/usePresence.js';
 
 /**
  * /upload — public entry. Anyone can upload an image without signing in.
@@ -24,6 +25,7 @@ export default function Upload() {
   const navigate = useNavigate();
   const { user, profile, isPaid, loading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  usePresence('upload');
 
   const inputRef = useRef(null);
   const [preview, setPreview]       = useState(null);   // object URL for current preview

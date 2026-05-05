@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { endTrialSession } from '../lib/freeTrial.js';
+import { currentPresence, onPresenceChange } from '../lib/presence.js';
 
 /**
  * AuthProvider exposes `{ user, profile, subscription, isPaid, loading, signOut, refresh }`
@@ -308,10 +309,21 @@ export function AuthProvider({ children }) {
     }
   }, [session?.user?.id]);
 
-  // Presence heartbeat: stamp profiles.last_seen_at every ~60s while the tab
-  // is visible. Powers the "online now" green dot on the admin dashboard.
-  // Cheap (one RPC, no payload) and bounded — we stop on hidden tabs so a
-  // backgrounded tab doesn't keep counting as "online" forever.
+  // Presence heartbeat: stamp profiles.last_seen_at + current_page +
+  // current_image_label every ~60s while the tab is visible. Powers the
+  // "online now" green dot on the admin dashboard AND tells the operator
+  // what page each user is on (and what image, when tracing).
+  //
+  // The page/image labels come from the lib/presence.js module-level
+  // registry, populated by individual pages via the usePresence() hook.
+  // We also subscribe to presence-change events so a route transition
+  // surfaces in <60s on the dashboard instead of waiting for the next
+  // tick.
+  //
+  // While in /trace, Trace.jsx runs its own heartbeat_trace_run() RPC
+  // every ~30s which independently stamps the same fields plus keeps
+  // the trace_session_runs row alive. The two streams stamp the same
+  // values; last write wins, no inconsistency.
   useEffect(() => {
     const userId = session?.user?.id;
     if (!userId) return;
@@ -324,7 +336,13 @@ export function AuthProvider({ children }) {
       // nice-to-have, not a correctness signal. The supabase builder is
       // thenable but not a real Promise, so we await it inside try/catch
       // rather than chaining .catch (which doesn't exist on the builder).
-      try { await supabase.rpc('touch_last_seen'); } catch { /* ignore */ }
+      const { page, imageLabel } = currentPresence();
+      try {
+        await supabase.rpc('touch_last_seen', {
+          p_page:  page  ?? null,
+          p_image: imageLabel ?? null,
+        });
+      } catch { /* ignore */ }
     };
     const start = () => {
       if (timer != null) return;
@@ -345,9 +363,18 @@ export function AuthProvider({ children }) {
     if (document.visibilityState === 'visible') start();
     document.addEventListener('visibilitychange', onVisible);
 
+    // Fire an immediate heartbeat whenever the user changes pages so the
+    // dashboard reflects the new context within seconds rather than up
+    // to a full HEARTBEAT_MS interval. Skip when the tab is hidden — no
+    // point spending the round-trip on a backgrounded tab.
+    const unsubPresence = onPresenceChange(() => {
+      if (document.visibilityState === 'visible') ping();
+    });
+
     return () => {
       stop();
       document.removeEventListener('visibilitychange', onVisible);
+      unsubPresence();
     };
   }, [session?.user?.id]);
 

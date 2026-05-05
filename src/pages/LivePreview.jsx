@@ -13,6 +13,7 @@ import {
 } from '../lib/perspectiveWarp.js';
 import Paywall from '../components/Paywall.jsx';
 import { freeTrialState } from '../lib/freeTrial.js';
+import { usePresence } from '../hooks/usePresence.js';
 
 const STATUS_LABEL = {
   idle:         'Idle',
@@ -1374,6 +1375,7 @@ function BroadcasterStage({ userId, onChangeRole }) {
 
 export default function LivePreview() {
   const { user, profile, isPaid } = useAuth();
+  usePresence('live');
   const gate = useAuthGate();
   const [role, setRole] = useState(null); // null | 'broadcaster' | 'viewer'
 

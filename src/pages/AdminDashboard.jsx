@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { listAllUsers, getUserActivity } from '../lib/admin.js';
 import { friendlyError } from '../lib/errors.js';
+import { usePresence } from '../hooks/usePresence.js';
 import { PLAN_LABEL } from '../lib/plans.js';
 import { ANALYTICS_PROVIDER, ANALYTICS_EMBED_URL } from '../lib/analytics.js';
 import { formatDuration, formatRelative as formatTraceRelative } from '../lib/traceStats.js';
@@ -81,11 +82,36 @@ function isOnline(lastSeen) {
   return Date.now() - t < ONLINE_WINDOW_MS;
 }
 
+// Friendly labels for the `current_page` enum the client emits. Keep this
+// list in sync with the strings passed to usePresence(...) and the literal
+// 'trace' written by heartbeat_trace_run on the server.
+const PAGE_LABEL = {
+  upload:    'Upload',
+  trace:     'Tracing',
+  account:   'Account',
+  pricing:   'Pricing',
+  checkout:  'Checkout',
+  live:      'Live preview',
+  admin:     'Admin',
+};
+
 // Heartbeat is the live "in the app right now" signal. last_sign_in_at is
 // Supabase's stamp on every successful auth — the right fallback for users
 // who haven't pinged the heartbeat (e.g. pre-dated the column).
+//
+// When the user is online, prefer the rich "what are they doing" label
+// over the generic "In the app now". Tracing shows the image name in
+// quotes; other pages just show the page label.
 function lastSeenLabel(u, online) {
-  if (online) return 'In the app now';
+  if (online) {
+    if (u.current_page === 'trace' && u.current_image_label) {
+      return `Tracing "${u.current_image_label}"`;
+    }
+    if (u.current_page && PAGE_LABEL[u.current_page]) {
+      return `On ${PAGE_LABEL[u.current_page]}`;
+    }
+    return 'In the app now';
+  }
   if (u.last_seen_at)     return formatRelative(u.last_seen_at);
   if (u.last_sign_in_at)  return `Signed in ${formatRelative(u.last_sign_in_at)}`;
   return 'never';
@@ -718,6 +744,7 @@ function SupportInbox() {
 
 export default function AdminDashboard() {
   const { user, signOut } = useAuth();
+  usePresence('admin');
   const [users, setUsers]       = useState(null);
   const [error, setError]       = useState(null);
   const [filter, setFilter]     = useState('all');   // 'all' | 'paid' | 'unpaid'
@@ -749,14 +776,17 @@ export default function AdminDashboard() {
   }, []);
 
   const counts = useMemo(() => {
-    if (!users) return { all: 0, paid: 0, unpaid: 0, online: 0 };
-    let paid = 0, online = 0;
+    if (!users) return { all: 0, paid: 0, unpaid: 0, online: 0, tracing: 0 };
+    let paid = 0, online = 0, tracing = 0;
     for (const u of users) {
       if (u.is_paid) paid++;
-      if (isOnline(u.last_seen_at)) online++;
+      if (isOnline(u.last_seen_at)) {
+        online++;
+        if (u.current_page === 'trace') tracing++;
+      }
     }
     void tick;
-    return { all: users.length, paid, unpaid: users.length - paid, online };
+    return { all: users.length, paid, unpaid: users.length - paid, online, tracing };
   }, [users, tick]);
 
   const filtered = useMemo(() => {
@@ -812,6 +842,10 @@ export default function AdminDashboard() {
             <span className="admin-summary-label">Online now</span>
             <span className="admin-summary-value">{counts.online}</span>
           </div>
+          <div className="admin-summary-card admin-summary-card-tracing">
+            <span className="admin-summary-label">Tracing now</span>
+            <span className="admin-summary-value">{counts.tracing}</span>
+          </div>
         </section>
 
         <SupportInbox />
@@ -863,17 +897,22 @@ export default function AdminDashboard() {
           <ul className="admin-list">
             {filtered.map((u) => {
               const online    = isOnline(u.last_seen_at);
+              const tracing   = online && u.current_page === 'trace';
               const tone      = STATUS_TONE[u.status] ?? 'neutral';
               const planLabel = u.plan ? (PLAN_LABEL[u.plan] ?? u.plan) : 'No plan';
               const isOpen    = expanded === u.id;
+              const presenceLabel = lastSeenLabel(u, online);
               return (
-                <li key={u.id} className={`admin-row ${isOpen ? 'is-open' : ''}`}>
+                <li
+                  key={u.id}
+                  className={`admin-row ${isOpen ? 'is-open' : ''} ${tracing ? 'is-tracing' : ''}`}
+                >
                   <div className="admin-row-main">
                     <div className="admin-row-id">
                       <span
-                        className={`admin-presence ${online ? 'is-online' : 'is-offline'}`}
-                        title={online ? 'Online now' : `Last seen ${lastSeenLabel(u, online)}`}
-                        aria-label={online ? 'Online now' : `Last seen ${lastSeenLabel(u, online)}`}
+                        className={`admin-presence ${online ? 'is-online' : 'is-offline'} ${tracing ? 'is-tracing' : ''}`}
+                        title={presenceLabel}
+                        aria-label={presenceLabel}
                       />
                       <div className="admin-row-who">
                         <span className="admin-row-email">
@@ -920,8 +959,8 @@ export default function AdminDashboard() {
                         </dd>
                       </div>
                       <div>
-                        <dt>Last seen</dt>
-                        <dd>{lastSeenLabel(u, online)}</dd>
+                        <dt>{online ? 'Status' : 'Last seen'}</dt>
+                        <dd>{presenceLabel}</dd>
                       </div>
                       <div>
                         <dt>Joined</dt>

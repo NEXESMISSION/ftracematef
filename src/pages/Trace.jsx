@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { startSession, addSessionDuration } from '../lib/traceStats.js';
 import { loadPendingImage } from '../lib/pendingImage.js';
 import { consumeFreeSession, trialAlreadyConsumedThisVisit } from '../lib/freeTrial.js';
+import { setPresence, clearPresence } from '../lib/presence.js';
 import {
   cssMatrix3d,
   identityCorners,
@@ -31,6 +32,14 @@ export default function Trace() {
   const [imageUrl] = useState(
     () => location.state?.imageUrl || loadPendingImage()?.dataUrl || null,
   );
+  // Captured at mount alongside imageUrl. Used as the human-readable label
+  // we send to the server so the admin dashboard can show "tracing
+  // puppy.jpg" instead of just "tracing". Falls back to the freshly-uploaded
+  // file name from /upload, then to the persisted pending-image meta, then
+  // to a generic placeholder when neither is available.
+  const [imageLabel] = useState(
+    () => location.state?.imageName || loadPendingImage()?.name || 'image',
+  );
 
   const videoRef    = useRef(null);
   const overlayRef  = useRef(null);
@@ -49,6 +58,12 @@ export default function Trace() {
   const [controlsHidden, setControlsHidden] = useState(false);
   const [flickerOn, setFlickerOn]           = useLocalState('tm:flickerOn', false);
   const [flickerSpeed, setFlickerSpeed]     = useLocalState('tm:flickerSpeed', 3);
+  // Bounds for the flicker oscillation. Defaults give a clearly-visible
+  // breathing effect without ever fully disappearing or going fully opaque
+  // — both extremes make the reference hard to align against. Persisted so
+  // a user's tuned bounds stick across sessions.
+  const [flickerMin, setFlickerMin]         = useLocalState('tm:flickerMin', 0.15);
+  const [flickerMax, setFlickerMax]         = useLocalState('tm:flickerMax', 0.85);
   const [flickerOpacity, setFlickerOpacity] = useState(0);
   const [warpMode, setWarpMode]             = useState(false);
   const [corners, setCorners]               = useState(null);
@@ -68,9 +83,9 @@ export default function Trace() {
   //
   // Consume regardless of paid status. A paid user burns the counter too;
   // it's harmless while they're paid (the cap is silent — RPC just returns
-  // the current count once at 5) and prevents a paid → free transition
-  // (refund, expired sub, admin dev-mutate) from handing the same account
-  // 5 fresh sessions on top of whatever they already used.
+  // the current count once at the limit) and prevents a paid → free
+  // transition (refund, expired sub, admin dev-mutate) from handing the
+  // same account a fresh batch on top of whatever they already used.
   useEffect(() => {
     if (!imageUrl) return;
     if (!user?.id) return;
@@ -223,131 +238,231 @@ export default function Trace() {
     if (baseSize) setCorners(identityCorners(baseSize.w, baseSize.h));
   }, [baseSize]);
 
-  // Flicker: smoothly oscillate overlay opacity 0 → 1 → 0 while enabled.
-  // flickerSpeed is a 1–10 dial; period in seconds = 6 / flickerSpeed.
+  // Flicker: smoothly oscillate overlay opacity between flickerMin and
+  // flickerMax while enabled. flickerSpeed is a 1–10 dial; period in
+  // seconds = 6 / flickerSpeed. The cosine sweep produces a value in
+  // [0,1] which we then linearly map onto [min,max] so the user can keep
+  // the reference visible at all times (e.g. 20% → 80% never blanks the
+  // overlay) without losing the rhythm of the breathing motion.
+  //
+  // Defensive: if min ≥ max (user dragged them past each other), pin to a
+  // tiny epsilon so the math doesn't invert and produce a negative range.
   useEffect(() => {
     if (!flickerOn) return;
     let rafId;
     let startTs = null;
     const periodSec = 6 / Math.max(0.5, flickerSpeed);
+    const lo = Math.max(0, Math.min(1, flickerMin));
+    const hi = Math.max(lo + 0.01, Math.min(1, flickerMax));
+    const span = hi - lo;
     const tick = (ts) => {
       if (startTs == null) startTs = ts;
       const elapsed = (ts - startTs) / 1000;
       const phase = (elapsed / periodSec) * 2 * Math.PI;
-      setFlickerOpacity((1 - Math.cos(phase)) / 2);
+      const t = (1 - Math.cos(phase)) / 2;
+      setFlickerOpacity(lo + t * span);
       rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [flickerOn, flickerSpeed]);
+  }, [flickerOn, flickerSpeed, flickerMin, flickerMax]);
 
   // ===== Track tracing sessions =====
-  // Two-phase accounting: bump the session count the moment the studio opens
-  // with an image (a session = "user opened tracing", regardless of how long
-  // they sat there), then accumulate active duration in the background and
-  // persist it on exit. Previously the count itself was gated on duration,
-  // so a user who opened tracing but didn't actively work would not get a
-  // session credited — that was the bug.
+  // Server-authoritative session tracking. Open a trace_session_runs row on
+  // mount (start_trace_run), keep it alive with periodic heartbeats, close it
+  // on exit (end_trace_run). The server computes duration from started_at
+  // and the close time — the client doesn't need to track active seconds
+  // anymore, which means we no longer lose sessions when the OS kills the
+  // tab without firing pagehide. Any row whose heartbeat goes stale gets
+  // reconciled by reconcile_trace_runs() (called from the admin endpoint
+  // and from start_trace_run when the user comes back), credited up to its
+  // last heartbeat — so a hard-killed session still counts as ~the actual
+  // time the user was tracing, not zero.
   //
-  // Persist must work in three exit paths: clicking End session (react-router
-  // unmount), browser back (also unmount), and tab close / app kill (pagehide).
-  // The first two leave the JS context alive; the last one tears it down, so
-  // the server RPC must use `fetch({ keepalive: true })` — the supabase JS
-  // client uses regular fetch which the browser cancels mid-flight on unload.
+  // We also stamp the local /account scrapbook (addSessionDuration) with a
+  // best-effort estimate computed from started_at on close, so the user's
+  // own stats keep updating without re-querying. The server is the source
+  // of truth; this is just the cached mirror.
   //
-  // Guards: startedRef prevents double-counting the start (StrictMode dev
-  // double-mount, or any future re-run of the effect with the same imageUrl);
-  // persistedRef prevents a stray pagehide racing with the unmount cleanup
-  // from double-recording duration.
-  const startedRef   = useRef(false);
-  const persistedRef = useRef(false);
+  // Three exit paths to handle:
+  //   1. Click End session → unmount → effect cleanup → end_trace_run.
+  //   2. Browser back / route change → same as 1.
+  //   3. Tab close / app kill → pagehide event → end_trace_run via
+  //      `fetch({ keepalive: true })`. The supabase JS client doesn't expose
+  //      keepalive; hit the REST RPC endpoint directly so the request
+  //      survives the tear-down.
+  //
+  // If pagehide doesn't fire (forced kill, OOM, swipe-away on some Android
+  // builds), no end_trace_run lands — but the heartbeat goes stale within
+  // ~30s and reconcile_trace_runs() finishes the job for us.
+  //
+  // Guards: startedRef gates the start RPC against StrictMode's dev
+  // double-mount; endedRef gates against a pagehide racing the unmount
+  // cleanup so we don't fire end_trace_run twice in quick succession.
+  //
+  // accessTokenRef holds the latest access token, updated whenever the
+  // session refreshes. We read it on demand (heartbeat, close) instead of
+  // capturing it in the effect's closure — token rotation during a long
+  // tracing session would otherwise re-run the effect, fire its cleanup
+  // (closing the run prematurely!), and leave a half-dead heartbeat
+  // pinging with no row.
+  const startedRef    = useRef(false);
+  const endedRef      = useRef(false);
+  const runIdRef      = useRef(null);
+  const startedAtRef  = useRef(null);
+  const accessTokenRef = useRef(null);
+  useEffect(() => {
+    accessTokenRef.current = session?.access_token || null;
+  }, [session?.access_token]);
   useEffect(() => {
     if (!imageUrl) return;
     if (!user?.id) return;
-    let elapsedMs = 0;
-    let activeSince = document.visibilityState === 'visible' ? Date.now() : null;
-    persistedRef.current = false;
+    endedRef.current = false;
+    runIdRef.current = null;
+    startedAtRef.current = null;
 
-    const accessToken = session?.access_token;
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const anonKey     = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const haveSupabaseEnv = !!(supabaseUrl && anonKey);
+    const canHitRest = () => haveSupabaseEnv && !!accessTokenRef.current;
 
-    // Bump count + timestamps locally and on the server, once.
+    // Tell the AuthProvider's presence stream we're in the trace studio
+    // even before the run RPC lands — that way the next 60s heartbeat
+    // reflects the user's actual page even if start_trace_run fails.
+    setPresence('trace', imageLabel);
+
+    // Bump the local sessions count immediately so the user sees their
+    // /account scrapbook tick up without waiting on the server. The DB
+    // mirror is bumped by start_trace_run RPC.
     if (!startedRef.current) {
       startedRef.current = true;
       startSession(user.id);
-      if (accessToken && supabaseUrl && anonKey) {
+
+      const accessToken = accessTokenRef.current;
+      if (haveSupabaseEnv && accessToken) {
+        startedAtRef.current = Date.now();
         try {
-          fetch(`${supabaseUrl}/rest/v1/rpc/start_trace_session`, {
+          fetch(`${supabaseUrl}/rest/v1/rpc/start_trace_run`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'apikey': anonKey,
               'Authorization': `Bearer ${accessToken}`,
             },
-            body: JSON.stringify({}),
-          }).catch((err) => console.warn('[trace] start_trace_session failed:', err));
+            body: JSON.stringify({ p_image_label: imageLabel }),
+          })
+            .then((res) => res.ok ? res.json() : null)
+            .then((data) => {
+              // RPC with returns scalar uuid → PostgREST hands back the
+              // bare value as JSON. Defensive: only adopt a uuid-shaped
+              // string so a malformed response can't poison subsequent calls.
+              if (typeof data === 'string' && data.length === 36) {
+                runIdRef.current = data;
+              }
+            })
+            .catch((err) => console.warn('[trace] start_trace_run failed:', err));
         } catch (err) {
-          console.warn('[trace] start_trace_session threw:', err);
+          console.warn('[trace] start_trace_run threw:', err);
         }
       }
     }
 
-    const flushActive = () => {
-      if (activeSince != null) {
-        elapsedMs += Date.now() - activeSince;
-        activeSince = null;
+    // Heartbeat every 30s while the tab is visible. Stops on hidden so a
+    // backgrounded tab doesn't keep a phantom run alive forever — the
+    // server's reconciler will close it after the stale window. Resumes
+    // when the tab returns to visible (the user came back).
+    const HEARTBEAT_MS = 30_000;
+    let heartbeatTimer = null;
+    const ping = () => {
+      const runId = runIdRef.current;
+      const accessToken = accessTokenRef.current;
+      if (!runId || !haveSupabaseEnv || !accessToken) return;
+      try {
+        fetch(`${supabaseUrl}/rest/v1/rpc/heartbeat_trace_run`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': anonKey,
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ p_run_id: runId }),
+        }).catch(() => { /* presence is best-effort */ });
+      } catch { /* ignore */ }
+    };
+    const startHeartbeat = () => {
+      if (heartbeatTimer != null) return;
+      ping();
+      heartbeatTimer = setInterval(ping, HEARTBEAT_MS);
+    };
+    const stopHeartbeat = () => {
+      if (heartbeatTimer != null) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
       }
     };
-
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        if (activeSince == null) activeSince = Date.now();
-      } else {
-        flushActive();
-      }
+      if (document.visibilityState === 'visible') startHeartbeat();
+      else stopHeartbeat();
     };
+    if (document.visibilityState === 'visible') startHeartbeat();
 
-    const persist = () => {
-      if (persistedRef.current) return;
-      persistedRef.current = true;
-      flushActive();
-      const seconds = elapsedMs / 1000;
-      if (seconds <= 0) return;
-      // localStorage write — synchronous, drives the user's own /account scrapbook.
-      addSessionDuration(user.id, seconds);
-      // Server-side mirror so the admin dashboard can see these. Use a
-      // keepalive fetch so the request survives tab close / app kill — the
-      // supabase JS client doesn't expose keepalive, so we hit the REST RPC
-      // endpoint directly.
-      if (accessToken && supabaseUrl && anonKey) {
-        try {
-          fetch(`${supabaseUrl}/rest/v1/rpc/record_trace_session`, {
-            method: 'POST',
-            keepalive: true,
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': anonKey,
-              'Authorization': `Bearer ${accessToken}`,
-            },
-            body: JSON.stringify({ duration_seconds: Math.round(seconds) }),
-          }).catch((err) => console.warn('[trace] record_trace_session failed:', err));
-        } catch (err) {
-          console.warn('[trace] record_trace_session threw:', err);
+    // Close the run + mirror duration into the local scrapbook. Idempotent
+    // — endedRef guards against pagehide racing the unmount cleanup.
+    const finish = (reason) => {
+      if (endedRef.current) return;
+      endedRef.current = true;
+      stopHeartbeat();
+      clearPresence();
+
+      const runId    = runIdRef.current;
+      const startedAt = startedAtRef.current;
+
+      // Best-effort local mirror: estimate the duration from the timer we
+      // captured at start so the /account scrapbook updates immediately
+      // without a server round-trip. The server-side total is authoritative
+      // and updated by end_trace_run / reconcile_trace_runs.
+      if (startedAt != null) {
+        const seconds = (Date.now() - startedAt) / 1000;
+        if (seconds > 0 && seconds < 86400) {
+          addSessionDuration(user.id, seconds);
         }
       }
-      elapsedMs = 0;
+
+      const accessToken = accessTokenRef.current;
+      if (!runId || !haveSupabaseEnv || !accessToken) return;
+      try {
+        fetch(`${supabaseUrl}/rest/v1/rpc/end_trace_run`, {
+          method: 'POST',
+          keepalive: true,
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': anonKey,
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ p_run_id: runId, p_reason: reason }),
+        }).catch((err) => console.warn('[trace] end_trace_run failed:', err));
+      } catch (err) {
+        console.warn('[trace] end_trace_run threw:', err);
+      }
     };
 
+    const onPagehide = () => finish('unload');
+
     document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('pagehide', persist);
+    window.addEventListener('pagehide', onPagehide);
 
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('pagehide', persist);
-      persist();
+      window.removeEventListener('pagehide', onPagehide);
+      finish('client_end');
     };
-  }, [imageUrl, user?.id, session?.access_token]);
+    // Intentionally exclude session.access_token: a token rotation in the
+    // middle of a long tracing session would re-run the effect, fire the
+    // cleanup (closing the run prematurely), and start a new effect that
+    // can't issue start_trace_run again because startedRef is already true
+    // — the heartbeat would then ping with a null runId. accessTokenRef
+    // gives later RPCs the freshest token without re-running the effect.
+  }, [imageUrl, imageLabel, user?.id]);
 
   // Toggle torch on the active video track. Wrapped in a try because not all
   // devices support it even when `caps.torch` is true (Safari quirks).
@@ -624,21 +739,70 @@ export default function Trace() {
             </div>
 
             {flickerOn && (
-              <div className="trace-slider">
-                <span className="trace-slider-label" aria-hidden="true">Speed</span>
-                <input
-                  id="flicker-speed"
-                  type="range"
-                  min="1"
-                  max="10"
-                  step="0.5"
-                  value={flickerSpeed}
-                  onChange={(e) => setFlickerSpeed(parseFloat(e.target.value))}
-                  aria-label="Flicker speed"
-                  style={{ '--tm-slider-fill': `${(flickerSpeed - 1) / 9 * 100}%` }}
-                />
-                <span className="trace-slider-value">{flickerSpeed.toFixed(1)}×</span>
-              </div>
+              <>
+                <div className="trace-slider">
+                  <span className="trace-slider-label" aria-hidden="true">Speed</span>
+                  <input
+                    id="flicker-speed"
+                    type="range"
+                    min="1"
+                    max="10"
+                    step="0.5"
+                    value={flickerSpeed}
+                    onChange={(e) => setFlickerSpeed(parseFloat(e.target.value))}
+                    aria-label="Flicker speed"
+                    style={{ '--tm-slider-fill': `${(flickerSpeed - 1) / 9 * 100}%` }}
+                  />
+                  <span className="trace-slider-value">{flickerSpeed.toFixed(1)}×</span>
+                </div>
+                {/* Min / Max bound the oscillation so the overlay never
+                    blanks (good for keeping reference visible at all times)
+                    or fully blocks the camera. We clamp Min to stay <= Max
+                    minus a small gap, and vice-versa, so users can drag
+                    them freely without the bounds crossing. */}
+                <div className="trace-slider">
+                  <span className="trace-slider-label" aria-hidden="true">Min</span>
+                  <input
+                    id="flicker-min"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={flickerMin}
+                    onChange={(e) => {
+                      const next = parseFloat(e.target.value);
+                      setFlickerMin(next);
+                      if (next >= flickerMax - 0.05) {
+                        setFlickerMax(Math.min(1, next + 0.05));
+                      }
+                    }}
+                    aria-label="Flicker minimum opacity"
+                    style={{ '--tm-slider-fill': `${flickerMin * 100}%` }}
+                  />
+                  <span className="trace-slider-value">{Math.round(flickerMin * 100)}%</span>
+                </div>
+                <div className="trace-slider">
+                  <span className="trace-slider-label" aria-hidden="true">Max</span>
+                  <input
+                    id="flicker-max"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={flickerMax}
+                    onChange={(e) => {
+                      const next = parseFloat(e.target.value);
+                      setFlickerMax(next);
+                      if (next <= flickerMin + 0.05) {
+                        setFlickerMin(Math.max(0, next - 0.05));
+                      }
+                    }}
+                    aria-label="Flicker maximum opacity"
+                    style={{ '--tm-slider-fill': `${flickerMax * 100}%` }}
+                  />
+                  <span className="trace-slider-value">{Math.round(flickerMax * 100)}%</span>
+                </div>
+              </>
             )}
 
             <div className="trace-toggles">

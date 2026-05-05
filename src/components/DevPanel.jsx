@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { unwrapFunctionError } from '../lib/errors.js';
+import { FREE_SESSION_LIMIT } from '../lib/freeTrial.js';
 
 // Self-test panel for the paywall + renewal + failure flows. Visible only
 // to users with `profiles.is_admin = true` (UI gate). The real security
@@ -75,7 +76,7 @@ export default function DevPanel() {
         <div><dt>plan</dt>           <dd>{subscription?.plan ?? '—'}</dd></div>
         <div><dt>status</dt>         <dd>{subscription?.status ?? '—'}</dd></div>
         <div><dt>period_end</dt>     <dd>{subscription?.current_period_end ?? '—'}</dd></div>
-        <div><dt>free sessions</dt> <dd>{profile?.free_sessions_used ?? 0} / 5</dd></div>
+        <div><dt>free sessions</dt> <dd>{profile?.free_sessions_used ?? 0} / {FREE_SESSION_LIMIT}</dd></div>
         <div><dt>email</dt>          <dd className="dev-mono">{user?.email}</dd></div>
       </dl>
 

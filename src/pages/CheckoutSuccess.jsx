@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { consumePreCheckoutSnapshot } from '../lib/checkout.js';
+import { usePresence } from '../hooks/usePresence.js';
 
 // Dodo redirects here after a successful payment. We DO NOT trust the URL
 // alone — Dodo will sometimes hit return_url on failure too, and showing a
@@ -32,6 +33,7 @@ export default function CheckoutSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { isPaid, subscription, user, loading } = useAuth();
+  usePresence('checkout');
   const [timedOut, setTimedOut] = useState(false);
 
   // Snapshot of the user's subscription state from immediately before the

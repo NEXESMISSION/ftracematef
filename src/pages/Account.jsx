@@ -14,6 +14,7 @@ import { isAdminUser } from '../lib/admin.js';
 import { canUseFreeTrial, freeSessionsLeft } from '../lib/freeTrial.js';
 import Alert from '../components/Alert.jsx';
 import ChatBubble from '../components/ChatBubble.jsx';
+import { usePresence } from '../hooks/usePresence.js';
 
 // DevPanel is admin-only and ships about ~3 KB of presets + dev UI. Lazy-load
 // it so the panel and its preset payload aren't in every visitor's bundle —
@@ -444,6 +445,7 @@ function StatsGrid({ stats, memberSince }) {
 
 export default function Account() {
   const { user, profile, subscription, signOut, refresh, isPaid, loading } = useAuth();
+  usePresence('account');
   const [showChange, setShowChange] = useState(false);
   const [stats, setStats] = useState(() => getStats(user?.id));
   // Single source of truth for action/portal/change-plan errors. SubscriptionCard
