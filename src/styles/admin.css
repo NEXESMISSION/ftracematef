@@ -248,22 +248,82 @@
 .admin-shell .admin-tab {
   background: transparent;
   border: 0;
-  padding: 8px 18px;
+  padding: 8px 14px;
   font-size: 13px;
   font-weight: 600;
   color: var(--ink-soft);
   border-right: 1.5px solid var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .admin-shell .admin-tab:last-child { border-right: 0; }
 .admin-shell .admin-tab.is-active {
   background: var(--ink);
   color: var(--paper);
 }
+.admin-shell .admin-tab-count {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+}
+.admin-shell .admin-tab.is-active .admin-tab-count {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* Right side of the controls row: sort dropdown + search input. They share
+   a flex row so they collapse onto a new line together on narrow screens
+   instead of the search jumping below the dropdown awkwardly. */
+.admin-shell .admin-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.admin-shell .admin-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.admin-shell .admin-sort-label {
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.admin-shell .admin-sort-select {
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  border-radius: 8px;
+  box-shadow: 3px 3px 0 var(--ink);
+  cursor: pointer;
+  transition: box-shadow 120ms ease, transform 120ms ease;
+}
+.admin-shell .admin-sort-select:focus {
+  outline: none;
+  box-shadow: 5px 5px 0 var(--ink);
+  transform: translate(-1px, -1px);
+}
 
 .admin-shell .admin-search {
   flex: 1;
-  min-width: 220px;
-  max-width: 380px;
+  min-width: 200px;
+  max-width: 320px;
   padding: 8px 14px;
   font: inherit;
   font-size: 14px;

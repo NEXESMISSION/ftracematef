@@ -747,7 +747,11 @@ export default function AdminDashboard() {
   usePresence('admin');
   const [users, setUsers]       = useState(null);
   const [error, setError]       = useState(null);
-  const [filter, setFilter]     = useState('all');   // 'all' | 'paid' | 'unpaid'
+  // Filter narrows the visible set; sort orders what's left. Both default to
+  // the broadest, least-opinionated value so a fresh dashboard render matches
+  // what the operator saw before these controls existed.
+  const [filter, setFilter]     = useState('all');     // 'all' | 'online' | 'tracing' | 'paid' | 'unpaid'
+  const [sort, setSort]         = useState('newest');  // 'newest' | 'active' | 'time' | 'sessions'
   const [query, setQuery]       = useState('');
   const [tick, setTick]         = useState(0);       // re-render every 30s for "online" decay
   const [expanded, setExpanded] = useState(null);    // currently-expanded user_id
@@ -792,16 +796,50 @@ export default function AdminDashboard() {
   const filtered = useMemo(() => {
     if (!users) return [];
     const q = query.trim().toLowerCase();
-    return users.filter((u) => {
-      if (filter === 'paid'   && !u.is_paid) return false;
-      if (filter === 'unpaid' &&  u.is_paid) return false;
+
+    // ── Filter ─────────────────────────────────────────────────────────────
+    // Online / Tracing are evaluated against last_seen_at + current_page,
+    // both of which are kept fresh by the heartbeat. The 30s reload + tick
+    // re-runs this memo so a user dropping offline disappears within ~30s
+    // of their heartbeat going stale.
+    const matches = users.filter((u) => {
+      if (filter === 'paid'    && !u.is_paid) return false;
+      if (filter === 'unpaid'  &&  u.is_paid) return false;
+      if (filter === 'online'  && !isOnline(u.last_seen_at)) return false;
+      if (filter === 'tracing' && (
+        !isOnline(u.last_seen_at) || u.current_page !== 'trace'
+      )) return false;
       if (q && !(u.email ?? '').toLowerCase().includes(q)
             && !(u.display_name ?? '').toLowerCase().includes(q)) {
         return false;
       }
       return true;
     });
-  }, [users, filter, query]);
+
+    // ── Sort ───────────────────────────────────────────────────────────────
+    // Default is 'newest' which preserves the server's `order by created_at`
+    // (the array is already in that order), so we skip the sort entirely
+    // when 'newest' is selected — pointless O(n log n) on a stable list.
+    if (sort === 'newest') return matches;
+
+    const num = (v) => Number.isFinite(v) ? v : 0;
+    const ts  = (v) => v ? new Date(v).getTime() : 0;
+
+    const sorted = matches.slice();
+    if (sort === 'active') {
+      // Most-recently-online first. Falls back to last_sign_in_at for users
+      // who haven't pinged the heartbeat yet.
+      sorted.sort((a, b) =>
+        ts(b.last_seen_at || b.last_sign_in_at) -
+        ts(a.last_seen_at || a.last_sign_in_at)
+      );
+    } else if (sort === 'time') {
+      sorted.sort((a, b) => num(b.total_trace_seconds) - num(a.total_trace_seconds));
+    } else if (sort === 'sessions') {
+      sorted.sort((a, b) => num(b.trace_sessions) - num(a.trace_sessions));
+    }
+    return sorted;
+  }, [users, filter, query, sort, tick]);
 
   const toggleExpand = useCallback((id) => {
     setExpanded((cur) => (cur === id ? null : id));
@@ -853,11 +891,18 @@ export default function AdminDashboard() {
         <TrafficPanel />
 
         <section className="admin-controls">
+          {/* Filter tabs include live-state filters (Online / Tracing) so the
+              operator can zero in on currently-engaged users without having
+              to scan the whole list for green dots. Counts are appended to
+              each tab as a small subdued number so it's obvious which
+              filters will return any results before clicking. */}
           <div className="admin-tabs" role="tablist" aria-label="Filter users">
             {[
-              { id: 'all',    label: 'All' },
-              { id: 'paid',   label: 'Paid' },
-              { id: 'unpaid', label: 'Unpaid' },
+              { id: 'all',     label: 'All',     count: counts.all },
+              { id: 'online',  label: 'Online',  count: counts.online },
+              { id: 'tracing', label: 'Tracing', count: counts.tracing },
+              { id: 'paid',    label: 'Paid',    count: counts.paid },
+              { id: 'unpaid',  label: 'Unpaid',  count: counts.unpaid },
             ].map((t) => (
               <button
                 key={t.id}
@@ -868,16 +913,36 @@ export default function AdminDashboard() {
                 onClick={() => setFilter(t.id)}
               >
                 {t.label}
+                <span className="admin-tab-count">{t.count}</span>
               </button>
             ))}
           </div>
-          <input
-            type="search"
-            className="admin-search"
-            placeholder="Search email or name…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          <div className="admin-controls-right">
+            {/* Sort is a separate concern from filtering. "Most active" =
+                sort by total_trace_seconds desc, "Most sessions" = by
+                trace_sessions desc — both surface power users at a glance. */}
+            <label className="admin-sort">
+              <span className="admin-sort-label">Sort</span>
+              <select
+                className="admin-sort-select"
+                value={sort}
+                onChange={(e) => setSort(e.target.value)}
+                aria-label="Sort users"
+              >
+                <option value="newest">Recent signup</option>
+                <option value="active">Last active</option>
+                <option value="time">Most time traced</option>
+                <option value="sessions">Most sessions</option>
+              </select>
+            </label>
+            <input
+              type="search"
+              className="admin-search"
+              placeholder="Search email or name…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
         </section>
 
         {error && <p className="admin-error">{error}</p>}
