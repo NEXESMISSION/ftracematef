@@ -665,9 +665,17 @@ function SpectateModal({ user, onClose }) {
     setReferenceImage(null);
     setHasAudio(false);
 
+    // Use the per-session spectate_token as the channel-key. Without a
+    // valid token the channel is unguessable (UUID v4, 122 bits) — even
+    // a user who knows another user's UUID can't subscribe. Falls back
+    // to user.id only if the dashboard's data is from before the token
+    // migration; in that case the connection won't establish (the
+    // broadcaster is on the new token-keyed channel) and the operator
+    // sees Waiting → next dashboard refresh fixes it.
+    const channelKey = user.spectate_token || user.id;
     const v = startViewer({
-      userId: user.id,
-      kind: 'tracewatch',
+      userId: channelKey,
+      kind: 'tw',
       onStream: (stream) => {
         const el = videoRef.current;
         if (!el) return;
@@ -694,7 +702,8 @@ function SpectateModal({ user, onClose }) {
         try { el.srcObject = null; } catch { /* ignore */ }
       }
     };
-  }, [user?.id]);
+    // Re-subscribe on token rotation (new tracing session = new token).
+  }, [user?.id, user?.spectate_token]);
 
   // Keep the <video>'s muted attribute in sync with our toggle. Setting it
   // imperatively avoids a React re-render churn each toggle.
@@ -1129,7 +1138,7 @@ export default function AdminDashboard() {
                     </dl>
 
                     <div className="admin-row-actions">
-                      {tracing && (
+                      {tracing && u.spectate_token && (
                         <button
                           type="button"
                           className="admin-row-watch"

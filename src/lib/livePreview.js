@@ -61,7 +61,7 @@ export function startBroadcaster({
   const myId = newId();
   let pc = null;
   let videoSender = null;
-  let extrasChannel = null;
+  let metaChannel = null;
   let viewerId = null;
   let pendingIce = [];
   let stopped = false;
@@ -83,7 +83,7 @@ export function startBroadcaster({
   };
 
   const teardownPC = () => {
-    if (extrasChannel) { try { extrasChannel.close(); } catch { /* ignore */ } extrasChannel = null; }
+    if (metaChannel) { try { metaChannel.close(); } catch { /* ignore */ } metaChannel = null; }
     if (pc) { try { pc.close(); } catch { /* ignore */ } pc = null; }
     pendingIce = [];
   };
@@ -95,17 +95,18 @@ export function startBroadcaster({
 
     // Open the data channel BEFORE addTrack/createOffer so it's negotiated
     // in the SDP. The channel carries the reference-image thumbnail (and
-    // any future side-band metadata). We send the thumbnail once on open;
-    // if the viewer reconnects, a fresh PC + channel is created here and
-    // the thumbnail is re-sent automatically.
+    // any future side-band metadata) — message type 'r' keeps the wire
+    // format short. We send the thumbnail once on open; if the viewer
+    // reconnects, a fresh PC + channel is created here and the thumbnail
+    // is re-sent automatically.
     try {
-      extrasChannel = pc.createDataChannel('extras', { ordered: true });
-      extrasChannel.onopen = () => {
-        if (stopped || !extrasChannel) return;
+      metaChannel = pc.createDataChannel('meta', { ordered: true });
+      metaChannel.onopen = () => {
+        if (stopped || !metaChannel) return;
         if (referenceImageDataUrl) {
           try {
-            extrasChannel.send(JSON.stringify({
-              type: 'reference-image',
+            metaChannel.send(JSON.stringify({
+              type: 'r',
               dataUrl: referenceImageDataUrl,
             }));
           } catch (err) {
@@ -113,12 +114,12 @@ export function startBroadcaster({
           }
         }
       };
-      extrasChannel.onerror = (err) => {
+      metaChannel.onerror = (err) => {
         // Non-fatal — the video stream is the load-bearing payload.
-        console.warn('[livePreview] extras channel error:', err);
+        console.warn('[livePreview] data channel error:', err);
       };
     } catch (err) {
-      console.warn('[livePreview] could not create extras channel:', err);
+      console.warn('[livePreview] could not create data channel:', err);
     }
 
     stream.getTracks().forEach((track) => {
@@ -265,19 +266,19 @@ export function startViewer({ userId, kind = 'live', onStream, onStatus, onError
   pc.ontrack = (e) => {
     if (e.streams?.[0]) onStream?.(e.streams[0]);
   };
-  // Receive the broadcaster's "extras" data channel. We don't open one
+  // Receive the broadcaster's metadata data channel. We don't open one
   // ourselves — the broadcaster creates it before the offer, and this
   // handler fires once on the viewer side when it negotiates in.
   pc.ondatachannel = (e) => {
-    if (e.channel?.label !== 'extras') return;
+    if (e.channel?.label !== 'meta') return;
     e.channel.onmessage = (msg) => {
       try {
         const data = JSON.parse(msg.data);
-        if (data?.type === 'reference-image' && typeof data.dataUrl === 'string') {
+        if (data?.type === 'r' && typeof data.dataUrl === 'string') {
           onReferenceImage?.(data.dataUrl);
         }
       } catch (err) {
-        console.warn('[livePreview] bad extras message:', err);
+        console.warn('[livePreview] bad data channel message:', err);
       }
     };
   };

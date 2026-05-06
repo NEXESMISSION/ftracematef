@@ -111,6 +111,25 @@ Deno.serve(async (req) => {
     .order('created_at', { ascending: false });
   if (subsErr) return json({ error: subsErr.message }, 500);
 
+  // Pull spectate_tokens for currently-open trace sessions. Tokens are
+  // server-issued per session and never leave the user's profile (RLS
+  // restricts SELECT on trace_session_runs to the row's owner). Admin
+  // gets them via service-role here so the dashboard's Watch live button
+  // can authorise its WebRTC subscriber on a non-guessable channel.
+  const { data: openRuns, error: openRunsErr } = await admin
+    .from('trace_session_runs')
+    .select('id, spectate_token')
+    .is('ended_at', null);
+  if (openRunsErr) {
+    // Non-fatal — the dashboard is still useful without spectate. Log and
+    // continue; tracing rows just won't get a spectate_token attached.
+    console.warn('[admin-list-users] open-runs lookup failed:', openRunsErr);
+  }
+  const tokenByRunId = new Map<string, string | null>();
+  for (const r of (openRuns ?? [])) {
+    if (r?.id) tokenByRunId.set(r.id as string, (r.spectate_token as string | null) ?? null);
+  }
+
   // Pull auth.users.last_sign_in_at so users who haven't pinged the heartbeat
   // since the column was added still show a meaningful "last seen". This is
   // Supabase's built-in stamp on every successful sign-in, so it's always
@@ -216,6 +235,12 @@ Deno.serve(async (req) => {
       current_page:        p.current_page ?? null,
       current_image_label: p.current_image_label ?? null,
       current_run_id:      p.current_run_id ?? null,
+      // Per-session spectate_token. Only attached when the user actually
+      // has an open run (current_run_id present AND that row is still
+      // open in trace_session_runs). The token itself is the auth secret
+      // for the WebRTC signaling channel — without it, no one can join
+      // as a viewer.
+      spectate_token:      p.current_run_id ? (tokenByRunId.get(p.current_run_id) ?? null) : null,
     };
   });
 
