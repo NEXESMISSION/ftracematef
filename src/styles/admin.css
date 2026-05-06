@@ -1349,6 +1349,36 @@
   background: #fea44c;
 }
 
+/* ─── Top-level view tabs (Users / Stats / Traffic) ─────────────────────── */
+.admin-shell .admin-views {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 14px;
+  padding: 4px;
+  background: var(--paper);
+  border: 1px solid var(--cream-deep);
+  border-radius: 12px;
+  width: fit-content;
+}
+.admin-shell .admin-view-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.admin-shell .admin-view-tab:hover { color: var(--ink); }
+.admin-shell .admin-view-tab.is-active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
 /* ─── Webhook health panel ──────────────────────────────────────────────── */
 .admin-shell .admin-webhooks {
   display: flex;

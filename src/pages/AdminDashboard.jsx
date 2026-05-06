@@ -389,14 +389,15 @@ function FunnelPanel({ funnel }) {
   );
 }
 
-function StatsPanel() {
+// Single source of truth for the stats + webhook-health rollup. Called at
+// the page level so the WebhookHealthPanel can stay visible across tab
+// switches without remounting the fetch.
+function useAdminMeta() {
   const [stats, setStats]   = useState(null);
   const [health, setHealth] = useState(null);
   const [error, setError]   = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Refresh every 60s while the page is open. The rollup is heavier than the
-  // user-list read so we don't run it on the same 30s cadence.
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -417,6 +418,11 @@ function StatsPanel() {
     const id = setInterval(load, 60_000);
     return () => { cancelled = true; clearInterval(id); };
   }, []);
+
+  return { stats, health, error, loading };
+}
+
+function StatsPanel({ stats, error, loading }) {
 
   if (loading && !stats) {
     return (
@@ -447,8 +453,6 @@ function StatsPanel() {
   const planEntries = Object.entries(revenue?.plans ?? {});
 
   return (
-    <>
-      {health && <WebhookHealthPanel data={health} />}
     <section className="admin-stats" aria-labelledby="admin-stats-title">
       <header className="admin-stats-head">
         <h2 id="admin-stats-title">Business stats</h2>
@@ -579,13 +583,13 @@ function StatsPanel() {
         </div>
       </div>
     </section>
-    </>
   );
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
 /* Webhook health — stuck-event count + recent list. Mounted above the
-   business stats so anything stuck for >24h is impossible to miss.       */
+   tab nav so anything stuck for >24h is impossible to miss regardless of
+   which tab the operator is currently on.                                */
 
 function fmtAgo(secs) {
   if (!Number.isFinite(secs) || secs <= 0) return '0s';
@@ -1056,6 +1060,14 @@ export default function AdminDashboard() {
   const [tick, setTick]         = useState(0);       // re-render every 30s for "online" decay
   const [expanded, setExpanded] = useState(null);    // currently-expanded user_id
   const [spectate, setSpectate] = useState(null);    // user object whose camera we're peeking at, or null
+  // Top-level view toggle — the user list is the workhorse, stats and traffic
+  // panels are reference data. Tabbing them keeps the dashboard from being a
+  // wall of charts every time you open it.
+  const [view, setView]         = useState('users'); // 'users' | 'stats' | 'traffic'
+
+  // Stats + webhook health share one fetch so the health banner stays mounted
+  // across tab switches without re-firing the rollup.
+  const meta = useAdminMeta();
 
   // Load function exposed at component scope so both the auto-refresh
   // timer AND the pull-to-refresh handler can call it. Throws on
@@ -1217,10 +1229,36 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        <StatsPanel />
+        {meta.health && <WebhookHealthPanel data={meta.health} />}
 
-        <TrafficPanel />
+        {/* View tabs — gate the heavy panels behind a click so the user list
+            (the day-to-day workhorse) is what loads first. */}
+        <nav className="admin-views" role="tablist" aria-label="Dashboard view">
+          {[
+            { id: 'users',   label: 'Users' },
+            { id: 'stats',   label: 'Stats' },
+            { id: 'traffic', label: 'Traffic' },
+          ].map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              role="tab"
+              aria-selected={view === v.id}
+              className={`admin-view-tab ${view === v.id ? 'is-active' : ''}`}
+              onClick={() => setView(v.id)}
+            >
+              {v.label}
+            </button>
+          ))}
+        </nav>
 
+        {view === 'stats' && (
+          <StatsPanel stats={meta.stats} error={meta.error} loading={meta.loading} />
+        )}
+        {view === 'traffic' && <TrafficPanel />}
+
+        {view === 'users' && (
+          <>
         <section className="admin-controls">
           {/* Filter tabs include live-state filters (Online / Tracing) so the
               operator can zero in on currently-engaged users without having
@@ -1404,6 +1442,8 @@ export default function AdminDashboard() {
               );
             })}
           </ul>
+        )}
+          </>
         )}
       </main>
 
