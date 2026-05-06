@@ -133,6 +133,14 @@ export default function Trace() {
   // is that trigger without forcing the camera effect to keep the stream
   // in React state.
   const [streamRev, setStreamRev] = useState(0);
+  // Per-session spectate token (random UUID server-issued by
+  // start_trace_run). Declared up here — NOT down with the rest of the
+  // session-tracking refs — because the broadcaster effect immediately
+  // below references it in its dependency array, and a function-scope
+  // const can't be referenced before its declaration line is executed
+  // (temporal dead zone). Putting both states together also makes the
+  // broadcaster effect's deps list read top-to-bottom in the file.
+  const [spectateToken, setSpectateToken] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -408,10 +416,9 @@ export default function Trace() {
   const runIdRef      = useRef(null);
   const startedAtRef  = useRef(null);
   const accessTokenRef = useRef(null);
-  // Spectate token (random per session, never derivable from user id)
-  // is the channel-key for the operator-side WebRTC subscriber. Stored
-  // in state so the broadcaster effect can react when it lands.
-  const [spectateToken, setSpectateToken] = useState(null);
+  // (spectateToken state is declared up near streamRev — see the comment
+  // there for why it can't live next to the rest of the session-tracking
+  // refs. The session effect below populates it via setSpectateToken.)
   useEffect(() => {
     accessTokenRef.current = session?.access_token || null;
   }, [session?.access_token]);
