@@ -460,12 +460,18 @@ export default function Trace() {
           })
             .then((res) => res.ok ? res.json() : null)
             .then((data) => {
-              // RPC returns jsonb { run_id, spectate_token }. PostgREST
-              // hands the object straight through. Defensive: validate
-              // shape before adopting either field — a malformed
-              // response shouldn't poison the heartbeat or the
-              // broadcaster channel key.
-              if (data && typeof data === 'object') {
+              // Accept BOTH RPC response shapes so the deploy ordering
+              // (client first, SQL migration later) doesn't break session
+              // tracking:
+              //   - Pre-migration-7: bare uuid string. We get a run_id,
+              //     no spectate_token → spectator feature unavailable
+              //     until SQL is run, but heartbeats + duration tracking
+              //     keep working.
+              //   - Post-migration-7: { run_id, spectate_token } object.
+              //     Both fields adopted; spectator wires up.
+              if (typeof data === 'string' && data.length === 36) {
+                runIdRef.current = data;
+              } else if (data && typeof data === 'object') {
                 if (typeof data.run_id === 'string' && data.run_id.length === 36) {
                   runIdRef.current = data.run_id;
                 }

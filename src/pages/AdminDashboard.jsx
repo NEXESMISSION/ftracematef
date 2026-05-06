@@ -8,6 +8,7 @@ import { PLAN_LABEL } from '../lib/plans.js';
 import { ANALYTICS_PROVIDER, ANALYTICS_EMBED_URL } from '../lib/analytics.js';
 import { formatDuration, formatRelative as formatTraceRelative } from '../lib/traceStats.js';
 import { startViewer } from '../lib/livePreview.js';
+import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 
 // Anyone seen pinging the heartbeat within this window is treated as "in the
 // app right now". Tab visibility throttles the heartbeat to 60s, so 2 minutes
@@ -657,6 +658,12 @@ function SpectateModal({ user, onClose }) {
   // policy). Toggle exposed for hands-free monitoring sessions.
   const [muted, setMuted] = useState(false);
   const [hasAudio, setHasAudio] = useState(false);
+  // Bumped on Retry — drives the connection useEffect to re-mount the
+  // viewer without closing/reopening the modal.
+  const [retryNonce, setRetryNonce] = useState(0);
+  // Flips on once we've been in 'waiting' / 'connecting' for >8s, so we
+  // can show the operator a hint instead of an indefinite spinner.
+  const [stuckHint, setStuckHint] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -664,6 +671,7 @@ function SpectateModal({ user, onClose }) {
     setError(null);
     setReferenceImage(null);
     setHasAudio(false);
+    setStuckHint(false);
 
     // Use the per-session spectate_token as the channel-key. Without a
     // valid token the channel is unguessable (UUID v4, 122 bits) — even
@@ -671,7 +679,7 @@ function SpectateModal({ user, onClose }) {
     // to user.id only if the dashboard's data is from before the token
     // migration; in that case the connection won't establish (the
     // broadcaster is on the new token-keyed channel) and the operator
-    // sees Waiting → next dashboard refresh fixes it.
+    // sees Waiting → Retry pulls the latest token from the server.
     const channelKey = user.spectate_token || user.id;
     const v = startViewer({
       userId: channelKey,
@@ -702,8 +710,26 @@ function SpectateModal({ user, onClose }) {
         try { el.srcObject = null; } catch { /* ignore */ }
       }
     };
-    // Re-subscribe on token rotation (new tracing session = new token).
-  }, [user?.id, user?.spectate_token]);
+    // Re-subscribe on:
+    //  - new user (Watch live on a different row)
+    //  - new token (user opened a fresh tracing session)
+    //  - manual Retry (retryNonce bump)
+  }, [user?.id, user?.spectate_token, retryNonce]);
+
+  // Stuck-hint timer: if we're not connected after 8 seconds, show the
+  // operator a why-might-this-be-stuck note + Retry button. The most
+  // common cause is the user's tab still running an old cached bundle
+  // that broadcasts on a different channel — a refresh on their side
+  // pairs them up. Resets when status flips to 'connected'.
+  useEffect(() => {
+    if (status === 'connected') {
+      setStuckHint(false);
+      return;
+    }
+    setStuckHint(false);
+    const t = setTimeout(() => setStuckHint(true), 8000);
+    return () => clearTimeout(t);
+  }, [status, retryNonce]);
 
   // Keep the <video>'s muted attribute in sync with our toggle. Setting it
   // imperatively avoids a React re-render churn each toggle.
@@ -788,6 +814,26 @@ function SpectateModal({ user, onClose }) {
             >
               {error ? error : SPECTATE_STATUS_LABEL[status] ?? status}
             </div>
+            {/* If we've been waiting for >8s without a frame, surface a
+                hint so the operator isn't staring at a blank box wondering
+                if the tool is broken. Most common cause is the user's
+                tab on a stale cached bundle — Retry re-mounts the viewer
+                in case the dashboard meanwhile picked up a fresh token. */}
+            {stuckHint && status !== 'connected' && (
+              <div className="admin-spectate-hint" role="status">
+                <p>
+                  Not connecting. The user may need to refresh their tab,
+                  or they're behind a strict NAT.
+                </p>
+                <button
+                  type="button"
+                  className="admin-spectate-retry"
+                  onClick={() => setRetryNonce((n) => n + 1)}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
           <aside className="admin-spectate-ref" aria-label="Reference image">
             {referenceImage ? (
@@ -800,7 +846,7 @@ function SpectateModal({ user, onClose }) {
             ) : (
               <div className="admin-spectate-ref-empty">
                 <span>Reference image</span>
-                <small>Loading…</small>
+                <small>{stuckHint ? 'Waiting on user…' : 'Loading…'}</small>
               </div>
             )}
           </aside>
@@ -860,28 +906,40 @@ export default function AdminDashboard() {
   const [expanded, setExpanded] = useState(null);    // currently-expanded user_id
   const [spectate, setSpectate] = useState(null);    // user object whose camera we're peeking at, or null
 
-  // Load + refresh every 30s while the page is open. Same cadence as the
+  // Load function exposed at component scope so both the auto-refresh
+  // timer AND the pull-to-refresh handler can call it. Throws on
+  // failure so pull-to-refresh's spinner snaps off cleanly.
+  const loadUsers = useCallback(async () => {
+    try {
+      const items = await listAllUsers();
+      setUsers(items);
+      setError(null);
+    } catch (e) {
+      setError(friendlyError(e, 'Could not load users.'));
+      throw e;
+    }
+  }, []);
+
+  // Auto-refresh every 30s while the page is open. Same cadence as the
   // tick used to fade the online dot — one timer drives both.
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
-      try {
-        const items = await listAllUsers();
-        if (!cancelled) {
-          setUsers(items);
-          setError(null);
-        }
-      } catch (e) {
-        if (!cancelled) setError(friendlyError(e, 'Could not load users.'));
-      }
-    };
-    load();
+    (async () => { try { await loadUsers(); } catch { /* logged via setError */ } })();
     const id = setInterval(() => {
-      load();
+      if (cancelled) return;
+      loadUsers().catch(() => { /* surfaced via setError */ });
       setTick((t) => t + 1);
     }, 30_000);
     return () => { cancelled = true; clearInterval(id); };
-  }, []);
+  }, [loadUsers]);
+
+  // Pull-to-refresh on mobile (PWA): drag down from the top of the page
+  // to force a fresh fetch without hunting for the URL bar. Desktop
+  // mouse-drag works too — handy for testing.
+  const { pullDistance, triggered, isRefreshing, threshold } = usePullToRefresh({
+    onRefresh: loadUsers,
+    threshold: 70,
+  });
 
   const counts = useMemo(() => {
     if (!users) return { all: 0, paid: 0, unpaid: 0, online: 0, tracing: 0 };
@@ -950,7 +1008,25 @@ export default function AdminDashboard() {
   }, []);
 
   return (
-    <div className="admin-shell">
+    <div
+      className="admin-shell"
+      style={pullDistance > 0 ? { transform: `translateY(${pullDistance}px)`, transition: pullDistance === 0 ? 'transform 200ms ease' : 'none' } : undefined}
+    >
+      {/* Pull-to-refresh indicator. Sits absolutely above the page; the
+          shell itself is translateY-shifted so the user gets the rubber-
+          band feel of "pulling the page down to reveal a spinner". */}
+      {(pullDistance > 0 || isRefreshing) && (
+        <div
+          className={`admin-ptr ${triggered ? 'is-triggered' : ''} ${isRefreshing ? 'is-refreshing' : ''}`}
+          style={{ height: pullDistance, top: -pullDistance }}
+          aria-hidden="true"
+        >
+          <span className="admin-ptr-dot" />
+          <span className="admin-ptr-label">
+            {isRefreshing ? 'Refreshing…' : triggered ? 'Release to refresh' : 'Pull to refresh'}
+          </span>
+        </div>
+      )}
       <header className="admin-bar">
         <div className="admin-bar-id">
           <span className="admin-bar-tag">ADMIN</span>

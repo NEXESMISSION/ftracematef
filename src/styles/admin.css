@@ -1245,3 +1245,80 @@
     border-top: 1px solid #333;
   }
 }
+
+/* ── Pull-to-refresh ─────────────────────────────────────────────────────── */
+.admin-shell .admin-ptr {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  background: linear-gradient(180deg, var(--cream-deep) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 5;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.admin-shell .admin-ptr-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  border-top-color: transparent;
+  transition: transform 200ms ease;
+}
+.admin-shell .admin-ptr.is-triggered .admin-ptr-dot {
+  background: var(--ink);
+}
+.admin-shell .admin-ptr.is-refreshing .admin-ptr-dot {
+  animation: admin-ptr-spin 700ms linear infinite;
+}
+@keyframes admin-ptr-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Spectate stuck hint + retry ─────────────────────────────────────────── */
+.admin-shell .admin-spectate-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  padding: 14px 18px;
+  border-radius: 8px;
+  text-align: center;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 2;
+}
+.admin-shell .admin-spectate-hint p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.admin-shell .admin-spectate-retry {
+  background: #f59332;
+  color: #fff;
+  border: 1.5px solid #c97324;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  align-self: center;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.admin-shell .admin-spectate-retry:hover {
+  background: #fea44c;
+}
