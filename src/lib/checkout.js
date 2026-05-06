@@ -18,7 +18,7 @@ export async function startCheckout(plan) {
   // funnel records "user clicked through to Dodo" even if the user never
   // makes it to the payment page (Dodo outage, browser back, etc.). Fire-
   // and-forget; idempotent on the server side.
-  supabase.rpc('mark_journey_event', { p_event: 'checkout' }).catch(() => {});
+  supabase.rpc('mark_journey_event', { p_event: 'checkout' }).then(() => {}, () => {});
   return data.checkout_url;
 }
 

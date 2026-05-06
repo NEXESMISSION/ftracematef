@@ -31,7 +31,7 @@ export default function Paywall({ trialUsed = false }) {
     // Stamp the user's first paywall view. Idempotent on the server side
     // (writes only when first_paywall_at is still null) so re-renders are
     // free. Fire-and-forget — failures don't change UX.
-    supabase.rpc('mark_journey_event', { p_event: 'paywall' }).catch(() => {});
+    supabase.rpc('mark_journey_event', { p_event: 'paywall' }).then(() => {}, () => {});
     return () => { cancelled = true; };
   }, []);
 

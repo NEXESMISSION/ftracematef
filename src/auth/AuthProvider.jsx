@@ -213,10 +213,13 @@ export function AuthProvider({ children }) {
     const referrer = (() => {
       try { return document.referrer || ''; } catch { return ''; }
     })();
+    // PostgrestBuilder is PromiseLike (only .then) — using .catch directly
+    // throws "x.catch is not a function". Pass a no-op error handler as
+    // the second .then argument instead. Same intent: silent on failure.
     supabase.rpc('record_signup_context', {
       p_landing: landing.slice(0, 60),
       p_referrer: referrer.slice(0, 500),
-    }).catch(() => { /* sparse stamp — silent on failure */ });
+    }).then(() => {}, () => {});
   }, [profile]);
 
   // 3) Real-time: when the webhook flips this user's subscription, refresh.

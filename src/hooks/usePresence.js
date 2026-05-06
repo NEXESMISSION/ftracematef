@@ -28,9 +28,11 @@ export function usePresence(page, imageLabel = null) {
       // call no-ops. Failures are silent — the live `current_page`
       // mirror on profiles is still accurate even if this row never
       // lands.
+      // PostgrestBuilder is PromiseLike — .catch() throws. Use the
+      // two-arg form of .then() to swallow rejections silently.
       supabase
         .rpc('record_page_visit', { p_page: page, p_image_label: imageLabel ?? null })
-        .catch(() => { /* best-effort log */ });
+        .then(() => {}, () => {});
     }
     return () => {
       // Only clear if WE own the current state. A page that unmounts

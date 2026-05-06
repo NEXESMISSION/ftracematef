@@ -30,7 +30,7 @@ export default function PricingPage() {
   // on user means we never stamp anonymous visits.
   useEffect(() => {
     if (!user?.id) return;
-    supabase.rpc('mark_journey_event', { p_event: 'pricing' }).catch(() => {});
+    supabase.rpc('mark_journey_event', { p_event: 'pricing' }).then(() => {}, () => {});
   }, [user?.id]);
 
   // Dodo bounces the user back here with ?checkout=cancelled on cancel/failure.
