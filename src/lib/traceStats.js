@@ -1,80 +1,13 @@
-// Trace stats tracker — stored in localStorage, scoped per user.
-// Schema: { totalSeconds, sessions, firstSessionAt, lastSessionAt }
+// Pure formatters used by the /account stats grid and the admin dashboard.
 //
-// Two-phase accounting:
-//   - startSession() runs the moment the user enters the trace studio with an
-//     image. It bumps `sessions` and stamps first/lastSessionAt. The count is
-//     a "did the user open a tracing session?" metric, not a "did they trace
-//     for ≥ N seconds?" metric — opening counts even if they walk away.
-//   - addSessionDuration() runs on exit and only accumulates `totalSeconds`.
-//     Never touches the count or timestamps.
-const KEY_PREFIX = 'tm:traceStats:';
-
-const empty = () => ({
-  totalSeconds: 0,
-  sessions: 0,
-  firstSessionAt: null,
-  lastSessionAt: null,
-});
-
-function keyFor(userId) {
-  // No fallback to a shared "anon" bucket — see startSession() for why. We
-  // return null when there's no user, and getStats short-circuits to an
-  // empty record. Reading this way is harmless; it's writing without a
-  // userId that would leak data across accounts on a shared device.
-  return userId ? `${KEY_PREFIX}${userId}` : null;
-}
-
-export function getStats(userId) {
-  try {
-    const key = keyFor(userId);
-    if (!key) return empty();
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return empty();
-    const parsed = JSON.parse(raw);
-    return { ...empty(), ...parsed };
-  } catch {
-    return empty();
-  }
-}
-
-export function startSession(userId) {
-  // Refuse to write without a user id. Previously a falsy userId was
-  // bucketed into `tm:traceStats:anon` — that bucket survived sign-out and
-  // mixed with whichever user signed in next on the same device. Better to
-  // drop the session than to leak it across accounts. Trace.jsx is gated by
-  // RequirePaid, so this branch is only reachable in narrow races (session
-  // expiring mid-trace) where losing the count is the right trade-off.
-  if (!userId) return null;
-  const key = keyFor(userId);
-  const now = new Date().toISOString();
-  const stats = getStats(userId);
-  const next = {
-    ...stats,
-    sessions:        stats.sessions + 1,
-    firstSessionAt:  stats.firstSessionAt ?? now,
-    lastSessionAt:   now,
-  };
-  try {
-    window.localStorage.setItem(key, JSON.stringify(next));
-  } catch { /* quota / private mode — ignore */ }
-  return next;
-}
-
-export function addSessionDuration(userId, durationSec) {
-  if (!userId) return null;
-  if (!Number.isFinite(durationSec) || durationSec <= 0) return null;
-  const key = keyFor(userId);
-  const stats = getStats(userId);
-  const next = {
-    ...stats,
-    totalSeconds: Math.round(stats.totalSeconds + durationSec),
-  };
-  try {
-    window.localStorage.setItem(key, JSON.stringify(next));
-  } catch { /* quota / private mode — ignore */ }
-  return next;
-}
+// The localStorage-based stats tracker that used to live here was retired
+// once trace_session_runs + profiles.{total_trace_seconds, trace_sessions,
+// last_trace_at} became authoritative — those server columns are kept
+// fresh by start_trace_run / end_trace_run / heartbeat_trace_run /
+// reconcile_trace_runs and reach the client via the AuthProvider realtime
+// subscription. Reading from the profile means /account and /admin-me
+// always agree; the local mirror was per-device, so it would silently
+// diverge whenever the user switched browsers or cleared cache.
 
 export function formatDuration(totalSeconds) {
   if (!totalSeconds || totalSeconds < 60) {

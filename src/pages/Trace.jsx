@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLocalState } from '../lib/useLocalState.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { startSession, addSessionDuration } from '../lib/traceStats.js';
 import { loadPendingImage } from '../lib/pendingImage.js';
 import { consumeFreeSession, trialAlreadyConsumedThisVisit } from '../lib/freeTrial.js';
 import { setPresence, clearPresence } from '../lib/presence.js';
@@ -415,7 +414,6 @@ export default function Trace() {
   const startedRef    = useRef(false);
   const endedRef      = useRef(false);
   const runIdRef      = useRef(null);
-  const startedAtRef  = useRef(null);
   const accessTokenRef = useRef(null);
   // (spectateToken state is declared up near streamRev — see the comment
   // there for why it can't live next to the rest of the session-tracking
@@ -428,7 +426,6 @@ export default function Trace() {
     if (!user?.id) return;
     endedRef.current = false;
     runIdRef.current = null;
-    startedAtRef.current = null;
 
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const anonKey     = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -443,16 +440,15 @@ export default function Trace() {
     // in finish() below on every exit path.
     setTracing(true);
 
-    // Bump the local sessions count immediately so the user sees their
-    // /account scrapbook tick up without waiting on the server. The DB
-    // mirror is bumped by start_trace_run RPC.
+    // Server-authoritative count. start_trace_run RPC inserts a
+    // trace_session_runs row + bumps profiles.trace_sessions; AuthProvider's
+    // realtime subscription pushes the new profile row to the client, which
+    // updates the /account stats grid the next render.
     if (!startedRef.current) {
       startedRef.current = true;
-      startSession(user.id);
 
       const accessToken = accessTokenRef.current;
       if (haveSupabaseEnv && accessToken) {
-        startedAtRef.current = Date.now();
         try {
           fetch(`${supabaseUrl}/rest/v1/rpc/start_trace_run`, {
             method: 'POST',
@@ -538,19 +534,7 @@ export default function Trace() {
       clearPresence();
       setTracing(false);
 
-      const runId    = runIdRef.current;
-      const startedAt = startedAtRef.current;
-
-      // Best-effort local mirror: estimate the duration from the timer we
-      // captured at start so the /account scrapbook updates immediately
-      // without a server round-trip. The server-side total is authoritative
-      // and updated by end_trace_run / reconcile_trace_runs.
-      if (startedAt != null) {
-        const seconds = (Date.now() - startedAt) / 1000;
-        if (seconds > 0 && seconds < 86400) {
-          addSessionDuration(user.id, seconds);
-        }
-      }
+      const runId = runIdRef.current;
 
       const accessToken = accessTokenRef.current;
       if (!runId || !haveSupabaseEnv || !accessToken) return;

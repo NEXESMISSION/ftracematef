@@ -9,7 +9,7 @@ import {
 } from '../lib/billing.js';
 import { PLANS, PLAN_LABEL } from '../lib/plans.js';
 import { friendlyError } from '../lib/errors.js';
-import { getStats, formatDuration, formatRelative } from '../lib/traceStats.js';
+import { formatDuration, formatRelative } from '../lib/traceStats.js';
 import { isAdminUser } from '../lib/admin.js';
 import { canUseFreeTrial, freeSessionsLeft } from '../lib/freeTrial.js';
 import Alert from '../components/Alert.jsx';
@@ -446,21 +446,22 @@ export default function Account() {
   const { user, profile, subscription, signOut, refresh, isPaid, loading } = useAuth();
   usePresence('account');
   const [showChange, setShowChange] = useState(false);
-  const [stats, setStats] = useState(() => getStats(user?.id));
   // Single source of truth for action/portal/change-plan errors. SubscriptionCard
   // and ChangePlanModal both write here; one Alert at page level renders it.
   const [alert, setAlert] = useState(null); // { title, message } | null
 
-  useEffect(() => {
-    setStats(getStats(user?.id));
-    const refreshStats = () => setStats(getStats(user?.id));
-    window.addEventListener('focus', refreshStats);
-    window.addEventListener('storage', refreshStats);
-    return () => {
-      window.removeEventListener('focus', refreshStats);
-      window.removeEventListener('storage', refreshStats);
-    };
-  }, [user?.id]);
+  // Trace stats derived from the server-authoritative profile row, NOT from
+  // localStorage. The localStorage flow predated the trace_session_runs table
+  // and was per-device — it would lose count whenever the user switched
+  // browsers, signed out, or cleared cache. profiles.{total_trace_seconds,
+  // trace_sessions, last_trace_at} is the truth, kept fresh by start/end/
+  // heartbeat_trace_run + reconcile_trace_runs. Reading from `profile` here
+  // matches what the admin dashboard sees, so the two views never diverge.
+  const stats = {
+    totalSeconds:  profile?.total_trace_seconds ?? 0,
+    sessions:      profile?.trace_sessions ?? 0,
+    lastSessionAt: profile?.last_trace_at ?? null,
+  };
 
   const greeting = profile?.display_name?.split(' ')[0] || user?.email?.split('@')[0] || 'there';
 
