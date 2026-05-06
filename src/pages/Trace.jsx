@@ -6,6 +6,7 @@ import { startSession, addSessionDuration } from '../lib/traceStats.js';
 import { loadPendingImage } from '../lib/pendingImage.js';
 import { consumeFreeSession, trialAlreadyConsumedThisVisit } from '../lib/freeTrial.js';
 import { setPresence, clearPresence } from '../lib/presence.js';
+import { setTracing } from '../lib/tracing-state.js';
 import { startBroadcaster } from '../lib/livePreview.js';
 import { downscaleToDataUrl } from '../lib/imageDownscale.js';
 import {
@@ -438,6 +439,10 @@ export default function Trace() {
     // reflects the user's actual page even if start_trace_run fails.
     setPresence('trace', imageLabel);
 
+    // Lock the auto-update poller out of reloading mid-session. Cleared
+    // in finish() below on every exit path.
+    setTracing(true);
+
     // Bump the local sessions count immediately so the user sees their
     // /account scrapbook tick up without waiting on the server. The DB
     // mirror is bumped by start_trace_run RPC.
@@ -531,6 +536,7 @@ export default function Trace() {
       endedRef.current = true;
       stopHeartbeat();
       clearPresence();
+      setTracing(false);
 
       const runId    = runIdRef.current;
       const startedAt = startedAtRef.current;

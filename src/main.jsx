@@ -5,6 +5,7 @@ import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { ensureNativeAuthInit, setupDeepLinks } from './lib/native.js';
 import { initAnalytics } from './lib/analytics.js';
+import { startUpdater } from './lib/updater.js';
 import './styles/globals.css';
 import './styles/login.css';
 import './styles/upload.css';
@@ -21,6 +22,10 @@ setupDeepLinks().catch(() => { /* deep links are best-effort */ });
 // Analytics is no-op until VITE_PLAUSIBLE_DOMAIN or VITE_UMAMI_WEBSITE_ID is
 // set at build time, so this is safe to call unconditionally.
 initAnalytics();
+
+// Background poll for new deploys. Reloads the tab when a fresh build
+// lands — but holds off while the user is mid-trace (see tracing-state).
+startUpdater();
 
 // Force the page to load at the top — disable browser scroll restoration
 // and clear any leftover hash so it doesn't auto-jump to a section.
