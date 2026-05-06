@@ -219,6 +219,18 @@ function Timeline({ activity, journey }) {
         detail: s.ip_address ? `ip ${s.ip_address}` : '',
       });
     }
+    // Page-visit log — every route the user landed on, deduped server-side
+    // for 30s windows. Reads as the user's literal navigation path top-
+    // to-bottom in the merged feed.
+    for (const v of activity.page_visits ?? []) {
+      const pageLabel = PAGE_LABEL[v.page] ?? v.page;
+      merged.push({
+        kind:   'visit',
+        at:     v.visited_at,
+        title:  `Visited · ${pageLabel}`,
+        detail: v.image_label ? `"${v.image_label}"` : null,
+      });
+    }
     // One row per tracing session — the operator's "what did they actually
     // do" feed. Active runs (ended_at is null) get a live ticker; closed
     // runs show the recorded duration.

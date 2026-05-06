@@ -716,6 +716,8 @@
 .admin-shell .admin-timeline-event-bad    .admin-timeline-dot { background: var(--coral); box-shadow: 0 0 0 1.5px var(--coral); }
 .admin-shell .admin-timeline-auth         .admin-timeline-dot { background: var(--yellow-deep); box-shadow: 0 0 0 1.5px var(--yellow-deep); }
 .admin-shell .admin-timeline-trace        .admin-timeline-dot { background: var(--ink); box-shadow: 0 0 0 1.5px var(--ink); }
+.admin-shell .admin-timeline-visit        .admin-timeline-dot { background: var(--cream-deep); box-shadow: 0 0 0 1.5px var(--ink-muted); }
+.admin-shell .admin-timeline-visit        .admin-timeline-title { color: var(--ink-muted); font-weight: 500; }
 .admin-shell .admin-timeline-journey-signup .admin-timeline-dot { background: #6c8cff;          box-shadow: 0 0 0 1.5px #6c8cff;          opacity: 0.5; }
 .admin-shell .admin-timeline-journey        .admin-timeline-dot { background: #2841a6;          box-shadow: 0 0 0 1.5px #2841a6; }
 .admin-shell .admin-timeline-journey-warn   .admin-timeline-dot { background: var(--yellow-deep); box-shadow: 0 0 0 1.5px var(--yellow-deep); }

@@ -15,6 +15,10 @@
 //                   IS NULL) are returned with last_heartbeat_at so the
 //                   dashboard can render a live duration ticker without
 //                   double-counting backgrounded-tab time.
+//   - page_visits : public.page_visits for the user — durable navigation
+//                   log written by usePresence on every route change.
+//                   30s server-side dedupe means we get genuine route
+//                   transitions, not StrictMode double-mounts.
 //
 // SECURITY: same double-gate as admin-list-users (ADMIN_EMAILS env +
 // profiles.is_admin). Service role only ever queries on the explicit
@@ -98,7 +102,7 @@ Deno.serve(async (req) => {
 
   const customerId = targetProfile.dodo_customer_id;
 
-  const [subHistRes, eventsRes, runsRes] = await Promise.all([
+  const [subHistRes, eventsRes, runsRes, visitsRes] = await Promise.all([
     admin
       .from('subscriptions')
       .select('id, plan, status, current_period_end, cancel_at_next_billing_date, amount_cents, currency, dodo_subscription_id, dodo_payment_id, created_at, updated_at, cancelled_at')
@@ -123,11 +127,21 @@ Deno.serve(async (req) => {
       .eq('user_id', userId)
       .order('started_at', { ascending: false })
       .limit(100),
+    // Page-visit history — newest 200 transitions. The 30s server-side
+    // dedupe in record_page_visit means each row is a genuine route
+    // change, so 200 covers ~a couple weeks of normal use.
+    admin
+      .from('page_visits')
+      .select('id, page, image_label, visited_at')
+      .eq('user_id', userId)
+      .order('visited_at', { ascending: false })
+      .limit(200),
   ]);
 
   if (subHistRes.error) return json({ error: subHistRes.error.message }, 500);
   if (eventsRes.error)  return json({ error: eventsRes.error.message }, 500);
   if (runsRes.error)    return json({ error: runsRes.error.message }, 500);
+  if (visitsRes.error)  return json({ error: visitsRes.error.message }, 500);
 
   // Auth audit log: every sign-in / token refresh / sign-out attempt for the
   // target user. Stored in the auth schema; service-role can read it via the
@@ -187,5 +201,6 @@ Deno.serve(async (req) => {
     events,
     sign_ins:    signIns,
     trace_runs:  runsRes.data ?? [],
+    page_visits: visitsRes.data ?? [],
   });
 });
