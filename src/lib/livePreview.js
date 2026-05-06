@@ -35,6 +35,27 @@ const ICE_SERVERS = [
 // Default `kind` keeps the existing /live page working without changes.
 // Pass kind: 'tracewatch' to use the admin-spectator channel.
 const channelName = (userId, kind = 'live') => `${kind}:${userId}`;
+
+/**
+ * Resolve the caller's pairing token for /live (lazy-create on first call).
+ * Returns a uuid the caller passes in as the channel-key for both
+ * startBroadcaster and startViewer, so the realtime channel becomes
+ * `live:{token}` instead of `live:{userId}`. The user's UUID can leak
+ * through error logs / analytics / shared screenshots; the token can't —
+ * it's only ever in the realtime channel name itself.
+ *
+ * Both devices belonging to the same user fetch the same token (the RPC
+ * looks it up by auth.uid()), so they meet on the same channel without
+ * any out-of-band coordination.
+ */
+export async function getLivePairingKey() {
+  const { data, error } = await supabase.rpc('get_live_pairing_token');
+  if (error) throw new Error(error.message || 'pairing token fetch failed');
+  if (typeof data !== 'string' || data.length !== 36) {
+    throw new Error('pairing token: unexpected response shape');
+  }
+  return data;
+}
 const newId = () =>
   (typeof crypto !== 'undefined' && crypto.randomUUID)
     ? crypto.randomUUID()

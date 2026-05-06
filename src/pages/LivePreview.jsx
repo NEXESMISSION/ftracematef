@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { useAuthGate } from '../auth/AuthGate.jsx';
 import { useLocalState } from '../lib/useLocalState.js';
-import { startBroadcaster, startViewer } from '../lib/livePreview.js';
+import { startBroadcaster, startViewer, getLivePairingKey } from '../lib/livePreview.js';
 import {
   cssMatrix3d,
   drawWarpedToCanvas,
@@ -1378,6 +1378,21 @@ export default function LivePreview() {
   usePresence('live');
   const gate = useAuthGate();
   const [role, setRole] = useState(null); // null | 'broadcaster' | 'viewer'
+  // Pairing token replaces the user's UUID as the realtime channel-key
+  // (see migration 20260505000008_live_pairing_token.sql). Fetched once
+  // per /live visit; both BroadcasterStage and ViewerStage need it so a
+  // role-change doesn't re-fetch. Falls back to user.id if the RPC fails
+  // — that path uses the legacy channel scheme but keeps the feature
+  // functional rather than breaking it.
+  const [pairingKey, setPairingKey] = useState(null);
+  useEffect(() => {
+    if (!user?.id || !isPaid) return;
+    let cancelled = false;
+    getLivePairingKey()
+      .then((token) => { if (!cancelled) setPairingKey(token); })
+      .catch(() => { if (!cancelled) setPairingKey(user.id); /* legacy fallback */ });
+    return () => { cancelled = true; };
+  }, [user?.id, isPaid]);
 
   // Wait for auth to settle (spinner + 12s stuck-redirect to /login) BEFORE
   // evaluating the paid/unpaid gate. Without this, a paid user navigating
@@ -1394,9 +1409,21 @@ export default function LivePreview() {
   // on /account.
   if (!isPaid) return <Paywall trialUsed={freeTrialState(profile) === 'used'} />;
 
+  // Hold the role picker until the pairing token has landed — without it
+  // we can't open the realtime channel, and showing the picker would
+  // tease an action that immediately bounces to a spinner anyway. Fast
+  // path: token usually returns in ~100-200ms.
+  if (!pairingKey) {
+    return (
+      <div className="auth-loading-screen">
+        <span className="auth-loading-dot" />
+      </div>
+    );
+  }
+
   if (!role) return <RolePicker onPick={setRole} />;
   if (role === 'viewer') {
-    return <ViewerStage userId={user.id} onChangeRole={() => setRole(null)} />;
+    return <ViewerStage userId={pairingKey} onChangeRole={() => setRole(null)} />;
   }
-  return <BroadcasterStage userId={user.id} onChangeRole={() => setRole(null)} />;
+  return <BroadcasterStage userId={pairingKey} onChangeRole={() => setRole(null)} />;
 }
