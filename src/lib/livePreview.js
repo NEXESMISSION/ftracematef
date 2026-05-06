@@ -7,14 +7,21 @@
  *    media ever touches our servers, so there's no bandwidth cost.
  *  - Supabase Realtime broadcast channel is the *signaling* layer: SDP
  *    offer/answer + ICE candidates are tiny JSON messages, pennies at most.
- *  - Channel name is `live:${userId}`. The user UUID is unguessable, so
- *    only devices that already authenticated as that user can find it.
+ *  - Channel name is `${kind}:${userId}`. The user UUID is unguessable, so
+ *    only the user's own devices (or an admin who already pulled the user
+ *    list from the secure admin endpoint) can find it.
+ *  - Two `kind`s are in use:
+ *      'live'       — user's own /live page (phone ↔ desktop pairing).
+ *      'tracewatch' — admin spectating a /trace session. Same protocol,
+ *                     separate channel so it never fights the user's own
+ *                     device pairing.
  *  - Presence is used to discover the other side: each peer tracks itself
  *    with a `role` field, and the broadcaster automatically initiates the
  *    offer when it sees a viewer appear (and vice versa for cleanup).
  *
  * Limitations:
- *  - 1:1 only. If a second viewer joins, only the first is paired.
+ *  - 1:1 only per channel. With separate `kind`s, /live and /trace can
+ *    coexist; within one kind, a second viewer is ignored.
  *  - STUN-only. ~80% of consumer NATs work; symmetric NATs (some corporate
  *    networks) need TURN. Add a TURN server later if reports come in.
  */
@@ -25,7 +32,9 @@ const ICE_SERVERS = [
   { urls: 'stun:stun1.l.google.com:19302' },
 ];
 
-const channelName = (userId) => `live:${userId}`;
+// Default `kind` keeps the existing /live page working without changes.
+// Pass kind: 'tracewatch' to use the admin-spectator channel.
+const channelName = (userId, kind = 'live') => `${kind}:${userId}`;
 const newId = () =>
   (typeof crypto !== 'undefined' && crypto.randomUUID)
     ? crypto.randomUUID()
@@ -36,7 +45,7 @@ const newId = () =>
 // onQualityRequest: optional callback fired when the viewer requests a
 // quality preset — the broadcaster's UI uses it to resize the canvas etc.
 // ────────────────────────────────────────────────────────────────────────────
-export function startBroadcaster({ userId, stream, onStatus, onError, onQualityRequest }) {
+export function startBroadcaster({ userId, kind = 'live', stream, onStatus, onError, onQualityRequest }) {
   const myId = newId();
   let pc = null;
   let videoSender = null;
@@ -44,7 +53,7 @@ export function startBroadcaster({ userId, stream, onStatus, onError, onQualityR
   let pendingIce = [];
   let stopped = false;
 
-  const channel = supabase.channel(channelName(userId), {
+  const channel = supabase.channel(channelName(userId, kind), {
     config: {
       broadcast: { self: false },
       presence: { key: myId },
@@ -196,7 +205,7 @@ export function startBroadcaster({ userId, stream, onStatus, onError, onQualityR
 // ────────────────────────────────────────────────────────────────────────────
 // Viewer: receive-only side. Waits for an offer, answers it.
 // ────────────────────────────────────────────────────────────────────────────
-export function startViewer({ userId, onStream, onStatus, onError }) {
+export function startViewer({ userId, kind = 'live', onStream, onStatus, onError }) {
   const myId = newId();
   let broadcasterId = null;
   let pendingIce = [];
@@ -217,7 +226,7 @@ export function startViewer({ userId, onStream, onStatus, onError }) {
     else if (s === 'failed') onStatus?.('disconnected');
   };
 
-  const channel = supabase.channel(channelName(userId), {
+  const channel = supabase.channel(channelName(userId, kind), {
     config: {
       broadcast: { self: false },
       presence: { key: myId },

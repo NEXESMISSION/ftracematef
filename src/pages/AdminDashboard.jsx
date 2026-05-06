@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { listAllUsers, getUserActivity, getAdminStats } from '../lib/admin.js';
@@ -7,6 +7,7 @@ import { usePresence } from '../hooks/usePresence.js';
 import { PLAN_LABEL } from '../lib/plans.js';
 import { ANALYTICS_PROVIDER, ANALYTICS_EMBED_URL } from '../lib/analytics.js';
 import { formatDuration, formatRelative as formatTraceRelative } from '../lib/traceStats.js';
+import { startViewer } from '../lib/livePreview.js';
 
 // Anyone seen pinging the heartbeat within this window is treated as "in the
 // app right now". Tab visibility throttles the heartbeat to 60s, so 2 minutes
@@ -630,6 +631,115 @@ function TraceStatsTiles({ user }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
+/* Spectate modal — operator peeks at a tracing user's live camera feed
+   over WebRTC. Reuses lib/livePreview.js with kind:'tracewatch' so it never
+   collides with the user's own /live phone↔desktop pairing. */
+
+const SPECTATE_STATUS_LABEL = {
+  waiting:      'Waiting for the user…',
+  connecting:   'Connecting…',
+  connected:    'Live',
+  reconnecting: 'Reconnecting…',
+  disconnected: 'Disconnected',
+};
+
+function SpectateModal({ user, onClose }) {
+  const videoRef = useRef(null);
+  const viewerRef = useRef(null);
+  const [status, setStatus] = useState('waiting');
+  const [error, setError]   = useState(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setStatus('waiting');
+    setError(null);
+
+    const v = startViewer({
+      userId: user.id,
+      kind: 'tracewatch',
+      onStream: (stream) => {
+        const el = videoRef.current;
+        if (!el) return;
+        el.srcObject = stream;
+        // Browsers require a play() after srcObject in some flows; ignore
+        // promise rejection (autoplay-with-mute always succeeds anyway).
+        el.play().catch(() => { /* autoplay policy / handled by element */ });
+      },
+      onStatus: (s) => setStatus(s),
+      onError:  (msg) => setError(msg || 'Connection error'),
+    });
+    viewerRef.current = v;
+
+    return () => {
+      try { v.stop(); } catch { /* ignore */ }
+      viewerRef.current = null;
+      const el = videoRef.current;
+      if (el) {
+        try { el.srcObject = null; } catch { /* ignore */ }
+      }
+    };
+  }, [user?.id]);
+
+  // Close on Escape — common modal expectation, no need for a global hook.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="admin-spectate-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="admin-spectate-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Live view of ${user?.email ?? 'user'}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="admin-spectate-head">
+          <div className="admin-spectate-id">
+            <span className="admin-spectate-email">{user?.email ?? '—'}</span>
+            {user?.current_image_label && (
+              <span className="admin-spectate-img">
+                tracing "{user.current_image_label}"
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="admin-spectate-close"
+            onClick={onClose}
+            aria-label="Close live view"
+          >
+            ✕
+          </button>
+        </header>
+
+        <div className="admin-spectate-stage">
+          <video
+            ref={videoRef}
+            className="admin-spectate-video"
+            playsInline
+            muted
+            autoPlay
+          />
+          <div
+            className={`admin-spectate-status admin-spectate-status-${status}`}
+            aria-live="polite"
+          >
+            {error ? error : SPECTATE_STATUS_LABEL[status] ?? status}
+          </div>
+        </div>
+
+        <footer className="admin-spectate-foot">
+          <span>P2P · video only · no recording</span>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
 
 function ActivityPanel({ userId }) {
   const [activity, setActivity] = useState(null);
@@ -673,6 +783,7 @@ export default function AdminDashboard() {
   const [query, setQuery]       = useState('');
   const [tick, setTick]         = useState(0);       // re-render every 30s for "online" decay
   const [expanded, setExpanded] = useState(null);    // currently-expanded user_id
+  const [spectate, setSpectate] = useState(null);    // user object whose camera we're peeking at, or null
 
   // Load + refresh every 30s while the page is open. Same cadence as the
   // tick used to fade the online dot — one timer drives both.
@@ -951,15 +1062,34 @@ export default function AdminDashboard() {
                       </div>
                     </dl>
 
-                    <button
-                      type="button"
-                      className="admin-row-toggle"
-                      onClick={() => toggleExpand(u.id)}
-                      aria-expanded={isOpen}
-                      aria-controls={`admin-activity-${u.id}`}
-                    >
-                      {isOpen ? 'Hide activity' : 'View activity'}
-                    </button>
+                    <div className="admin-row-actions">
+                      {tracing && (
+                        <button
+                          type="button"
+                          className="admin-row-watch"
+                          onClick={() => setSpectate(u)}
+                          aria-label={`Watch ${u.email ?? 'user'} live`}
+                          title="Live camera view"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"
+                               stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
+                               strokeLinejoin="round" aria-hidden="true">
+                            <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" />
+                            <circle cx="8" cy="8" r="2" fill="currentColor" stroke="none" />
+                          </svg>
+                          Watch live
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="admin-row-toggle"
+                        onClick={() => toggleExpand(u.id)}
+                        aria-expanded={isOpen}
+                        aria-controls={`admin-activity-${u.id}`}
+                      >
+                        {isOpen ? 'Hide activity' : 'View activity'}
+                      </button>
+                    </div>
                   </div>
 
                   {isOpen && (
@@ -974,6 +1104,10 @@ export default function AdminDashboard() {
           </ul>
         )}
       </main>
+
+      {spectate && (
+        <SpectateModal user={spectate} onClose={() => setSpectate(null)} />
+      )}
     </div>
   );
 }

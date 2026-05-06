@@ -543,8 +543,14 @@
   align-items: center;
 }
 
-.admin-shell .admin-row-toggle {
+.admin-shell .admin-row-actions {
   align-self: center;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+.admin-shell .admin-row-toggle {
   background: transparent;
   border: 1.5px solid var(--ink);
   color: var(--ink);
@@ -559,6 +565,30 @@
 .admin-shell .admin-row.is-open .admin-row-toggle {
   background: var(--ink);
   color: var(--paper);
+}
+.admin-shell .admin-row-watch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #f59332;
+  color: var(--paper);
+  border: 1.5px solid #c97324;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  box-shadow: 2px 2px 0 #c97324;
+}
+.admin-shell .admin-row-watch:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 #c97324;
+}
+.admin-shell .admin-row-watch:active {
+  transform: translate(1px, 1px);
+  box-shadow: 0 0 0 #c97324;
 }
 
 /* activity drawer */
@@ -1004,4 +1034,123 @@
   .admin-shell .admin-stats-mini {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Spectate modal — admin live camera view ────────────────────────────── */
+.admin-spectate-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+.admin-spectate-modal {
+  background: var(--paper, #fff);
+  border: 1.5px solid var(--ink, #2a1f14);
+  border-radius: 12px;
+  box-shadow: 6px 6px 0 var(--ink, #2a1f14);
+  width: min(820px, 96vw);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.admin-spectate-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1.5px solid var(--ink);
+  background: var(--cream-deep, #f5ede1);
+}
+.admin-spectate-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.admin-spectate-email {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-spectate-img {
+  font-size: 12px;
+  color: var(--ink-muted, #6b5a48);
+  font-style: italic;
+}
+.admin-spectate-close {
+  background: transparent;
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.admin-spectate-close:hover { background: var(--ink); color: var(--paper); }
+.admin-spectate-stage {
+  position: relative;
+  background: #000;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.admin-spectate-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+.admin-spectate-status {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.admin-spectate-status::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #aaa;
+}
+.admin-spectate-status-connected::before { background: #2bbf6a; box-shadow: 0 0 0 3px rgba(43,191,106,0.25); }
+.admin-spectate-status-connecting::before,
+.admin-spectate-status-reconnecting::before { background: #f5b432; }
+.admin-spectate-status-disconnected::before { background: #d94a4a; }
+.admin-spectate-foot {
+  padding: 8px 16px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.15);
+  background: var(--paper);
+  font-size: 11px;
+  color: var(--ink-soft, #8a7762);
+  text-align: center;
+  letter-spacing: 0.04em;
 }
