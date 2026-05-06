@@ -236,36 +236,55 @@
   margin-bottom: 18px;
 }
 
+/* Filter chips. Wrapping pill row — each chip is independent so the row
+   collapses cleanly to multiple lines on narrow viewports without leaving
+   broken segmented borders mid-wrap. The connected segmented control we
+   used to have here held up at 4-5 tabs but couldn't grow past that
+   without a horizontal scrollbar; with 9+ stage filters added we need
+   wrap-friendly chips at every viewport width.
+
+   Each chip has its own border + offset shadow to match the rest of the
+   admin's Neubrutalism vocabulary, so this still reads as the same UI
+   even though the wrapping behavior is different. */
 .admin-shell .admin-tabs {
-  display: inline-flex;
-  background: var(--paper);
-  border: 1.5px solid var(--ink);
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 3px 3px 0 var(--ink);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .admin-shell .admin-tab {
-  background: transparent;
-  border: 0;
-  padding: 8px 14px;
+  appearance: none;
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font: inherit;
   font-size: 13px;
   font-weight: 600;
   color: var(--ink-soft);
-  border-right: 1.5px solid var(--ink);
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
+  box-shadow: 2px 2px 0 var(--ink);
+  transition: transform 100ms ease, box-shadow 100ms ease, background 120ms ease, color 120ms ease;
 }
-.admin-shell .admin-tab:last-child { border-right: 0; }
+.admin-shell .admin-tab:hover {
+  color: var(--ink);
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--ink);
+}
 .admin-shell .admin-tab.is-active {
   background: var(--ink);
   color: var(--paper);
+  transform: translate(1px, 1px);
+  box-shadow: 0 0 0 var(--ink);
 }
 .admin-shell .admin-tab-count {
   display: inline-block;
   min-width: 18px;
-  padding: 1px 6px;
+  padding: 1px 7px;
   font-size: 11px;
   font-weight: 700;
   text-align: center;
@@ -274,7 +293,21 @@
   color: inherit;
 }
 .admin-shell .admin-tab.is-active .admin-tab-count {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 480px) {
+  .admin-shell .admin-tabs { gap: 5px; }
+  .admin-shell .admin-tab {
+    padding: 5px 10px;
+    font-size: 12px;
+    box-shadow: 1.5px 1.5px 0 var(--ink);
+  }
+  .admin-shell .admin-tab-count {
+    min-width: 16px;
+    padding: 0 6px;
+    font-size: 10px;
+  }
 }
 
 /* Right side of the controls row: sort dropdown + search input. They share
