@@ -1,51 +1,20 @@
 -- =============================================================================
--- Trace Mate — get_admin_stats() server-side analytics rollup
+-- Trace Mate — get_admin_stats(): cast plan to text before comparing literals
 -- =============================================================================
--- Until now the admin dashboard rendered raw per-user rows and let the
--- operator eyeball patterns. With more users that's no longer enough — we
--- need rolled-up numbers to make decisions ("is conversion getting better
--- after the cap drop?", "which users are at risk of churning?", "is
--- engagement trending up or down?").
+-- The previous migration (20260505000005_admin_stats.sql) left the function
+-- created OK (plpgsql validates lazily) but failed at *call* time with:
+--   ERROR: invalid input value for enum subscription_plan: "yearly"
+-- because the MRR CASE compared the enum column against the string literal
+-- 'yearly' which isn't a member of the current subscription_plan enum
+-- (only free, monthly, quarterly, lifetime).
 --
--- This RPC computes everything in one shot, server-side, with the service
--- role bypassing RLS. The edge function calls it from the same handler
--- that does the admin gate, so the cost of computing all of this is one
--- round trip and one transaction.
+-- Fix: cast the column to text inside the CTE so the CASE matches against
+-- strings, not enum values. Unknown plan strings now silently fall through
+-- to ELSE 0 instead of failing the whole RPC. Forward-compat for adding
+-- 'yearly' (or any new plan) to the enum without touching this function.
 --
--- Returned shape (jsonb):
---   {
---     funnel: {
---       signed_up:       int,    -- everyone with a profile
---       opened_studio:   int,    -- ever bumped trace_sessions ≥ 1
---       used_trial:      int,    -- ever bumped free_sessions_used ≥ 1
---       currently_paid:  int     -- has an active paying subscription right now
---     },
---     revenue: {
---       mrr_cents:              bigint,  -- monthly-equivalent of active recurring
---       lifetime_revenue_cents: bigint,  -- sum of all paid subscription rows ever
---       paid_today:             int,
---       paid_this_week:         int,
---       paid_this_month:        int,
---       plans:                  { monthly: n, quarterly: n, lifetime: n, ... }
---     },
---     activity: [                      -- last 14 days, oldest-first
---       { date, signups, tracings, paid }
---     ],
---     engagement: {
---       active_24h:  int,   -- distinct users with last_seen_at in last 24h
---       active_7d:   int,
---       tracings_24h:        int,
---       tracings_7d:         int,
---       tracing_seconds_24h: bigint,
---       tracing_seconds_7d:  bigint
---     },
---     top_users:  [{ id, email, display_name, total_trace_seconds, trace_sessions }],
---     at_risk:    [{ id, email, display_name, last_seen_at, plan, current_period_end }],
---     computed_at: timestamptz
---   }
---
--- Idempotent — safe to re-run. Granted to service_role only; the edge
--- function does the admin authorization gate.
+-- Idempotent — CREATE OR REPLACE swaps the body in place. Permissions and
+-- the service-role grant from the prior migration are preserved.
 -- =============================================================================
 
 create or replace function public.get_admin_stats()
@@ -71,7 +40,6 @@ declare
   v_at_risk      jsonb;
   v_paid_user_ids uuid[];
 begin
-  -- ── Currently-paid user ids (one source of truth, reused below) ──────────
   select array_agg(distinct s.user_id)
     from public.subscriptions s
    where s.status = 'active'
@@ -89,9 +57,6 @@ begin
 
   v_paid_user_ids := coalesce(v_paid_user_ids, '{}'::uuid[]);
 
-  -- ── Funnel: signed_up → opened_studio → used_trial → currently_paid ──────
-  -- Each stage counted independently (not nested) so the operator sees raw
-  -- counts and can compute their own conversion ratios in the UI.
   select jsonb_build_object(
     'signed_up',      count(*),
     'opened_studio',  count(*) filter (where p.trace_sessions > 0),
@@ -101,21 +66,9 @@ begin
     from public.profiles p
     into v_funnel;
 
-  -- ── Revenue ──────────────────────────────────────────────────────────────
-  -- MRR normalises non-monthly recurring plans to a monthly equivalent so
-  -- the headline number stays comparable across plan changes:
-  --    monthly  → amount
-  --    quarterly→ amount / 3
-  --    yearly   → amount / 12  (only matched if you add it to the enum later)
-  -- Lifetime is one-time, contributes 0 to MRR but counts in lifetime_revenue.
-  --
-  -- IMPORTANT: cast `plan` to text inside the CASE. The enum currently has
-  -- only {free, monthly, quarterly, lifetime}; comparing against an unknown
-  -- string literal like 'yearly' would fail at runtime with
-  -- "invalid input value for enum subscription_plan" because Postgres tries
-  -- to coerce the literal to the enum before comparing. Casting the column
-  -- to text moves the comparison onto strings, so unmatched literals just
-  -- fall through to ELSE 0.
+  -- Cast plan to text in the CTE so CASE comparisons run on strings, not
+  -- enum values. Without this, an unmatched literal ('yearly' below) blows
+  -- up the whole RPC at call time.
   with active_recurring as (
     select plan::text as plan_label, amount_cents
       from public.subscriptions
@@ -163,7 +116,6 @@ begin
     ), '{}'::jsonb)
   ) into v_revenue;
 
-  -- ── Activity: last 14 days, daily counts of signups + tracings + paid ───
   with days as (
     select generate_series(
       date_trunc('day', v_now - interval '13 days'),
@@ -201,7 +153,6 @@ begin
     left join paid_conv p on p.d = d.d
     into v_activity;
 
-  -- ── Engagement (last 24h / 7d) ───────────────────────────────────────────
   select jsonb_build_object(
     'active_24h', (
       select count(*) from public.profiles where last_seen_at >= v_24h
@@ -227,7 +178,6 @@ begin
     )
   ) into v_engagement;
 
-  -- ── Top users by total time traced (drives "who's most engaged?") ───────
   select coalesce(jsonb_agg(jsonb_build_object(
     'id',                  id,
     'email',               email,
@@ -245,9 +195,6 @@ begin
     ) z
     into v_top_users;
 
-  -- ── At-risk: paid users we haven't seen in 14+ days (or never) ──────────
-  -- Strong retention signal — if they haven't opened the app in two weeks
-  -- on a paying plan, the next renewal is the most likely cancel point.
   select coalesce(jsonb_agg(jsonb_build_object(
     'id',                 p.id,
     'email',              p.email,
@@ -280,6 +227,3 @@ begin
     'computed_at', v_now
   );
 end $$;
-
-revoke all on function public.get_admin_stats() from public;
-grant execute on function public.get_admin_stats() to service_role;
