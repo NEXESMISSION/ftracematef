@@ -17,10 +17,21 @@
 //   DODO_WEBHOOK_SECRET       — the signing secret from the Dodo dashboard
 //   DODO_ENVIRONMENT          — "test_mode" | "live_mode"
 //   DODO_PRODUCT_*            — product IDs so we can map to plan names
-//   DODO_PRICE_MONTHLY_CENTS  — expected price in cents for amount validation
-//   DODO_PRICE_QUARTERLY_CENTS
-//   DODO_PRICE_LIFETIME_CENTS
-//   DODO_EXPECTED_CURRENCY    — uppercased ISO 4217 (default "USD")
+//   DODO_PRICE_<PLAN>_CENTS_<CCY>  — per-currency price floors. Configure
+//                                    one per (plan, currency) pair you accept,
+//                                    e.g. DODO_PRICE_MONTHLY_CENTS_USD=499,
+//                                    DODO_PRICE_MONTHLY_CENTS_EUR=449. A
+//                                    currency without a configured floor is
+//                                    rejected — events from new regions need
+//                                    a config change, not a code change.
+//   DODO_PRICE_<PLAN>_CENTS   — legacy single-currency floor. Still honored
+//                                    when no per-currency floor exists for
+//                                    the plan (paired with DODO_EXPECTED_CURRENCY,
+//                                    default "USD") so existing deployments
+//                                    keep working until they migrate.
+//   DODO_EXPECTED_CURRENCY    — legacy: which currency the legacy CENTS floor
+//                                    applies to. Ignored when per-currency
+//                                    floors are configured.
 // (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are auto-provided)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -53,64 +64,94 @@ const PLAN_FROM_PRODUCT: Record<string, string> = {};
   if (lifetime)  PLAN_FROM_PRODUCT[lifetime]  = 'lifetime';
 }
 
-// Plan → expected amount in cents for amount/currency validation. Reading
-// from env keeps the webhook authoritative on what each plan should cost,
-// independent of whatever a stray event claims. When set, an event whose
-// amount disagrees is rejected and the user's plan stays put — so a tampered
-// or replayed event carrying the wrong product_id can't silently upgrade.
+// Plan → currency → minimum cents we'll accept on an event for that plan.
+// Reading from env keeps the webhook authoritative on what each plan should
+// cost, independent of whatever a stray event claims. An event whose amount
+// disagrees is rejected and the user's plan stays put — so a tampered or
+// replayed event carrying the wrong product_id can't silently upgrade.
 //
-// Env var is *optional* per-plan: unset → log a warning and skip the check
-// (existing deployments don't break the moment they pull this code), set
-// → strict. Operators should set all three on first deploy of this code.
-const EXPECTED_AMOUNT_CENTS: Record<string, number | null> = {
-  monthly:   parseEnvInt('DODO_PRICE_MONTHLY_CENTS'),
-  quarterly: parseEnvInt('DODO_PRICE_QUARTERLY_CENTS'),
-  lifetime:  parseEnvInt('DODO_PRICE_LIFETIME_CENTS'),
-};
-const EXPECTED_CURRENCY = (Deno.env.get('DODO_EXPECTED_CURRENCY') ?? 'USD').toUpperCase();
+// Multi-currency by design. Set one floor per (plan, currency) pair you
+// accept; new regions only need a config change, not a code edit:
+//   DODO_PRICE_MONTHLY_CENTS_USD=499
+//   DODO_PRICE_MONTHLY_CENTS_EUR=449
+//   DODO_PRICE_QUARTERLY_CENTS_USD=1299
+//   DODO_PRICE_QUARTERLY_CENTS_EUR=1199
+//   DODO_PRICE_LIFETIME_CENTS_USD=1500
+// A currency the operator hasn't configured for a plan is treated as not
+// allowlisted and the event is rejected — that's the right default, since
+// we can't validate "is this enough money" without knowing the floor.
+//
+// Legacy fallback: deployments that still set DODO_PRICE_<PLAN>_CENTS (no
+// currency suffix) get that value mapped to DODO_EXPECTED_CURRENCY (default
+// USD) — but only when the plan has no per-currency floor set, so the new
+// vars always win once configured. This keeps existing setups working
+// through the rollout window.
+//
+// FAIL CLOSED. A plan with zero configured floors throws on every paid
+// event for that plan. There is no opt-out: every paid plan MUST have at
+// least one positive floor set, or payments don't process.
+const SUPPORTED_PLANS = ['monthly', 'quarterly', 'lifetime'] as const;
+type Plan = typeof SUPPORTED_PLANS[number];
 
-function parseEnvInt(name: string): number | null {
-  const raw = Deno.env.get(name);
-  if (!raw) return null;
-  const n = parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
+const PLAN_FLOORS: Record<Plan, Record<string, number>> = (() => {
+  const out: Record<Plan, Record<string, number>> = {
+    monthly: {}, quarterly: {}, lifetime: {},
+  };
+  // 1. Per-currency floors — DODO_PRICE_<PLAN>_CENTS_<CCY>=<n>. Always win.
+  const RE = /^DODO_PRICE_(MONTHLY|QUARTERLY|LIFETIME)_CENTS_([A-Z]{3})$/;
+  for (const [name, raw] of Object.entries(Deno.env.toObject())) {
+    const m = name.match(RE);
+    if (!m) continue;
+    const cents = parseInt(raw, 10);
+    if (!Number.isFinite(cents) || cents <= 0) continue;
+    out[m[1].toLowerCase() as Plan][m[2].toUpperCase()] = cents;
+  }
+  // 2. Legacy fallback — only used for plans with no per-currency floor yet.
+  const legacyCcy = (Deno.env.get('DODO_EXPECTED_CURRENCY') ?? 'USD').toUpperCase();
+  for (const plan of SUPPORTED_PLANS) {
+    if (Object.keys(out[plan]).length > 0) continue;
+    const raw = Deno.env.get(`DODO_PRICE_${plan.toUpperCase()}_CENTS`);
+    if (!raw) continue;
+    const cents = parseInt(raw, 10);
+    if (Number.isFinite(cents) && cents > 0) out[plan][legacyCcy] = cents;
+  }
+  return out;
+})();
 
 // Throws if `amount` / `currency` don't match what we expect for `plan`.
 // Pre-tax amounts can be slightly less than the headline price in regions
 // that add tax on top, so we treat the env value as a *minimum*.
 //
-// FAIL CLOSED on missing env vars. Previously a missing
-// DODO_PRICE_<PLAN>_CENTS just logged a warning and skipped validation,
-// which means a misconfigured deploy (env var rotation, brand-new project,
-// typo in the secret name) silently disabled this check and re-opened
-// the unauthorized-grant path. The rest of the webhook treats validation
-// failures as critical (throw → land in webhook_events.error_message →
-// ops investigates), so config gaps must do the same. There is no opt-out
-// — every paid plan MUST have a positive DODO_PRICE_<PLAN>_CENTS set.
+// Error messages name what's missing/wrong so an operator looking at the
+// webhook_events.error_message column gets a self-explanatory diagnosis.
 function assertExpectedAmount(plan: string, amountCents: unknown, currency: unknown) {
-  const expectedCents = EXPECTED_AMOUNT_CENTS[plan];
-  if (expectedCents == null) {
+  const floors = PLAN_FLOORS[plan as Plan];
+  if (!floors || Object.keys(floors).length === 0) {
     throw new Error(
-      `Amount validation refused for plan ${plan}: ` +
-      `DODO_PRICE_${plan.toUpperCase()}_CENTS env var is not set or non-positive. ` +
-      `Set it on the Supabase project secrets and redeploy. ` +
+      `Amount validation refused for plan ${plan}: no DODO_PRICE_${plan.toUpperCase()}_CENTS_<CCY> env var configured. ` +
+      `Set at least one (e.g. DODO_PRICE_${plan.toUpperCase()}_CENTS_USD=...) and redeploy. ` +
       `Refusing to process payment events without a price floor.`,
     );
   }
-  const got = typeof amountCents === 'number' ? amountCents : Number(amountCents);
-  if (!Number.isFinite(got) || got < expectedCents) {
+  const ccy = String(currency ?? '').toUpperCase();
+  if (!ccy) {
     throw new Error(
-      `Amount validation failed for plan ${plan}: got ${amountCents}, expected >= ${expectedCents}`,
+      `Currency missing on event for plan ${plan}: cannot validate amount without a currency`,
     );
   }
-  if (currency != null) {
-    const got = String(currency).toUpperCase();
-    if (got !== EXPECTED_CURRENCY) {
-      throw new Error(
-        `Currency validation failed for plan ${plan}: got ${got}, expected ${EXPECTED_CURRENCY}`,
-      );
-    }
+  const floor = floors[ccy];
+  if (floor == null) {
+    throw new Error(
+      `Currency ${ccy} not allowlisted for plan ${plan}: ` +
+      `set DODO_PRICE_${plan.toUpperCase()}_CENTS_${ccy} on the Supabase project secrets to accept it. ` +
+      `Currently allowed: ${Object.keys(floors).sort().join(', ')}`,
+    );
+  }
+  const got = typeof amountCents === 'number' ? amountCents : Number(amountCents);
+  if (!Number.isFinite(got) || got < floor) {
+    throw new Error(
+      `Amount validation failed for plan ${plan} ${ccy}: got ${amountCents}, expected >= ${floor}`,
+    );
   }
 }
 

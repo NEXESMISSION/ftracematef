@@ -28,12 +28,31 @@ const REQUIRED = [
 ];
 
 // Optional — set whenever defined, skipped silently otherwise.
-//   DODO_PRICE_*_CENTS / DODO_EXPECTED_CURRENCY: per-plan price guards used
-//     by dodo-webhook to validate amounts on incoming events.
+//   DODO_PRICE_<PLAN>_CENTS_<CCY>: per-currency price floors used by
+//     dodo-webhook to validate amounts on incoming events. Set one per
+//     (plan, currency) pair you accept — e.g. DODO_PRICE_MONTHLY_CENTS_USD,
+//     DODO_PRICE_MONTHLY_CENTS_EUR. The webhook FAIL-CLOSES if a paid event
+//     arrives for a plan with zero configured floors, so set at least one
+//     per plan or payments break for everyone.
+//   DODO_PRICE_<PLAN>_CENTS / DODO_EXPECTED_CURRENCY: legacy single-currency
+//     vars. Still honored when no per-currency floor is set for the plan,
+//     paired together as a USD-default floor. Migrate to the per-currency
+//     vars when you next touch secrets.
 //   ADMIN_EMAILS / ENABLE_DEV_MUTATE: gates for the /account dev self-test
 //     panel. ENABLE_DEV_MUTATE must be exactly "true" AND DODO_ENVIRONMENT
 //     must NOT be "live_mode" — set on test/staging projects only.
 const OPTIONAL = [
+  // Per-currency floors (preferred).
+  'DODO_PRICE_MONTHLY_CENTS_USD',
+  'DODO_PRICE_MONTHLY_CENTS_EUR',
+  'DODO_PRICE_MONTHLY_CENTS_GBP',
+  'DODO_PRICE_QUARTERLY_CENTS_USD',
+  'DODO_PRICE_QUARTERLY_CENTS_EUR',
+  'DODO_PRICE_QUARTERLY_CENTS_GBP',
+  'DODO_PRICE_LIFETIME_CENTS_USD',
+  'DODO_PRICE_LIFETIME_CENTS_EUR',
+  'DODO_PRICE_LIFETIME_CENTS_GBP',
+  // Legacy single-currency floors (still honored when no per-currency var is set).
   'DODO_PRICE_MONTHLY_CENTS',
   'DODO_PRICE_QUARTERLY_CENTS',
   'DODO_PRICE_LIFETIME_CENTS',
