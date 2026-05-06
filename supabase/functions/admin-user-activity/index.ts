@@ -9,6 +9,12 @@
 //                   dodo_customer_id (payment + subscription lifecycle)
 //   - sign_ins    : auth.audit_log_entries for the user (every login,
 //                   token refresh, password change, etc.)
+//   - trace_runs  : public.trace_session_runs for the user — one row per
+//                   tracing session with started_at / ended_at /
+//                   duration_seconds / image_label. Active runs (ended_at
+//                   IS NULL) are returned with last_heartbeat_at so the
+//                   dashboard can render a live duration ticker without
+//                   double-counting backgrounded-tab time.
 //
 // SECURITY: same double-gate as admin-list-users (ADMIN_EMAILS env +
 // profiles.is_admin). Service role only ever queries on the explicit
@@ -92,7 +98,7 @@ Deno.serve(async (req) => {
 
   const customerId = targetProfile.dodo_customer_id;
 
-  const [subHistRes, eventsRes] = await Promise.all([
+  const [subHistRes, eventsRes, runsRes] = await Promise.all([
     admin
       .from('subscriptions')
       .select('id, plan, status, current_period_end, cancel_at_next_billing_date, amount_cents, currency, dodo_subscription_id, dodo_payment_id, created_at, updated_at, cancelled_at')
@@ -109,10 +115,19 @@ Deno.serve(async (req) => {
           .order('created_at', { ascending: false })
           .limit(100)
       : Promise.resolve({ data: [], error: null }),
+    // Per-session trace runs. Cap at 100 — a paid user tracing 1-2 sessions
+    // a day takes ~50 days to fill that, plenty of history for ops review.
+    admin
+      .from('trace_session_runs')
+      .select('id, started_at, ended_at, last_heartbeat_at, duration_seconds, image_label, closed_reason')
+      .eq('user_id', userId)
+      .order('started_at', { ascending: false })
+      .limit(100),
   ]);
 
   if (subHistRes.error) return json({ error: subHistRes.error.message }, 500);
   if (eventsRes.error)  return json({ error: eventsRes.error.message }, 500);
+  if (runsRes.error)    return json({ error: runsRes.error.message }, 500);
 
   // Auth audit log: every sign-in / token refresh / sign-out attempt for the
   // target user. Stored in the auth schema; service-role can read it via the
@@ -171,5 +186,6 @@ Deno.serve(async (req) => {
     sub_history: subHistRes.data ?? [],
     events,
     sign_ins:    signIns,
+    trace_runs:  runsRes.data ?? [],
   });
 });

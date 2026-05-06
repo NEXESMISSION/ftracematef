@@ -675,10 +675,36 @@
   box-shadow: 0 0 0 1.5px var(--ink-muted);
 }
 
-.admin-shell .admin-timeline-sub       .admin-timeline-dot { background: #6c8cff; box-shadow: 0 0 0 1.5px #6c8cff; }
-.admin-shell .admin-timeline-event     .admin-timeline-dot { background: #2bbf6a; box-shadow: 0 0 0 1.5px #2bbf6a; }
-.admin-shell .admin-timeline-event-bad .admin-timeline-dot { background: var(--coral); box-shadow: 0 0 0 1.5px var(--coral); }
-.admin-shell .admin-timeline-auth      .admin-timeline-dot { background: var(--yellow-deep); box-shadow: 0 0 0 1.5px var(--yellow-deep); }
+.admin-shell .admin-timeline-sub          .admin-timeline-dot { background: #6c8cff; box-shadow: 0 0 0 1.5px #6c8cff; }
+.admin-shell .admin-timeline-event        .admin-timeline-dot { background: #2bbf6a; box-shadow: 0 0 0 1.5px #2bbf6a; }
+.admin-shell .admin-timeline-event-bad    .admin-timeline-dot { background: var(--coral); box-shadow: 0 0 0 1.5px var(--coral); }
+.admin-shell .admin-timeline-auth         .admin-timeline-dot { background: var(--yellow-deep); box-shadow: 0 0 0 1.5px var(--yellow-deep); }
+.admin-shell .admin-timeline-trace        .admin-timeline-dot { background: var(--ink); box-shadow: 0 0 0 1.5px var(--ink); }
+.admin-shell .admin-timeline-trace-active .admin-timeline-dot {
+  background: var(--coral);
+  box-shadow: 0 0 0 1.5px var(--coral);
+  animation: admin-timeline-pulse 1.4s ease-in-out infinite;
+}
+@keyframes admin-timeline-pulse {
+  0%, 100% { transform: scale(1);   opacity: 1; }
+  50%      { transform: scale(1.4); opacity: 0.55; }
+}
+.admin-shell .admin-timeline-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  color: var(--coral);
+  font-weight: 600;
+}
+.admin-shell .admin-timeline-live::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--coral);
+  animation: admin-timeline-pulse 1.4s ease-in-out infinite;
+}
 
 .admin-shell .admin-timeline-row {
   display: flex;

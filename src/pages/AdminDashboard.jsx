@@ -114,6 +114,39 @@ function lastSeenLabel(u, online) {
 /* ─────────────────────────────────────────────────────────────────────── */
 /* Per-user activity log (drill-down) */
 
+// Live, second-by-second duration counter for an open trace run.
+// `lastHeartbeatAt` lets us freeze the ticker if the user backgrounded the
+// tab — heartbeats stop on visibilitychange (see Trace.jsx), so a heartbeat
+// older than the visible-tab cadence is the signal that the tab isn't live.
+// Without this guard a paused/backgrounded session would tick up forever
+// and mislead ops.
+const HEARTBEAT_FRESH_MS = 90_000;
+const HEARTBEAT_GRACE_MS = 30_000;
+
+function liveDurationSeconds(startedAt, lastHeartbeatAt) {
+  const start = startedAt ? new Date(startedAt).getTime() : NaN;
+  if (!Number.isFinite(start)) return 0;
+  const heartbeat = lastHeartbeatAt ? new Date(lastHeartbeatAt).getTime() : 0;
+  const now = Date.now();
+  const cap = (now - heartbeat) < HEARTBEAT_FRESH_MS
+    ? now
+    : heartbeat + HEARTBEAT_GRACE_MS;
+  return Math.max(0, Math.floor((cap - start) / 1000));
+}
+
+function LiveDuration({ startedAt, lastHeartbeatAt }) {
+  const [seconds, setSeconds] = useState(() =>
+    liveDurationSeconds(startedAt, lastHeartbeatAt)
+  );
+  useEffect(() => {
+    const id = setInterval(() => {
+      setSeconds(liveDurationSeconds(startedAt, lastHeartbeatAt));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [startedAt, lastHeartbeatAt]);
+  return <>{formatDuration(seconds)}</>;
+}
+
 function Timeline({ activity }) {
   // Merge events from three sources into a single chronological feed —
   // operator scans top-to-bottom, no need to remember which silo holds what.
@@ -163,6 +196,39 @@ function Timeline({ activity }) {
         detail: s.ip_address ? `ip ${s.ip_address}` : '',
       });
     }
+    // One row per tracing session — the operator's "what did they actually
+    // do" feed. Active runs (ended_at is null) get a live ticker; closed
+    // runs show the recorded duration.
+    for (const r of activity.trace_runs ?? []) {
+      const active = !r.ended_at;
+      merged.push({
+        kind:  active ? 'trace-active' : 'trace',
+        at:    r.started_at,
+        title: active
+          ? `Tracing "${r.image_label ?? '—'}" · live`
+          : `Trace · "${r.image_label ?? '—'}"`,
+        // detailNode is rendered as JSX when present; falls through to
+        // detail string for plain text rows. Active runs get the ticker.
+        detailNode: active
+          ? (
+              <span className="admin-timeline-live">
+                <LiveDuration
+                  startedAt={r.started_at}
+                  lastHeartbeatAt={r.last_heartbeat_at}
+                />
+              </span>
+            )
+          : null,
+        detail: active
+          ? null
+          : [
+              formatDuration(r.duration_seconds ?? 0),
+              r.closed_reason && r.closed_reason !== 'client_end'
+                ? `closed: ${r.closed_reason}`
+                : null,
+            ].filter(Boolean).join(' · '),
+      });
+    }
     return merged
       .filter((m) => m.at)
       .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
@@ -185,7 +251,11 @@ function Timeline({ activity }) {
                 {formatRelative(item.at)}
               </span>
             </div>
-            {item.detail && <div className="admin-timeline-detail">{item.detail}</div>}
+            {item.detailNode
+              ? <div className="admin-timeline-detail">{item.detailNode}</div>
+              : item.detail
+                ? <div className="admin-timeline-detail">{item.detail}</div>
+                : null}
           </div>
         </li>
       ))}
