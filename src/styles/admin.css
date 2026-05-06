@@ -684,3 +684,324 @@
   .admin-shell .admin-row-plan { flex-direction: row; flex-wrap: wrap; }
   .admin-shell .admin-row-toggle { align-self: flex-start; }
 }
+
+/* ── Stats panel (business KPIs + funnel + activity + top users + at-risk) ── */
+.admin-shell .admin-stats {
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 4px 4px 0 var(--ink);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.admin-shell .admin-stats-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 1.5px solid var(--ink);
+  background: var(--cream-deep);
+}
+.admin-shell .admin-stats-head h2 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+.admin-shell .admin-stats-when {
+  font-size: 11px;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+.admin-shell .admin-stats-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 18px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.admin-shell .admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  padding: 14px;
+}
+.admin-shell .admin-stats-card {
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 2px 2px 0 var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.admin-shell .admin-stats-card-wide {
+  grid-column: 1 / -1;
+}
+.admin-shell .admin-stats-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.admin-shell .admin-stats-card-head h3 {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0;
+}
+.admin-shell .admin-stats-card-meta {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.admin-shell .admin-stats-empty {
+  color: var(--ink-soft);
+  font-size: 13px;
+  padding: 12px 0;
+}
+
+/* Revenue tile */
+.admin-shell .admin-stats-revenue {
+  background: linear-gradient(135deg, #eef9f1 0%, var(--paper) 70%);
+}
+.admin-shell .admin-stats-revenue-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.admin-shell .admin-stats-revenue-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.admin-shell .admin-stats-revenue-label {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-left: 6px;
+}
+.admin-shell .admin-stats-revenue-secondary {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+/* Mini KPI grid (used inside Revenue + Activity cards) */
+.admin-shell .admin-stats-mini {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+}
+.admin-shell .admin-stats-mini > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.08);
+  padding: 4px 0;
+}
+.admin-shell .admin-stats-mini dt {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0;
+}
+.admin-shell .admin-stats-mini dd {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+.admin-shell .admin-stats-plans {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.admin-shell .admin-stats-plan-pill {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--ink);
+}
+.admin-shell .admin-stats-plan-pill strong {
+  font-weight: 800;
+  margin-right: 4px;
+}
+
+/* Funnel */
+.admin-shell .admin-stats-funnel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.admin-shell .admin-stats-funnel-step {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.admin-shell .admin-stats-funnel-bar {
+  position: relative;
+  height: 26px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+.admin-shell .admin-stats-funnel-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #2bbf6a 0%, #25a55c 100%);
+  transition: width 220ms ease;
+}
+.admin-shell .admin-stats-funnel-label {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--paper);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.admin-shell .admin-stats-funnel-count {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+  z-index: 1;
+}
+.admin-shell .admin-stats-funnel-meta {
+  font-size: 11px;
+  color: var(--ink-soft);
+  padding-left: 4px;
+}
+.admin-shell .admin-stats-funnel-overall {
+  font-weight: 700;
+  color: var(--ink-muted);
+}
+
+/* Activity sparkline */
+.admin-shell .admin-stats-chart-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.admin-shell .admin-stats-chart-legend {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.admin-shell .admin-stats-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+.admin-shell .admin-stats-swatch-tracings { background: #f59332; }
+.admin-shell .admin-stats-swatch-signups  { background: #4d7cff; }
+.admin-shell .admin-stats-chart {
+  width: 100%;
+  height: auto;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+.admin-shell .admin-stats-bar-tracings { fill: #f59332; }
+.admin-shell .admin-stats-bar-signups  { fill: #4d7cff; }
+
+/* Top users + at-risk lists */
+.admin-shell .admin-stats-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  counter-reset: tracer;
+}
+.admin-shell .admin-stats-list ol,
+.admin-shell ol.admin-stats-list { counter-reset: tracer; }
+.admin-shell ol.admin-stats-list li {
+  counter-increment: tracer;
+}
+.admin-shell ol.admin-stats-list li::before {
+  content: counter(tracer);
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 18px;
+  vertical-align: middle;
+}
+.admin-shell .admin-stats-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.025);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+.admin-shell .admin-stats-list-id {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.admin-shell .admin-stats-list-meta {
+  font-size: 11px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.admin-shell .admin-stats-list-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 3px;
+  background: var(--ink);
+  color: var(--paper);
+}
+.admin-shell .admin-stats-list-risk li {
+  background: rgba(245, 147, 50, 0.08);
+  border-color: rgba(245, 147, 50, 0.25);
+}
+
+@media (max-width: 720px) {
+  .admin-shell .admin-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-shell .admin-stats-mini {
+    grid-template-columns: 1fr;
+  }
+}

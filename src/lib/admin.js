@@ -43,3 +43,21 @@ export async function getUserActivity(userId) {
   if (data?.error) throw new Error(data.error);
   return data;
 }
+
+/**
+ * Server-side analytics rollup for the StatsPanel:
+ *   { funnel, revenue, activity, engagement, top_users, at_risk, computed_at }
+ *
+ * One request → one transaction → all stats. The aggregation runs server-
+ * side via get_admin_stats() so the client doesn't have to walk every row
+ * of profiles + subscriptions + trace_session_runs.
+ */
+export async function getAdminStats() {
+  const { data, error } = await supabase.functions.invoke('admin-stats', {
+    method: 'POST',
+    body: {},
+  });
+  if (error) throw new Error(await unwrapFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return data?.stats ?? null;
+}

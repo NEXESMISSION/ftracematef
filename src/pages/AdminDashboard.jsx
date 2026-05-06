@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { listAllUsers, getUserActivity } from '../lib/admin.js';
+import { listAllUsers, getUserActivity, getAdminStats } from '../lib/admin.js';
 import { friendlyError } from '../lib/errors.js';
 import { usePresence } from '../hooks/usePresence.js';
 import { PLAN_LABEL } from '../lib/plans.js';
@@ -188,6 +188,321 @@ function Timeline({ activity }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
+/* Stats panel — server-side rollup of funnel, revenue, activity, top users,
+   and at-risk paying customers. The per-user list below answers "who?";
+   this panel answers "how's the business doing?". */
+
+function formatMoneyCents(cents, currency = 'USD') {
+  if (cents == null) return '—';
+  const n = Number(cents);
+  if (!Number.isFinite(n)) return '—';
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: n >= 100_00 ? 0 : 2,
+    }).format(n / 100);
+  } catch {
+    return `$${(n / 100).toFixed(2)}`;
+  }
+}
+
+function pct(part, whole) {
+  if (!whole) return '0%';
+  const v = (part / whole) * 100;
+  if (v >= 10)  return `${Math.round(v)}%`;
+  if (v >= 1)   return `${v.toFixed(1)}%`;
+  return `${v.toFixed(2)}%`;
+}
+
+// Tiny inline bar chart — pure SVG, no chart library. 14 days × 2 series
+// (signups + tracings) stacked vertically with a shared y-axis. Hover tip
+// uses native title attribute so we don't need a tooltip layer.
+function ActivitySparkline({ days }) {
+  const data = days ?? [];
+  if (data.length === 0) {
+    return <div className="admin-stats-empty">No activity yet.</div>;
+  }
+  const max = Math.max(
+    1,
+    ...data.map((d) => Math.max(d.signups || 0, d.tracings || 0)),
+  );
+  const W = 280, H = 90, pad = 4;
+  const slot = (W - pad * 2) / data.length;
+  const barW = Math.max(2, slot * 0.36);
+  const yFor = (n) => H - pad - (n / max) * (H - pad * 2);
+  return (
+    <div className="admin-stats-chart-wrap">
+      <div className="admin-stats-chart-legend">
+        <span><span className="admin-stats-swatch admin-stats-swatch-tracings" /> Tracings</span>
+        <span><span className="admin-stats-swatch admin-stats-swatch-signups" /> Signups</span>
+      </div>
+      <svg
+        className="admin-stats-chart"
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label="14-day activity"
+      >
+        {data.map((d, i) => {
+          const xCenter = pad + slot * (i + 0.5);
+          const xT = xCenter - barW - 1;
+          const xS = xCenter + 1;
+          const yT = yFor(d.tracings || 0);
+          const yS = yFor(d.signups || 0);
+          const title = `${d.date} — ${d.tracings || 0} tracings, ${d.signups || 0} signups, ${d.paid || 0} paid`;
+          return (
+            <g key={d.date}>
+              <title>{title}</title>
+              <rect
+                className="admin-stats-bar admin-stats-bar-tracings"
+                x={xT} y={yT}
+                width={barW} height={Math.max(0, H - pad - yT)}
+              />
+              <rect
+                className="admin-stats-bar admin-stats-bar-signups"
+                x={xS} y={yS}
+                width={barW} height={Math.max(0, H - pad - yS)}
+              />
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function FunnelPanel({ funnel }) {
+  if (!funnel) return null;
+  const steps = [
+    { key: 'signed_up',      label: 'Signed up',      n: funnel.signed_up      ?? 0 },
+    { key: 'opened_studio',  label: 'Opened studio',  n: funnel.opened_studio  ?? 0 },
+    { key: 'used_trial',     label: 'Used a session', n: funnel.used_trial     ?? 0 },
+    { key: 'currently_paid', label: 'Paying now',     n: funnel.currently_paid ?? 0 },
+  ];
+  const top = steps[0].n || 1;
+  return (
+    <div className="admin-stats-funnel">
+      {steps.map((s, i) => {
+        const prev = i === 0 ? null : steps[i - 1].n;
+        return (
+          <div key={s.key} className="admin-stats-funnel-step">
+            <div className="admin-stats-funnel-bar">
+              <div
+                className="admin-stats-funnel-fill"
+                style={{ width: `${Math.max(2, (s.n / top) * 100)}%` }}
+              />
+              <span className="admin-stats-funnel-label">{s.label}</span>
+              <span className="admin-stats-funnel-count">{s.n}</span>
+            </div>
+            <div className="admin-stats-funnel-meta">
+              {prev != null && (
+                <span title={`vs previous step`}>
+                  {pct(s.n, prev)} of {steps[i - 1].label.toLowerCase()}
+                </span>
+              )}
+              {i === steps.length - 1 && top > 0 && (
+                <span className="admin-stats-funnel-overall" title="Overall conversion">
+                  · {pct(s.n, top)} overall
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StatsPanel() {
+  const [stats, setStats]   = useState(null);
+  const [error, setError]   = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Refresh every 60s while the page is open. The rollup is heavier than the
+  // user-list read so we don't run it on the same 30s cadence.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const data = await getAdminStats();
+        if (!cancelled) {
+          setStats(data);
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) setError(friendlyError(e, 'Could not load stats.'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    const id = setInterval(load, 60_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
+  if (loading && !stats) {
+    return (
+      <section className="admin-stats">
+        <header className="admin-stats-head">
+          <h2>Business stats</h2>
+        </header>
+        <div className="admin-stats-loading">
+          <span className="admin-spinner" aria-hidden="true" />
+          <span>Loading stats…</span>
+        </div>
+      </section>
+    );
+  }
+  if (error) {
+    return (
+      <section className="admin-stats">
+        <header className="admin-stats-head">
+          <h2>Business stats</h2>
+        </header>
+        <p className="admin-error" style={{ margin: 12 }}>{error}</p>
+      </section>
+    );
+  }
+  if (!stats) return null;
+
+  const { funnel, revenue, activity, engagement, top_users, at_risk } = stats;
+  const planEntries = Object.entries(revenue?.plans ?? {});
+
+  return (
+    <section className="admin-stats" aria-labelledby="admin-stats-title">
+      <header className="admin-stats-head">
+        <h2 id="admin-stats-title">Business stats</h2>
+        <span className="admin-stats-when">
+          updated {stats.computed_at ? formatTraceRelative(stats.computed_at) : 'just now'}
+        </span>
+      </header>
+
+      <div className="admin-stats-grid">
+        {/* ── Revenue tile ───────────────────────────────────────────── */}
+        <div className="admin-stats-card admin-stats-revenue">
+          <div className="admin-stats-card-head">
+            <h3>Revenue</h3>
+          </div>
+          <div className="admin-stats-revenue-headline">
+            <div>
+              <span className="admin-stats-revenue-value">{formatMoneyCents(revenue?.mrr_cents)}</span>
+              <span className="admin-stats-revenue-label">/ month (MRR)</span>
+            </div>
+            <div className="admin-stats-revenue-secondary">
+              <span>{formatMoneyCents(revenue?.lifetime_revenue_cents)} lifetime</span>
+            </div>
+          </div>
+          <dl className="admin-stats-mini">
+            <div><dt>New paid · today</dt>     <dd>{revenue?.paid_today      ?? 0}</dd></div>
+            <div><dt>New paid · week</dt>      <dd>{revenue?.paid_this_week  ?? 0}</dd></div>
+            <div><dt>New paid · month</dt>     <dd>{revenue?.paid_this_month ?? 0}</dd></div>
+          </dl>
+          {planEntries.length > 0 && (
+            <div className="admin-stats-plans">
+              {planEntries.map(([plan, n]) => (
+                <span key={plan} className="admin-stats-plan-pill">
+                  <strong>{n}</strong> {PLAN_LABEL[plan] ?? plan}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Funnel tile ───────────────────────────────────────────── */}
+        <div className="admin-stats-card">
+          <div className="admin-stats-card-head">
+            <h3>Conversion funnel</h3>
+          </div>
+          <FunnelPanel funnel={funnel} />
+        </div>
+
+        {/* ── Activity / engagement tile ────────────────────────────── */}
+        <div className="admin-stats-card">
+          <div className="admin-stats-card-head">
+            <h3>Activity · last 14 days</h3>
+          </div>
+          <ActivitySparkline days={activity} />
+          <dl className="admin-stats-mini">
+            <div>
+              <dt>Active · 24h</dt>
+              <dd>{engagement?.active_24h ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Active · 7d</dt>
+              <dd>{engagement?.active_7d ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Tracings · 24h</dt>
+              <dd>{engagement?.tracings_24h ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Time traced · 7d</dt>
+              <dd>{formatDuration(engagement?.tracing_seconds_7d ?? 0)}</dd>
+            </div>
+          </dl>
+        </div>
+
+        {/* ── Top users tile ────────────────────────────────────────── */}
+        <div className="admin-stats-card">
+          <div className="admin-stats-card-head">
+            <h3>Top tracers</h3>
+          </div>
+          {top_users?.length ? (
+            <ol className="admin-stats-list">
+              {top_users.map((u) => (
+                <li key={u.id}>
+                  <span className="admin-stats-list-id">
+                    {u.email ?? '—'}
+                    {u.is_paid && <span className="admin-stats-list-tag">paid</span>}
+                  </span>
+                  <span className="admin-stats-list-meta">
+                    {formatDuration(u.total_trace_seconds)}
+                    {' · '}
+                    {u.trace_sessions} sess
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div className="admin-stats-empty">No tracings yet.</div>
+          )}
+        </div>
+
+        {/* ── At-risk tile ──────────────────────────────────────────── */}
+        <div className="admin-stats-card admin-stats-card-wide">
+          <div className="admin-stats-card-head">
+            <h3>At risk · paid + idle 14+ days</h3>
+            <span className="admin-stats-card-meta">{at_risk?.length ?? 0}</span>
+          </div>
+          {at_risk?.length ? (
+            <ul className="admin-stats-list admin-stats-list-risk">
+              {at_risk.map((u) => (
+                <li key={u.id}>
+                  <span className="admin-stats-list-id">
+                    {u.email ?? '—'}
+                    <span className="admin-stats-list-tag">{PLAN_LABEL[u.plan] ?? u.plan}</span>
+                  </span>
+                  <span className="admin-stats-list-meta">
+                    {u.last_seen_at
+                      ? `idle ${u.days_since_seen}d`
+                      : 'never opened'}
+                    {u.current_period_end && (
+                      <> · renews {new Date(u.current_period_end).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="admin-stats-empty">All paying customers active. 🎉</div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -488,6 +803,8 @@ export default function AdminDashboard() {
             <span className="admin-summary-value">{counts.tracing}</span>
           </div>
         </section>
+
+        <StatsPanel />
 
         <TrafficPanel />
 
