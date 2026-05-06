@@ -28,12 +28,6 @@ const REQUIRED = [
 ];
 
 // Optional — set whenever defined, skipped silently otherwise.
-//   DODO_PRICE_<PLAN>_CENTS_<CCY>: per-currency price floors used by
-//     dodo-webhook to validate amounts on incoming events. Set one per
-//     (plan, currency) pair you accept — e.g. DODO_PRICE_MONTHLY_CENTS_USD,
-//     DODO_PRICE_MONTHLY_CENTS_EUR. The webhook FAIL-CLOSES if a paid event
-//     arrives for a plan with zero configured floors, so set at least one
-//     per plan or payments break for everyone.
 //   DODO_PRICE_<PLAN>_CENTS / DODO_EXPECTED_CURRENCY: legacy single-currency
 //     vars. Still honored when no per-currency floor is set for the plan,
 //     paired together as a USD-default floor. Migrate to the per-currency
@@ -41,18 +35,11 @@ const REQUIRED = [
 //   ADMIN_EMAILS / ENABLE_DEV_MUTATE: gates for the /account dev self-test
 //     panel. ENABLE_DEV_MUTATE must be exactly "true" AND DODO_ENVIRONMENT
 //     must NOT be "live_mode" — set on test/staging projects only.
+//
+// Per-currency price floors (DODO_PRICE_<PLAN>_CENTS_<CCY>) aren't listed
+// here because they're auto-discovered below — adding a new currency is
+// purely an env-file change, no script edit needed.
 const OPTIONAL = [
-  // Per-currency floors (preferred).
-  'DODO_PRICE_MONTHLY_CENTS_USD',
-  'DODO_PRICE_MONTHLY_CENTS_EUR',
-  'DODO_PRICE_MONTHLY_CENTS_GBP',
-  'DODO_PRICE_QUARTERLY_CENTS_USD',
-  'DODO_PRICE_QUARTERLY_CENTS_EUR',
-  'DODO_PRICE_QUARTERLY_CENTS_GBP',
-  'DODO_PRICE_LIFETIME_CENTS_USD',
-  'DODO_PRICE_LIFETIME_CENTS_EUR',
-  'DODO_PRICE_LIFETIME_CENTS_GBP',
-  // Legacy single-currency floors (still honored when no per-currency var is set).
   'DODO_PRICE_MONTHLY_CENTS',
   'DODO_PRICE_QUARTERLY_CENTS',
   'DODO_PRICE_LIFETIME_CENTS',
@@ -61,6 +48,11 @@ const OPTIONAL = [
   'ENABLE_DEV_MUTATE',
   'APP_URL_EXTRA_ORIGINS',
 ];
+
+// Any env var matching this pattern is treated as a per-currency price floor
+// and pushed to Supabase automatically. Lets the operator add a region
+// (BRL, JPY, INR, ...) by editing .env.secrets and re-running this script.
+const PRICE_FLOOR_RE = /^DODO_PRICE_(MONTHLY|QUARTERLY|LIFETIME)_CENTS_[A-Z]{3}$/;
 
 function parseEnvFile(path) {
   if (!existsSync(path)) return {};
@@ -97,6 +89,18 @@ for (const key of REQUIRED) {
 for (const key of OPTIONAL) {
   const val = process.env[key] ?? fromFile[key];
   if (val) SECRETS[key] = val;
+}
+
+// Auto-discover per-currency price floors from both process env and .env.secrets.
+// This is what lets a new region go live without editing this script: drop a
+// `DODO_PRICE_MONTHLY_CENTS_BRL=1500` line into .env.secrets and re-run.
+// fromFile written first, process.env second so CI/shell exports win on conflict.
+for (const source of [fromFile, process.env]) {
+  for (const [key, val] of Object.entries(source)) {
+    if (!PRICE_FLOOR_RE.test(key)) continue;
+    if (!val) continue;
+    SECRETS[key] = val;
+  }
 }
 
 if (missing.length) {
