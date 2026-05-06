@@ -7,6 +7,7 @@ import { loadPendingImage } from '../lib/pendingImage.js';
 import { consumeFreeSession, trialAlreadyConsumedThisVisit } from '../lib/freeTrial.js';
 import { setPresence, clearPresence } from '../lib/presence.js';
 import { startBroadcaster } from '../lib/livePreview.js';
+import { downscaleToDataUrl } from '../lib/imageDownscale.js';
 import {
   cssMatrix3d,
   identityCorners,
@@ -107,6 +108,25 @@ export default function Trace() {
   }, [imageUrl]);
 
   // Start (or restart) the camera whenever facingMode changes.
+  // Cache the downsampled reference-image thumbnail across camera-effect
+  // re-runs (front ↔ back switch). Recomputing the canvas resize is cheap
+  // but pointless when the image hasn't changed.
+  const thumbCacheRef = useRef({ src: null, dataUrl: null });
+  const getReferenceThumb = useCallback(async () => {
+    if (!imageUrl) return null;
+    if (thumbCacheRef.current.src === imageUrl && thumbCacheRef.current.dataUrl) {
+      return thumbCacheRef.current.dataUrl;
+    }
+    try {
+      const dataUrl = await downscaleToDataUrl(imageUrl, 640, 0.85);
+      thumbCacheRef.current = { src: imageUrl, dataUrl };
+      return dataUrl;
+    } catch (err) {
+      console.warn('[trace] reference thumbnail failed:', err);
+      return null;
+    }
+  }, [imageUrl]);
+
   useEffect(() => {
     let cancelled = false;
     // Operator-side spectator broadcaster. Reuses the existing WebRTC
@@ -125,55 +145,92 @@ export default function Trace() {
       setTorchSupported(false);
       setTorchOn(false);
 
+      // Best-quality video + clean audio. Echo cancellation, noise
+      // suppression, and AGC are enabled explicitly so what the operator
+      // hears is voice, not room reverb. If the user denies the mic prompt
+      // we fall back to video-only — /trace doesn't actually use audio
+      // locally (the local <video> is muted) so losing it costs nothing.
+      const videoConstraints = {
+        facingMode: { ideal: facingMode },
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 },
+      };
+      const audioConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl:  true,
+      };
+
+      let stream = null;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: facingMode },
-            width:  { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
-          audio: false,
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: videoConstraints,
+          audio: audioConstraints,
         });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play().catch(() => {});
-        }
-
-        // Detect torch support on the back camera.
-        const track = stream.getVideoTracks()[0];
-        if (track && typeof track.getCapabilities === 'function') {
-          const caps = track.getCapabilities();
-          if (caps?.torch) setTorchSupported(true);
-        }
-        setCameraError('');
-
-        // Spin up the spectator broadcaster once we actually have a stream.
-        // Tear down any prior broadcaster first (camera switch flips this
-        // effect; the old WebRTC peer is bound to the previous stream).
-        if (broadcaster) { try { broadcaster.stop(); } catch { /* ignore */ } broadcaster = null; }
-        if (userId && !cancelled) {
+      } catch (err) {
+        // Mic-only failures: user denied audio but might have allowed
+        // video. Try again without audio so /trace still works.
+        if (!cancelled) {
+          console.warn('[trace] getUserMedia audio+video failed, retrying video-only:', err);
           try {
-            broadcaster = startBroadcaster({
-              userId,
-              kind: 'tracewatch',
-              stream,
-              onError: (err) => console.warn('[trace] watch broadcaster error:', err),
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: videoConstraints,
+              audio: false,
             });
-          } catch (err) {
-            console.warn('[trace] could not start watch broadcaster:', err);
+          } catch (err2) {
+            if (cancelled) return;
+            setCameraError(
+              err2?.name === 'NotAllowedError'
+                ? 'Camera access was blocked. Allow it in your browser settings to start tracing.'
+                : 'Could not start the camera. Try a different browser or device.'
+            );
+            return;
           }
         }
-      } catch (err) {
-        setCameraError(
-          err?.name === 'NotAllowedError'
-            ? 'Camera access was blocked. Allow it in your browser settings to start tracing.'
-            : 'Could not start the camera. Try a different browser or device.'
-        );
+      }
+
+      if (cancelled || !stream) {
+        if (stream) stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
+
+      // Detect torch support on the back camera.
+      const track = stream.getVideoTracks()[0];
+      if (track && typeof track.getCapabilities === 'function') {
+        const caps = track.getCapabilities();
+        if (caps?.torch) setTorchSupported(true);
+      }
+      setCameraError('');
+
+      // Reference-image thumbnail is sent over a WebRTC data channel to
+      // the admin's spectator modal. Downscale once, cache, hand a string
+      // ref to the broadcaster — no server storage, no extra bandwidth
+      // beyond the one P2P send when the data channel opens.
+      const referenceThumb = await getReferenceThumb();
+      if (cancelled) return;
+
+      // Spin up the spectator broadcaster once we actually have a stream.
+      // Tear down any prior broadcaster first (camera switch flips this
+      // effect; the old WebRTC peer is bound to the previous stream).
+      if (broadcaster) { try { broadcaster.stop(); } catch { /* ignore */ } broadcaster = null; }
+      if (userId && !cancelled) {
+        try {
+          broadcaster = startBroadcaster({
+            userId,
+            kind: 'tracewatch',
+            stream,
+            referenceImageDataUrl: referenceThumb,
+            onError: (err) => console.warn('[trace] watch broadcaster error:', err),
+          });
+        } catch (err) {
+          console.warn('[trace] could not start watch broadcaster:', err);
+        }
       }
     }
 
@@ -185,7 +242,7 @@ export default function Trace() {
       if (stream) stream.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
-  }, [facingMode, user?.id]);
+  }, [facingMode, user?.id, getReferenceThumb]);
 
   // Auto-hide the gesture hint after a moment
   useEffect(() => {

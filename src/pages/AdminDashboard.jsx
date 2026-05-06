@@ -648,11 +648,22 @@ function SpectateModal({ user, onClose }) {
   const viewerRef = useRef(null);
   const [status, setStatus] = useState('waiting');
   const [error, setError]   = useState(null);
+  // Reference image arrives via WebRTC data channel a beat after the video
+  // tracks. Render side-by-side so the operator sees both the user's
+  // camera feed and the picture they're tracing without leaving the modal.
+  const [referenceImage, setReferenceImage] = useState(null);
+  // Audio flows over the same peer connection. Default unmuted because the
+  // operator clicked Watch Live (counts as user gesture for autoplay
+  // policy). Toggle exposed for hands-free monitoring sessions.
+  const [muted, setMuted] = useState(false);
+  const [hasAudio, setHasAudio] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
     setStatus('waiting');
     setError(null);
+    setReferenceImage(null);
+    setHasAudio(false);
 
     const v = startViewer({
       userId: user.id,
@@ -661,12 +672,17 @@ function SpectateModal({ user, onClose }) {
         const el = videoRef.current;
         if (!el) return;
         el.srcObject = stream;
+        // Track-presence drives the mute UI affordance — if the user
+        // denied mic on /trace there's no audio track and the toggle
+        // shouldn't pretend otherwise.
+        setHasAudio(stream.getAudioTracks().length > 0);
         // Browsers require a play() after srcObject in some flows; ignore
-        // promise rejection (autoplay-with-mute always succeeds anyway).
+        // promise rejection (autoplay policy may still need a gesture).
         el.play().catch(() => { /* autoplay policy / handled by element */ });
       },
       onStatus: (s) => setStatus(s),
       onError:  (msg) => setError(msg || 'Connection error'),
+      onReferenceImage: (dataUrl) => setReferenceImage(dataUrl),
     });
     viewerRef.current = v;
 
@@ -679,6 +695,13 @@ function SpectateModal({ user, onClose }) {
       }
     };
   }, [user?.id]);
+
+  // Keep the <video>'s muted attribute in sync with our toggle. Setting it
+  // imperatively avoids a React re-render churn each toggle.
+  useEffect(() => {
+    const el = videoRef.current;
+    if (el) el.muted = muted;
+  }, [muted]);
 
   // Close on Escape — common modal expectation, no need for a global hook.
   useEffect(() => {
@@ -705,34 +728,77 @@ function SpectateModal({ user, onClose }) {
               </span>
             )}
           </div>
-          <button
-            type="button"
-            className="admin-spectate-close"
-            onClick={onClose}
-            aria-label="Close live view"
-          >
-            ✕
-          </button>
+          <div className="admin-spectate-actions">
+            {hasAudio && (
+              <button
+                type="button"
+                className={`admin-spectate-mute ${muted ? 'is-muted' : ''}`}
+                onClick={() => setMuted((m) => !m)}
+                aria-label={muted ? 'Unmute audio' : 'Mute audio'}
+                title={muted ? 'Unmute' : 'Mute'}
+              >
+                {muted ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                    <line x1="23" y1="9" x2="17" y2="15" />
+                    <line x1="17" y1="9" x2="23" y2="15" />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                    <path d="M15.54 8.46a5 5 0 010 7.07" />
+                    <path d="M19.07 4.93a10 10 0 010 14.14" />
+                  </svg>
+                )}
+              </button>
+            )}
+            <button
+              type="button"
+              className="admin-spectate-close"
+              onClick={onClose}
+              aria-label="Close live view"
+            >
+              ✕
+            </button>
+          </div>
         </header>
 
         <div className="admin-spectate-stage">
-          <video
-            ref={videoRef}
-            className="admin-spectate-video"
-            playsInline
-            muted
-            autoPlay
-          />
-          <div
-            className={`admin-spectate-status admin-spectate-status-${status}`}
-            aria-live="polite"
-          >
-            {error ? error : SPECTATE_STATUS_LABEL[status] ?? status}
+          <div className="admin-spectate-video-wrap">
+            <video
+              ref={videoRef}
+              className="admin-spectate-video"
+              playsInline
+              autoPlay
+            />
+            <div
+              className={`admin-spectate-status admin-spectate-status-${status}`}
+              aria-live="polite"
+            >
+              {error ? error : SPECTATE_STATUS_LABEL[status] ?? status}
+            </div>
           </div>
+          <aside className="admin-spectate-ref" aria-label="Reference image">
+            {referenceImage ? (
+              <img
+                src={referenceImage}
+                alt={user?.current_image_label || 'Reference image'}
+                className="admin-spectate-ref-img"
+                draggable={false}
+              />
+            ) : (
+              <div className="admin-spectate-ref-empty">
+                <span>Reference image</span>
+                <small>Loading…</small>
+              </div>
+            )}
+          </aside>
         </div>
 
         <footer className="admin-spectate-foot">
-          <span>P2P · video only · no recording</span>
+          <span>P2P · {hasAudio ? 'video + audio' : 'video only'} · no recording</span>
         </footer>
       </div>
     </div>

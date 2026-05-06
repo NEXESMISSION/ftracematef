@@ -44,11 +44,24 @@ const newId = () =>
 // Broadcaster: owns the camera stream, sends offers when a viewer appears.
 // onQualityRequest: optional callback fired when the viewer requests a
 // quality preset — the broadcaster's UI uses it to resize the canvas etc.
+// referenceImageDataUrl: optional thumbnail data URL. When provided, an
+// "extras" data channel is opened and the image is sent as soon as the
+// channel is ready — admin spectator uses this to show what the user is
+// tracing alongside the live camera feed.
 // ────────────────────────────────────────────────────────────────────────────
-export function startBroadcaster({ userId, kind = 'live', stream, onStatus, onError, onQualityRequest }) {
+export function startBroadcaster({
+  userId,
+  kind = 'live',
+  stream,
+  referenceImageDataUrl = null,
+  onStatus,
+  onError,
+  onQualityRequest,
+}) {
   const myId = newId();
   let pc = null;
   let videoSender = null;
+  let extrasChannel = null;
   let viewerId = null;
   let pendingIce = [];
   let stopped = false;
@@ -70,6 +83,7 @@ export function startBroadcaster({ userId, kind = 'live', stream, onStatus, onEr
   };
 
   const teardownPC = () => {
+    if (extrasChannel) { try { extrasChannel.close(); } catch { /* ignore */ } extrasChannel = null; }
     if (pc) { try { pc.close(); } catch { /* ignore */ } pc = null; }
     pendingIce = [];
   };
@@ -78,6 +92,35 @@ export function startBroadcaster({ userId, kind = 'live', stream, onStatus, onEr
     teardownPC();
     pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     videoSender = null;
+
+    // Open the data channel BEFORE addTrack/createOffer so it's negotiated
+    // in the SDP. The channel carries the reference-image thumbnail (and
+    // any future side-band metadata). We send the thumbnail once on open;
+    // if the viewer reconnects, a fresh PC + channel is created here and
+    // the thumbnail is re-sent automatically.
+    try {
+      extrasChannel = pc.createDataChannel('extras', { ordered: true });
+      extrasChannel.onopen = () => {
+        if (stopped || !extrasChannel) return;
+        if (referenceImageDataUrl) {
+          try {
+            extrasChannel.send(JSON.stringify({
+              type: 'reference-image',
+              dataUrl: referenceImageDataUrl,
+            }));
+          } catch (err) {
+            console.warn('[livePreview] failed to send reference image:', err);
+          }
+        }
+      };
+      extrasChannel.onerror = (err) => {
+        // Non-fatal — the video stream is the load-bearing payload.
+        console.warn('[livePreview] extras channel error:', err);
+      };
+    } catch (err) {
+      console.warn('[livePreview] could not create extras channel:', err);
+    }
+
     stream.getTracks().forEach((track) => {
       const sender = pc.addTrack(track, stream);
       if (track.kind === 'video') videoSender = sender;
@@ -204,8 +247,11 @@ export function startBroadcaster({ userId, kind = 'live', stream, onStatus, onEr
 
 // ────────────────────────────────────────────────────────────────────────────
 // Viewer: receive-only side. Waits for an offer, answers it.
+// onReferenceImage: optional callback fired when the broadcaster ships the
+// reference-image thumbnail over the "extras" data channel. Receives a
+// data URL string suitable for an <img src=...>.
 // ────────────────────────────────────────────────────────────────────────────
-export function startViewer({ userId, kind = 'live', onStream, onStatus, onError }) {
+export function startViewer({ userId, kind = 'live', onStream, onStatus, onError, onReferenceImage }) {
   const myId = newId();
   let broadcasterId = null;
   let pendingIce = [];
@@ -218,6 +264,22 @@ export function startViewer({ userId, kind = 'live', onStream, onStatus, onError
   pc.addTransceiver('audio', { direction: 'recvonly' });
   pc.ontrack = (e) => {
     if (e.streams?.[0]) onStream?.(e.streams[0]);
+  };
+  // Receive the broadcaster's "extras" data channel. We don't open one
+  // ourselves — the broadcaster creates it before the offer, and this
+  // handler fires once on the viewer side when it negotiates in.
+  pc.ondatachannel = (e) => {
+    if (e.channel?.label !== 'extras') return;
+    e.channel.onmessage = (msg) => {
+      try {
+        const data = JSON.parse(msg.data);
+        if (data?.type === 'reference-image' && typeof data.dataUrl === 'string') {
+          onReferenceImage?.(data.dataUrl);
+        }
+      } catch (err) {
+        console.warn('[livePreview] bad extras message:', err);
+      }
+    };
   };
   pc.onconnectionstatechange = () => {
     const s = pc.connectionState;

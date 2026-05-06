@@ -1101,11 +1101,47 @@
   flex-shrink: 0;
 }
 .admin-spectate-close:hover { background: var(--ink); color: var(--paper); }
+
+/* Header right cluster: mute toggle (when audio present) + close. */
+.admin-spectate-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.admin-spectate-mute {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.admin-spectate-mute:hover { background: var(--cream-deep); }
+.admin-spectate-mute.is-muted {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Stage = live video (left/top) + reference image (right/bottom). Grid
+   gives the video the bulk of the space and keeps the reference panel a
+   readable size (~30%) regardless of screen width. Stacks on narrow
+   viewports — the video sits on top, the reference below. */
 .admin-spectate-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(180px, 3fr);
+  background: #000;
+  width: 100%;
+}
+.admin-spectate-video-wrap {
   position: relative;
   background: #000;
   aspect-ratio: 16 / 9;
-  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1145,6 +1181,48 @@
 .admin-spectate-status-connecting::before,
 .admin-spectate-status-reconnecting::before { background: #f5b432; }
 .admin-spectate-status-disconnected::before { background: #d94a4a; }
+
+/* Reference-image side panel. Dark backdrop so the image — which can be
+   any color — stays readable, with a subtle inner glow on the boundary
+   between the video and the reference so they don't blur together. */
+.admin-spectate-ref {
+  background: #1a1a1a;
+  border-left: 1px solid #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  min-height: 140px;
+}
+.admin-spectate-ref-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.admin-spectate-ref-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+}
+.admin-spectate-ref-empty small {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.4);
+}
+
 .admin-spectate-foot {
   padding: 8px 16px;
   border-top: 1px dashed rgba(0, 0, 0, 0.15);
@@ -1153,4 +1231,17 @@
   color: var(--ink-soft, #8a7762);
   text-align: center;
   letter-spacing: 0.04em;
+}
+
+/* On narrow screens the side-by-side layout makes both halves too small.
+   Stack — video on top, reference below — so each gets full width. */
+@media (max-width: 720px) {
+  .admin-spectate-stage {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(140px, 30vh);
+  }
+  .admin-spectate-ref {
+    border-left: none;
+    border-top: 1px solid #333;
+  }
 }
