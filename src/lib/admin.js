@@ -45,12 +45,15 @@ export async function getUserActivity(userId) {
 }
 
 /**
- * Server-side analytics rollup for the StatsPanel:
- *   { funnel, revenue, activity, engagement, top_users, at_risk, computed_at }
+ * Server-side analytics rollup for the StatsPanel + the webhook health
+ * sidecar. Returns:
+ *   { stats: { funnel, revenue, activity, engagement, top_users, at_risk },
+ *     webhook_health: { stuck_count, stuck_24h_count, oldest_stuck_age_secs, recent } }
  *
- * One request → one transaction → all stats. The aggregation runs server-
- * side via get_admin_stats() so the client doesn't have to walk every row
- * of profiles + subscriptions + trace_session_runs.
+ * One request → two parallel server-side queries → both payloads. The
+ * aggregation runs server-side via get_admin_stats() + get_webhook_health()
+ * so the client doesn't have to walk every row of profiles + subscriptions
+ * + trace_session_runs + webhook_events.
  */
 export async function getAdminStats() {
   const { data, error } = await supabase.functions.invoke('admin-stats', {
@@ -59,5 +62,8 @@ export async function getAdminStats() {
   });
   if (error) throw new Error(await unwrapFunctionError(error));
   if (data?.error) throw new Error(data.error);
-  return data?.stats ?? null;
+  return {
+    stats:          data?.stats ?? null,
+    webhook_health: data?.webhook_health ?? null,
+  };
 }

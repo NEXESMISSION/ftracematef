@@ -391,6 +391,7 @@ function FunnelPanel({ funnel }) {
 
 function StatsPanel() {
   const [stats, setStats]   = useState(null);
+  const [health, setHealth] = useState(null);
   const [error, setError]   = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -402,7 +403,8 @@ function StatsPanel() {
       try {
         const data = await getAdminStats();
         if (!cancelled) {
-          setStats(data);
+          setStats(data.stats);
+          setHealth(data.webhook_health);
           setError(null);
         }
       } catch (e) {
@@ -445,6 +447,8 @@ function StatsPanel() {
   const planEntries = Object.entries(revenue?.plans ?? {});
 
   return (
+    <>
+      {health && <WebhookHealthPanel data={health} />}
     <section className="admin-stats" aria-labelledby="admin-stats-title">
       <header className="admin-stats-head">
         <h2 id="admin-stats-title">Business stats</h2>
@@ -574,6 +578,83 @@ function StatsPanel() {
           )}
         </div>
       </div>
+    </section>
+    </>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
+/* Webhook health — stuck-event count + recent list. Mounted above the
+   business stats so anything stuck for >24h is impossible to miss.       */
+
+function fmtAgo(secs) {
+  if (!Number.isFinite(secs) || secs <= 0) return '0s';
+  if (secs < 60)     return `${Math.round(secs)}s`;
+  if (secs < 3600)   return `${Math.round(secs / 60)}m`;
+  if (secs < 86400)  return `${Math.round(secs / 3600)}h`;
+  return `${Math.round(secs / 86400)}d`;
+}
+
+function WebhookHealthPanel({ data }) {
+  const [open, setOpen] = useState(false);
+  const stuck     = Number(data?.stuck_count ?? 0);
+  const stuck24h  = Number(data?.stuck_24h_count ?? 0);
+  const oldest    = Number(data?.oldest_stuck_age_secs ?? 0);
+  const recent    = Array.isArray(data?.recent) ? data.recent : [];
+
+  if (stuck === 0) {
+    return (
+      <section className="admin-webhooks admin-webhooks-clean" aria-label="Webhook health">
+        <span className="admin-webhooks-dot" aria-hidden="true" />
+        <span className="admin-webhooks-headline">Webhooks healthy</span>
+        <span className="admin-webhooks-sub">no stuck events in the last 14 days</span>
+      </section>
+    );
+  }
+
+  const tone = stuck24h > 0 ? 'admin-webhooks-bad' : 'admin-webhooks-warn';
+  return (
+    <section className={`admin-webhooks ${tone}`} aria-label="Webhook health">
+      <button
+        type="button"
+        className="admin-webhooks-summary"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span className="admin-webhooks-dot" aria-hidden="true" />
+        <span className="admin-webhooks-headline">
+          {stuck} stuck webhook{stuck === 1 ? '' : 's'}
+          {stuck24h > 0 && <em> · {stuck24h} over 24h</em>}
+        </span>
+        <span className="admin-webhooks-sub">
+          oldest {fmtAgo(oldest)} ago · {open ? 'hide' : 'view'}
+        </span>
+      </button>
+      {open && (
+        <ol className="admin-webhooks-list">
+          {recent.map((r, i) => (
+            <li key={r.webhook_id || i} className="admin-webhooks-row">
+              <div className="admin-webhooks-row-head">
+                <span className="admin-webhooks-event">{r.event_type ?? '—'}</span>
+                <span className="admin-webhooks-when" title={r.created_at}>
+                  {formatRelative(r.created_at)} · {r.attempts ?? 0} attempts
+                </span>
+              </div>
+              {(r.subscription_id || r.payment_id || r.customer_email) && (
+                <div className="admin-webhooks-meta">
+                  {r.customer_email && <span>{r.customer_email}</span>}
+                  {r.amount && r.currency && <span>{r.amount} {r.currency}</span>}
+                  {r.subscription_id && <span>sub {String(r.subscription_id).slice(-10)}</span>}
+                  {r.payment_id && <span>pay {String(r.payment_id).slice(-10)}</span>}
+                </div>
+              )}
+              {r.error_message && (
+                <div className="admin-webhooks-error">{r.error_message}</div>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }

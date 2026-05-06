@@ -80,14 +80,28 @@ Deno.serve(async (req) => {
     return json({ error: 'Too many requests. Slow down and try again in a minute.' }, 429);
   }
 
-  // The RPC returns a single jsonb blob with all stats. service_role bypasses
-  // RLS and is the only role granted execute on get_admin_stats() — non-admin
-  // routes can't call this function even with a leaked SUPABASE_URL.
-  const { data: stats, error: rpcErr } = await admin.rpc('get_admin_stats');
-  if (rpcErr) {
-    console.error('[admin-stats] get_admin_stats failed:', rpcErr);
-    return json({ error: rpcErr.message }, 500);
+  // The RPCs return a single jsonb blob each. service_role bypasses RLS
+  // and is the only role granted execute, so non-admin routes can't call
+  // these even with a leaked SUPABASE_URL. Run in parallel — both touch
+  // different tables, no ordering hazard.
+  const [statsRes, healthRes] = await Promise.all([
+    admin.rpc('get_admin_stats'),
+    admin.rpc('get_webhook_health'),
+  ]);
+
+  if (statsRes.error) {
+    console.error('[admin-stats] get_admin_stats failed:', statsRes.error);
+    return json({ error: statsRes.error.message }, 500);
+  }
+  // Webhook health is a soft dependency — log and degrade gracefully so an
+  // older project that hasn't run the migration yet still gets the rest of
+  // the stats payload.
+  if (healthRes.error) {
+    console.warn('[admin-stats] get_webhook_health failed (continuing):', healthRes.error);
   }
 
-  return json({ stats });
+  return json({
+    stats:          statsRes.data,
+    webhook_health: healthRes.data ?? null,
+  });
 });

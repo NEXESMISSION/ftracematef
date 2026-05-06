@@ -1,11 +1,13 @@
 // Supabase Edge Function: notify-operator
 // ─────────────────────────────────────────────────────────────────────────────
 // Receives event payloads from Postgres triggers (via pg_net) and forwards
-// them to the operator as Resend emails. Three event shapes:
+// them to the operator as Resend emails. Five event shapes:
 //
-//   { event: "signup",  profile_id, email, display_name, created_at }
-//   { event: "active",  profile_id, email, display_name, last_seen_at }
-//   { event: "digest",  signups_24h, active_24h, paid_total }
+//   { event: "signup",          profile_id, email, display_name, created_at }
+//   { event: "active",          profile_id, email, display_name, last_seen_at }
+//   { event: "digest",          signups_24h, active_24h, paid_total }
+//   { event: "stuck_webhooks",  stuck_count, oldest_age_secs, sample[] }
+//   { event: "test", to? }      diagnostic — sends a one-shot probe email
 //
 // Authentication is a shared secret in `x-notify-secret`. Without this gate
 // the function URL would be a free email-relay for any pg_net caller on the
@@ -55,7 +57,7 @@ function escapeHtml(value: unknown): string {
     .replace(/'/g, '&#39;');
 }
 
-async function sendEmail(subject: string, html: string): Promise<Response> {
+async function sendEmail(subject: string, html: string, overrideTo?: string): Promise<Response> {
   if (!RESEND_API_KEY || !OPERATOR_EMAIL) {
     console.error('[notify-operator] RESEND_API_KEY or OPERATOR_EMAIL not set');
     return new Response(
@@ -64,6 +66,7 @@ async function sendEmail(subject: string, html: string): Promise<Response> {
     );
   }
 
+  const to = overrideTo || OPERATOR_EMAIL;
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -72,23 +75,39 @@ async function sendEmail(subject: string, html: string): Promise<Response> {
     },
     body: JSON.stringify({
       from:    RESEND_FROM,
-      to:      [OPERATOR_EMAIL],
+      to:      [to],
       subject,
       html,
     }),
   });
 
+  // Resend always returns JSON. On success: { id: 'xx_...' } — surface it so
+  // the operator can search the Resend dashboard / pg_net response log to
+  // confirm a specific delivery. On failure: { name, message, ... }.
+  let resendBody: any = null;
+  try { resendBody = await r.json(); } catch { /* leave null */ }
+
   if (!r.ok) {
-    const errText = await r.text().catch(() => '');
-    console.error('[notify-operator] Resend error', r.status, errText);
+    console.error('[notify-operator] Resend error', r.status, resendBody);
     return new Response(
-      JSON.stringify({ error: 'email send failed', status: r.status, detail: errText }),
+      JSON.stringify({
+        error: 'email send failed',
+        status: r.status,
+        from: RESEND_FROM,
+        to,
+        resend: resendBody,
+      }),
       { status: 502, headers: { 'Content-Type': 'application/json' } },
     );
   }
 
   return new Response(
-    JSON.stringify({ ok: true }),
+    JSON.stringify({
+      ok: true,
+      from: RESEND_FROM,
+      to,
+      resend_id: resendBody?.id ?? null,
+    }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   );
 }
@@ -178,6 +197,59 @@ Deno.serve(async (req) => {
           </tr>
         </table>
       </div>`,
+    );
+  }
+
+  if (event === 'stuck_webhooks') {
+    const count   = Number(payload.stuck_count ?? 0);
+    const oldest  = Number(payload.oldest_age_secs ?? 0);
+    const oldestH = Math.floor(oldest / 3600);
+    const sample  = Array.isArray(payload.sample) ? payload.sample : [];
+    const rows = sample.map((s: any) => `
+      <tr>
+        <td style="padding:6px 10px 6px 0; color:#555; font-size:12px;">${escapeHtml(s.event_type)}</td>
+        <td style="padding:6px 10px 6px 0; color:#888; font-size:12px;">${escapeHtml(s.created_at)}</td>
+        <td style="padding:6px 0; color:#a33; font-size:12px;">${escapeHtml((s.error_message ?? '').slice(0, 140))}</td>
+      </tr>
+    `).join('');
+    return sendEmail(
+      `Trace Mate · ${count} stuck webhook${count === 1 ? '' : 's'}`,
+      `<div style="font-family: system-ui, -apple-system, sans-serif; max-width: 640px; line-height: 1.4;">
+        <h2 style="margin:0 0 12px; font-size:18px;">${count} webhook event${count === 1 ? ' has' : 's have'} been stuck for over 24 hours</h2>
+        <p style="margin:0 0 12px; color:#555;">
+          Oldest is <strong>${oldestH}h</strong> old. Dodo has either given up retrying or is about to.
+          Check the admin dashboard's Webhook health panel for the full list, or read the error messages below to start triage.
+        </p>
+        ${rows ? `<table style="border-collapse: collapse; width: 100%; font-size:12px; margin-top:8px;">
+          <thead><tr style="text-align:left;">
+            <th style="padding:4px 10px 4px 0; color:#888; font-weight:600;">event</th>
+            <th style="padding:4px 10px 4px 0; color:#888; font-weight:600;">when</th>
+            <th style="padding:4px 0;          color:#888; font-weight:600;">error</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>` : ''}
+      </div>`,
+    );
+  }
+
+  // Diagnostic: send a one-shot test email to OPERATOR_EMAIL (or a custom
+  // address passed as `to`). Returns the resolved RESEND_FROM and the Resend
+  // response id so the operator can confirm delivery vs. silent-bounce.
+  // Body: { event: 'test', to?: string }
+  if (event === 'test') {
+    const overrideTo = typeof payload.to === 'string' && payload.to.length > 0
+      ? payload.to
+      : undefined;
+    return sendEmail(
+      'Trace Mate · notify-operator test',
+      `<div style="font-family: system-ui, -apple-system, sans-serif; max-width: 480px; line-height: 1.4;">
+        <h2 style="margin:0 0 12px; font-size:18px;">Test email</h2>
+        <p style="margin:0 0 6px;">If you're reading this, the notify-operator pipeline is healthy end-to-end.</p>
+        <p style="margin:14px 0 0; color:#888; font-size:12px;">from: ${escapeHtml(RESEND_FROM)}</p>
+        <p style="margin:6px 0 0; color:#888; font-size:12px;">to: ${escapeHtml(overrideTo ?? OPERATOR_EMAIL ?? '(unset)')}</p>
+        <p style="margin:6px 0 0; color:#888; font-size:12px;">at: ${new Date().toISOString()}</p>
+      </div>`,
+      overrideTo,
     );
   }
 
