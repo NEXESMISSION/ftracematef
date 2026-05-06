@@ -182,6 +182,43 @@ export function AuthProvider({ children }) {
     };
   }, [loadUserData]);
 
+  // 2.5) Capture signup context (landing page + referrer) on first sign-in.
+  // Fires once per profile, the first time we see a profile whose
+  // signup_landing column is still null AND whose created_at is fresh
+  // (< 60s old, so we don't retroactively stamp an existing user with the
+  // page they happened to be on when they updated to this build).
+  // Best-effort RPC: failures are silent — we'd rather miss a stamp than
+  // block sign-in on a transient network blip.
+  const stampedSignupRef = useRef(false);
+  useEffect(() => {
+    if (!profile || stampedSignupRef.current) return;
+    if (profile.signup_landing) return;
+    const created = profile.created_at ? new Date(profile.created_at).getTime() : 0;
+    if (Date.now() - created > 60_000) return;
+    stampedSignupRef.current = true;
+    // Strip the auth callback's ?code= / #access_token= from the path so
+    // the landing column is the route the user *intended*, not the OAuth
+    // hand-off URL. The most useful signal is whether they landed on
+    // /pricing vs /welcome vs / before signup, not the auth flow detail.
+    const landing = (() => {
+      try {
+        const path = window.location.pathname.replace(/^\//, '') || 'root';
+        if (path.startsWith('auth/callback')) {
+          // OAuth round-trip — try sessionStorage marker the login UI sets.
+          return window.sessionStorage.getItem('tm:signup-landing') || 'oauth';
+        }
+        return path.split('/')[0];
+      } catch { return 'unknown'; }
+    })();
+    const referrer = (() => {
+      try { return document.referrer || ''; } catch { return ''; }
+    })();
+    supabase.rpc('record_signup_context', {
+      p_landing: landing.slice(0, 60),
+      p_referrer: referrer.slice(0, 500),
+    }).catch(() => { /* sparse stamp — silent on failure */ });
+  }, [profile]);
+
   // 3) Real-time: when the webhook flips this user's subscription, refresh.
   //    Falls back to lightweight polling if the realtime channel never reaches
   //    SUBSCRIBED (corp firewalls, ad-blockers, blocked WebSocket transport).

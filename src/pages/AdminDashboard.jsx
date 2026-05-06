@@ -76,6 +76,26 @@ function isOnline(lastSeen) {
   return Date.now() - t < ONLINE_WINDOW_MS;
 }
 
+// Classify each user by where they got in the funnel. Priority order
+// matters — a paid user is paid even if they also hit the paywall once.
+// 'ghost' is the catch-all for users who signed up and did literally
+// nothing else, which is the most actionable segment to investigate.
+const STAGE_DEFS = {
+  paid:   { label: 'Paid',         tone: 'good',    blurb: 'Paying customer' },
+  warm:   { label: 'Bailed checkout', tone: 'warn', blurb: 'Opened Dodo checkout but didn\'t finish — recoverable lead' },
+  cold:   { label: 'Saw pricing',  tone: 'info',    blurb: 'Reached pricing or paywall but didn\'t open checkout' },
+  trying: { label: 'Trying',       tone: 'info',    blurb: 'Used the studio at least once' },
+  ghost:  { label: 'Ghost',        tone: 'muted',   blurb: 'Signed up, never traced, never saw pricing — investigate why' },
+};
+
+function userStage(u) {
+  if (u.is_paid) return 'paid';
+  if (u.first_checkout_at) return 'warm';
+  if (u.first_paywall_at || u.first_pricing_at) return 'cold';
+  if ((u.trace_sessions ?? 0) > 0) return 'trying';
+  return 'ghost';
+}
+
 // Friendly labels for the `current_page` enum the client emits. Keep this
 // list in sync with the strings passed to usePresence(...) and the literal
 // 'trace' written by heartbeat_trace_run on the server.
@@ -147,12 +167,15 @@ function LiveDuration({ startedAt, lastHeartbeatAt }) {
   return <>{formatDuration(seconds)}</>;
 }
 
-function Timeline({ activity }) {
-  // Merge events from three sources into a single chronological feed —
+function Timeline({ activity, journey }) {
+  // Merge events from four sources into a single chronological feed —
   // operator scans top-to-bottom, no need to remember which silo holds what.
+  // `journey` items are synthesized client-side from the user record (signup
+  // landing, first pricing/paywall/checkout) — server doesn't ship them on
+  // the activity endpoint since they live as columns on the user row.
   const items = useMemo(() => {
     if (!activity) return [];
-    const merged = [];
+    const merged = [...(journey ?? [])];
     for (const s of activity.sub_history ?? []) {
       merged.push({
         kind:   'sub',
@@ -232,7 +255,7 @@ function Timeline({ activity }) {
     return merged
       .filter((m) => m.at)
       .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
-  }, [activity]);
+  }, [activity, journey]);
 
   if (!activity) return null;
   if (items.length === 0) {
@@ -1017,7 +1040,8 @@ function SpectateModal({ user, onClose }) {
 
 /* ─────────────────────────────────────────────────────────────────────── */
 
-function ActivityPanel({ userId }) {
+function ActivityPanel({ user }) {
+  const userId = user?.id;
   const [activity, setActivity] = useState(null);
   const [error, setError]       = useState(null);
 
@@ -1030,6 +1054,49 @@ function ActivityPanel({ userId }) {
     return () => { cancelled = true; };
   }, [userId]);
 
+  // Synthesize journey events client-side from the user record. These
+  // columns ride along on the list-users response, so no extra fetch.
+  // Mounted alongside the server-fetched timeline below — the Timeline
+  // component merges everything by timestamp.
+  const journey = useMemo(() => {
+    if (!user) return [];
+    const out = [];
+    if (user.created_at) {
+      const where = user.signup_landing ? ` (from /${user.signup_landing})` : '';
+      out.push({
+        kind: 'journey-signup',
+        at: user.created_at,
+        title: `Signed up${where}`,
+        detail: user.signup_referrer ? `referrer: ${user.signup_referrer.slice(0, 100)}` : null,
+      });
+    }
+    if (user.first_pricing_at) {
+      out.push({
+        kind: 'journey',
+        at: user.first_pricing_at,
+        title: 'First viewed pricing',
+        detail: null,
+      });
+    }
+    if (user.first_paywall_at) {
+      out.push({
+        kind: 'journey-warn',
+        at: user.first_paywall_at,
+        title: 'Hit the paywall',
+        detail: null,
+      });
+    }
+    if (user.first_checkout_at) {
+      out.push({
+        kind: 'journey-warm',
+        at: user.first_checkout_at,
+        title: 'Opened Dodo checkout',
+        detail: null,
+      });
+    }
+    return out;
+  }, [user]);
+
   return (
     <div className="admin-activity">
       {!activity && !error && (
@@ -1039,7 +1106,7 @@ function ActivityPanel({ userId }) {
         </div>
       )}
       {error && <p className="admin-error">{error}</p>}
-      {activity && <Timeline activity={activity} />}
+      {activity && <Timeline activity={activity} journey={journey} />}
     </div>
   );
 }
@@ -1105,17 +1172,23 @@ export default function AdminDashboard() {
   });
 
   const counts = useMemo(() => {
-    if (!users) return { all: 0, paid: 0, unpaid: 0, online: 0, tracing: 0 };
+    if (!users) return { all: 0, paid: 0, unpaid: 0, online: 0, tracing: 0, ghost: 0, cold: 0, warm: 0, trying: 0 };
     let paid = 0, online = 0, tracing = 0;
+    let ghost = 0, cold = 0, warm = 0, trying = 0;
     for (const u of users) {
       if (u.is_paid) paid++;
       if (isOnline(u.last_seen_at)) {
         online++;
         if (u.current_page === 'trace') tracing++;
       }
+      const stage = userStage(u);
+      if      (stage === 'ghost')  ghost++;
+      else if (stage === 'cold')   cold++;
+      else if (stage === 'warm')   warm++;
+      else if (stage === 'trying') trying++;
     }
     void tick;
-    return { all: users.length, paid, unpaid: users.length - paid, online, tracing };
+    return { all: users.length, paid, unpaid: users.length - paid, online, tracing, ghost, cold, warm, trying };
   }, [users, tick]);
 
   const filtered = useMemo(() => {
@@ -1130,6 +1203,7 @@ export default function AdminDashboard() {
     const matches = users.filter((u) => {
       if (filter === 'paid'    && !u.is_paid) return false;
       if (filter === 'unpaid'  &&  u.is_paid) return false;
+      if (['ghost','cold','warm','trying'].includes(filter) && userStage(u) !== filter) return false;
       if (filter === 'online'  && !isOnline(u.last_seen_at)) return false;
       if (filter === 'tracing' && (
         !isOnline(u.last_seen_at) || u.current_page !== 'trace'
@@ -1272,6 +1346,14 @@ export default function AdminDashboard() {
               { id: 'tracing', label: 'Tracing', count: counts.tracing },
               { id: 'paid',    label: 'Paid',    count: counts.paid },
               { id: 'unpaid',  label: 'Unpaid',  count: counts.unpaid },
+              // Funnel stages — derived client-side from the journey columns
+              // shipped on the user record. Lets the operator zero in on
+              // ghosts (signed up, did nothing) or warm leads (bailed during
+              // checkout) without scanning the whole list.
+              { id: 'ghost',   label: 'Ghost',   count: counts.ghost,  hint: 'Signed up, never traced or saw pricing' },
+              { id: 'cold',    label: 'Cold',    count: counts.cold,   hint: 'Saw pricing or paywall, didn\'t open checkout' },
+              { id: 'warm',    label: 'Warm',    count: counts.warm,   hint: 'Opened checkout but didn\'t finish' },
+              { id: 'trying',  label: 'Trying',  count: counts.trying, hint: 'Used the studio, hasn\'t reached pricing yet' },
             ].map((t) => (
               <button
                 key={t.id}
@@ -1280,6 +1362,7 @@ export default function AdminDashboard() {
                 aria-selected={filter === t.id}
                 className={`admin-tab ${filter === t.id ? 'is-active' : ''}`}
                 onClick={() => setFilter(t.id)}
+                title={t.hint}
               >
                 {t.label}
                 <span className="admin-tab-count">{t.count}</span>
@@ -1368,6 +1451,19 @@ export default function AdminDashboard() {
                           {u.cancel_at_period_end ? 'Pending cancel' : u.status}
                         </span>
                       )}
+                      {(() => {
+                        const stage = userStage(u);
+                        if (stage === 'paid') return null;  // 'Paid' pill above already says it
+                        const def = STAGE_DEFS[stage];
+                        return (
+                          <span
+                            className={`admin-pill admin-pill-stage admin-pill-${def.tone}`}
+                            title={def.blurb}
+                          >
+                            {def.label}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     <dl className="admin-row-meta">
@@ -1435,7 +1531,7 @@ export default function AdminDashboard() {
                   {isOpen && (
                     <div id={`admin-activity-${u.id}`} className="admin-row-activity">
                       <TraceStatsTiles user={u} />
-                      <ActivityPanel userId={u.id} />
+                      <ActivityPanel user={u} />
                     </div>
                   )}
                 </li>

@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
   // about than the foreign-key embed magic.
   const { data: profiles, error: profErr } = await admin
     .from('profiles')
-    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at, dodo_customer_id, total_trace_seconds, trace_sessions, first_trace_at, last_trace_at, current_page, current_image_label, current_run_id')
+    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at, dodo_customer_id, total_trace_seconds, trace_sessions, first_trace_at, last_trace_at, current_page, current_image_label, current_run_id, signup_landing, signup_referrer, first_pricing_at, first_paywall_at, first_checkout_at')
     .order('created_at', { ascending: false })
     .limit(2000);
   if (profErr) return json({ error: profErr.message }, 500);
@@ -228,6 +228,16 @@ Deno.serve(async (req) => {
       trace_sessions:      p.trace_sessions ?? 0,
       first_trace_at:      p.first_trace_at ?? null,
       last_trace_at:       p.last_trace_at ?? null,
+      // Journey funnel — sparse "first occurrence" stamps. The admin UI
+      // uses these to classify each user (ghost / curious / tried / paywalled
+      // / abandoned / paid) so an operator can see at a glance why a row
+      // is sitting at "0 sessions". NULLs for users who signed up before
+      // 20260506200000_user_journey.sql landed — handle gracefully in the UI.
+      signup_landing:      p.signup_landing ?? null,
+      signup_referrer:     p.signup_referrer ?? null,
+      first_pricing_at:    p.first_pricing_at ?? null,
+      first_paywall_at:    p.first_paywall_at ?? null,
+      first_checkout_at:   p.first_checkout_at ?? null,
       // Live presence — what page the user is on right now, and the image
       // they're tracing if they're in the studio. Only meaningful when the
       // user is also "online" (last_seen_at within the heartbeat window);

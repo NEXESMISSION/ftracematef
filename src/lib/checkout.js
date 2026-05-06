@@ -14,6 +14,11 @@ export async function startCheckout(plan) {
   });
   if (error) throw new Error(await unwrapFunctionError(error));
   if (!data?.checkout_url) throw new Error('No checkout_url returned from Edge Function');
+  // Stamp first checkout open BEFORE returning the URL so the journey
+  // funnel records "user clicked through to Dodo" even if the user never
+  // makes it to the payment page (Dodo outage, browser back, etc.). Fire-
+  // and-forget; idempotent on the server side.
+  supabase.rpc('mark_journey_event', { p_event: 'checkout' }).catch(() => {});
   return data.checkout_url;
 }
 

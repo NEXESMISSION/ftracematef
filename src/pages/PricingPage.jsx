@@ -25,6 +25,14 @@ export default function PricingPage() {
   const [error, setError]               = useState(null);
   const [lifetimeLeft, setLifetimeLeft] = useState(null);
 
+  // Stamp first /pricing view for journey funnel. Server-side idempotent
+  // (only writes if first_pricing_at is null). Fire-and-forget; the gate
+  // on user means we never stamp anonymous visits.
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.rpc('mark_journey_event', { p_event: 'pricing' }).catch(() => {});
+  }, [user?.id]);
+
   // Dodo bounces the user back here with ?checkout=cancelled on cancel/failure.
   // Keep the param reactive (read directly) so the modal can be dismissed by
   // clearing it from the URL — that way a hard refresh re-shows the modal,
