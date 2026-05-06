@@ -30,7 +30,7 @@ import { supabase } from './supabase.js';
  * logic. It's kept for analytics + the existing dev-panel reset flow.
  */
 
-export const FREE_SESSION_LIMIT = 1;
+export const FREE_SESSION_LIMIT = 2;
 
 const TRIAL_SESSION_KEY = 'tm:trial-session-active';
 const CONSUMED_KEY      = 'tm:trial-consumed-this-session';
