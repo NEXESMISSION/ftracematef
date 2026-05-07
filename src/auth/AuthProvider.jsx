@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { supabase } from '../lib/supabase.js';
 import { endTrialSession } from '../lib/freeTrial.js';
 import { currentPresence, onPresenceChange } from '../lib/presence.js';
+import { identifyUser, resetUser } from '../lib/analytics.js';
 
 /**
  * AuthProvider exposes `{ user, profile, subscription, isPaid, loading, signOut, refresh }`
@@ -221,6 +222,20 @@ export function AuthProvider({ children }) {
       p_referrer: referrer.slice(0, 500),
     }).then(() => {}, () => {});
   }, [profile]);
+
+  // 2.6) Tag the visitor in analytics so the pre-signup anonymous trail
+  // (referrer, UTMs, country, device) gets joined to the registered account.
+  // No-op when no analytics provider is configured. Repeated identify calls
+  // with the same id are cheap — PostHog dedupes server-side.
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+    identifyUser(userId, {
+      email: session.user.email || undefined,
+      plan: subscription?.plan || 'free',
+      plan_status: subscription?.status || undefined,
+    });
+  }, [session?.user?.id, session?.user?.email, subscription?.plan, subscription?.status]);
 
   // 3) Real-time: when the webhook flips this user's subscription, refresh.
   //    Falls back to lightweight polling if the realtime channel never reaches
@@ -450,6 +465,9 @@ export function AuthProvider({ children }) {
     // user doesn't inherit it. The DB stamp is per-account so it's already
     // isolated, but the in-tab flag would otherwise leak across users.
     endTrialSession();
+    // Forget the analytics identity so the next visitor on this device
+    // gets a fresh anonymous id and isn't merged with the previous user.
+    resetUser();
     // Global sign-out tries to invalidate refresh tokens server-side AND
     // wipe local storage. If the network call fails, the local-storage wipe
     // can be skipped — leaving the JWT readable to any later XSS. Catch the
