@@ -8,6 +8,7 @@ import { setPresence, clearPresence } from '../lib/presence.js';
 import { setTracing } from '../lib/tracing-state.js';
 import { startBroadcaster } from '../lib/livePreview.js';
 import { downscaleToDataUrl } from '../lib/imageDownscale.js';
+import { startRecording, isRecordingSupported } from '../lib/recorder.js';
 import {
   cssMatrix3d,
   identityCorners,
@@ -71,6 +72,21 @@ export default function Trace() {
   const [corners, setCorners]               = useState(null);
   const [baseSize, setBaseSize]             = useState(null);
   const handleDragRef                       = useRef(null);
+
+  // Recording state. recordIncludeOverlay persists the user's last choice so
+  // they don't have to re-tick the box on every visit. The stopper ref holds
+  // the {stop} handle returned by startRecording — null when idle.
+  const [recordIncludeOverlay, setRecordIncludeOverlay] = useLocalState('tm:recordOverlay', true);
+  const [recording, setRecording]   = useState(false);
+  const [recordSecs, setRecordSecs] = useState(0);
+  const [recordError, setRecordError] = useState('');
+  const recordStopperRef = useRef(null);
+  const recordSupported = isRecordingSupported();
+
+  // Refs that mirror the live overlay state so the recorder's per-frame
+  // composite tick can read up-to-date values without us re-creating the
+  // recorder on every gesture. Updated below in a tiny effect.
+  const overlayStateRef = useRef({ x: 0, y: 0, scale: 1, rotation: 0, flip: false, opacity: 0.55 });
 
   // No image? Bounce back to upload.
   useEffect(() => {
@@ -670,6 +686,82 @@ export default function Trace() {
     }
   }, []);
 
+  // Mirror the live overlay state into a ref so the recorder's per-frame
+  // composite tick can read the current transform/opacity without the
+  // recorder being recreated on every gesture.
+  useEffect(() => {
+    overlayStateRef.current = {
+      x: transform.x,
+      y: transform.y,
+      scale: transform.scale,
+      rotation: transform.rotation,
+      flip: transform.flip,
+      opacity: flickerOn ? flickerOpacity : opacity,
+    };
+  }, [transform, opacity, flickerOn, flickerOpacity]);
+
+  // 1Hz timer while recording — drives the REC chip in the topbar.
+  useEffect(() => {
+    if (!recording) return;
+    setRecordSecs(0);
+    const startedAt = Date.now();
+    const id = setInterval(() => {
+      setRecordSecs(Math.floor((Date.now() - startedAt) / 1000));
+    }, 250);
+    return () => clearInterval(id);
+  }, [recording]);
+
+  const toggleRecording = useCallback(async () => {
+    if (recording) {
+      const stopper = recordStopperRef.current;
+      recordStopperRef.current = null;
+      setRecording(false);
+      if (stopper) {
+        try { await stopper.stop(); } catch (err) { console.warn('[trace] stop record failed:', err); }
+      }
+      return;
+    }
+    if (!recordSupported) {
+      setRecordError('Recording is not supported in this browser.');
+      return;
+    }
+    const stream = streamRef.current;
+    if (!stream) {
+      setRecordError('Camera is not ready yet.');
+      return;
+    }
+    try {
+      const handle = startRecording({
+        mode: recordIncludeOverlay ? 'composite' : 'camera',
+        sourceStream: stream,
+        videoEl: videoRef.current,
+        overlayEl: overlayRef.current,
+        getOverlayState: () => overlayStateRef.current,
+      });
+      recordStopperRef.current = handle;
+      setRecording(true);
+      setRecordError('');
+    } catch (err) {
+      console.warn('[trace] start record failed:', err);
+      setRecordError(err?.message || 'Could not start recording.');
+    }
+  }, [recording, recordIncludeOverlay, recordSupported]);
+
+  // Make sure recording stops if the studio is unmounted mid-take.
+  useEffect(() => {
+    return () => {
+      const stopper = recordStopperRef.current;
+      recordStopperRef.current = null;
+      if (stopper) { try { stopper.stop(); } catch { /* ignore */ } }
+    };
+  }, []);
+
+  const formatRecTime = (s) => {
+    const mm = Math.floor(s / 60);
+    const ss = s % 60;
+    return `${mm}:${ss.toString().padStart(2, '0')}`;
+  };
+
   // ===== Quick actions =====
   const recenter       = () => setTransform((t) => ({ ...t, x: 0, y: 0 }));
   const flipHorizontal = () => setTransform((t) => ({ ...t, flip: !t.flip }));
@@ -761,6 +853,12 @@ export default function Trace() {
           <img src="/images/brand/logo-icon.webp" alt="" className="trace-brand-icon" />
           <span className="trace-brand-domain">tracemate.art</span>
         </div>
+        {recording && (
+          <div className="trace-rec-chip" role="status" aria-live="polite">
+            <span className="trace-rec-dot" aria-hidden="true" />
+            <span>REC {formatRecTime(recordSecs)}</span>
+          </div>
+        )}
       </header>
 
       {/* Hint */}
@@ -830,6 +928,26 @@ export default function Trace() {
 
         {!controlsHidden && (
           <div className="trace-controls-inner">
+            {recordSupported && !recording && (
+              <label className="trace-checkbox">
+                <input
+                  type="checkbox"
+                  checked={recordIncludeOverlay}
+                  onChange={(e) => setRecordIncludeOverlay(e.target.checked)}
+                />
+                <span className="trace-checkbox-box" aria-hidden="true">
+                  <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor"
+                       strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2.5 7.5 L6 11 L11.5 3.5" />
+                  </svg>
+                </span>
+                <span className="trace-checkbox-label">Include drawing overlay in recording</span>
+              </label>
+            )}
+            {recordError && (
+              <div className="trace-rec-error" role="alert">{recordError}</div>
+            )}
+
             <div className="trace-slider">
               <input
                 id="opacity"
@@ -990,6 +1108,29 @@ export default function Trace() {
                 </svg>
                 <span>Camera</span>
               </button>
+
+              {recordSupported && (
+                <button
+                  type="button"
+                  className={`trace-action-btn trace-record-btn ${recording ? 'is-recording' : ''}`}
+                  onClick={toggleRecording}
+                  aria-pressed={recording}
+                  aria-label={recording ? 'Stop recording' : 'Start recording'}
+                >
+                  {recording ? (
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <rect x="5" y="5" width="10" height="10" rx="1.5" />
+                    </svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                         strokeWidth="1.8" aria-hidden="true">
+                      <circle cx="10" cy="10" r="7" />
+                      <circle cx="10" cy="10" r="3.4" fill="currentColor" stroke="none" />
+                    </svg>
+                  )}
+                  <span>{recording ? 'Stop' : 'Record'}</span>
+                </button>
+              )}
 
               {torchSupported && (
                 <button
