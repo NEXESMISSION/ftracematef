@@ -384,6 +384,24 @@ body:has(.trace-stage) {
   border-color: var(--coral);
 }
 
+/* ----- Idle dim: chrome fades after 10s of no interaction ----- */
+.trace-topbar,
+.trace-controls,
+.warp-reset {
+  transition: opacity 0.6s ease;
+}
+.trace-stage.is-idle .trace-topbar,
+.trace-stage.is-idle .trace-controls,
+.trace-stage.is-idle .warp-reset {
+  opacity: 0.22;
+}
+/* The opacity transition on .trace-controls would otherwise stomp the
+   existing padding/background/width transition declared up above. Keep
+   both by extending the multi-property transition for the controls dock. */
+.trace-controls {
+  transition: padding 0.2s ease, background 0.2s ease, width 0.2s ease, opacity 0.6s ease;
+}
+
 /* ----- Record: REC chip in topbar, checkbox, button states, errors ----- */
 .trace-rec-chip {
   display: inline-flex;

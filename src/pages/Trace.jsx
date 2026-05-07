@@ -73,6 +73,14 @@ export default function Trace() {
   const [baseSize, setBaseSize]             = useState(null);
   const handleDragRef                       = useRef(null);
 
+  // Idle dim. After 10s with no click/tap/wheel/keypress the on-screen
+  // chrome (topbar, controls dock, warp reset) fades to a low opacity so
+  // it's out of the way during long focused tracing sessions and out of
+  // shot during recordings. Any interaction snaps it back instantly.
+  // Hover alone is intentionally NOT counted — on desktop it would keep
+  // the timer constantly reset just because the cursor crossed the window.
+  const [idle, setIdle] = useState(false);
+
   // Recording state. recordIncludeOverlay persists the user's last choice so
   // they don't have to re-tick the box on every visit. The stopper ref holds
   // the {stop} handle returned by startRecording — null when idle.
@@ -747,6 +755,29 @@ export default function Trace() {
     }
   }, [recording, recordIncludeOverlay, recordSupported]);
 
+  // Idle timer. Reset on pointerdown / wheel / keydown anywhere on the
+  // page; fires after 10s of quiet to dim the chrome.
+  useEffect(() => {
+    let timerId = null;
+    const IDLE_MS = 10_000;
+    const arm = () => {
+      setIdle(false);
+      if (timerId) clearTimeout(timerId);
+      timerId = setTimeout(() => setIdle(true), IDLE_MS);
+    };
+    arm();
+    const opts = { passive: true, capture: true };
+    window.addEventListener('pointerdown', arm, opts);
+    window.addEventListener('wheel',       arm, opts);
+    window.addEventListener('keydown',     arm, opts);
+    return () => {
+      if (timerId) clearTimeout(timerId);
+      window.removeEventListener('pointerdown', arm, opts);
+      window.removeEventListener('wheel',       arm, opts);
+      window.removeEventListener('keydown',     arm, opts);
+    };
+  }, []);
+
   // Make sure recording stops if the studio is unmounted mid-take.
   useEffect(() => {
     return () => {
@@ -800,7 +831,7 @@ export default function Trace() {
   } : null;
 
   return (
-    <div className="trace-stage">
+    <div className={`trace-stage ${idle ? 'is-idle' : ''}`}>
       <video ref={videoRef} className="trace-video" playsInline muted autoPlay />
 
       <div
