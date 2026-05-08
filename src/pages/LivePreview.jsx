@@ -228,12 +228,16 @@ function ViewerStage({ userId, onChangeRole }) {
     setEditMode(true);
   };
 
+  // Revoke the blob URL when it's replaced or the component unmounts. Empty
+  // deps used to capture the *initial* overlayUrl (null) in closure, so an
+  // unmount AFTER a file pick leaked the blob. Depending on overlayUrl makes
+  // the cleanup see the value to revoke; the file picker also revokes the
+  // previous URL inline (idempotent — no double-free).
   useEffect(() => {
     return () => {
       if (overlayUrl?.startsWith('blob:')) URL.revokeObjectURL(overlayUrl);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [overlayUrl]);
 
   // ───────── Gestures: dispatch to overlay (edit) or video (view) ─────────
   // The viewer's gesture handlers live on the entire trace-stage div, so
@@ -250,7 +254,9 @@ function ViewerStage({ userId, onChangeRole }) {
 
   const onPointerDown = useCallback((e) => {
     if (isUiTarget(e.target)) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    // setPointerCapture can throw on Safari/iOS / detached nodes; failure
+    // just falls back to hit-test pointer routing — don't kill the gesture.
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (editMode) {
       // Drag overlay (with optional pinch/rotate)
@@ -378,7 +384,7 @@ function ViewerStage({ userId, onChangeRole }) {
   // ───────── Warp handle drag ─────────
   const onHandleDown = useCallback((key, e) => {
     e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     handleDragRef.current = {
       key,
       pointerId: e.pointerId,
@@ -905,7 +911,7 @@ function BroadcasterStage({ userId, onChangeRole }) {
   // ===== Warp handle drag =====
   const onHandleDown = useCallback((key, e) => {
     e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     handleDragRef.current = {
       key,
       pointerId: e.pointerId,
@@ -996,12 +1002,16 @@ function BroadcasterStage({ userId, onChangeRole }) {
   };
 
   // Revoke blob URL on unmount.
+  // Revoke the blob URL when it's replaced or the component unmounts. Empty
+  // deps used to capture the *initial* overlayUrl (null) in closure, so an
+  // unmount AFTER a file pick leaked the blob. Depending on overlayUrl makes
+  // the cleanup see the value to revoke; the file picker also revokes the
+  // previous URL inline (idempotent — no double-free).
   useEffect(() => {
     return () => {
       if (overlayUrl?.startsWith('blob:')) URL.revokeObjectURL(overlayUrl);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [overlayUrl]);
 
   // ===== Start broadcasting once the camera is live =====
   // The composite stream is the canvas's captureStream — every frame we draw
@@ -1047,7 +1057,7 @@ function BroadcasterStage({ userId, onChangeRole }) {
 
   // ===== Gestures (drag, pinch, rotate) — same logic as Trace, mapped to canvas pixels =====
   const onPointerDown = useCallback((e) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointersRef.current.size === 1) {
       gestureRef.current = {

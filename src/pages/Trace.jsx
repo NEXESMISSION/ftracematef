@@ -261,7 +261,11 @@ export default function Trace() {
   // ===== Warp handle drag (pointer events captured per-handle) =====
   const onHandleDown = useCallback((key, e) => {
     e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
+    // setPointerCapture can throw on Safari/iOS if the pointer was already
+    // captured elsewhere or the event target is detached. Failing capture
+    // just means move events route by hit-testing instead of by pointerId,
+    // which is fine for a single-finger drag — don't abort the whole gesture.
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     handleDragRef.current = {
       key,
       pointerId: e.pointerId,
@@ -535,7 +539,8 @@ export default function Trace() {
 
   // ===== Gesture handling: drag (1 pointer), pinch + rotate (2 pointers) =====
   const onPointerDown = useCallback((e) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
+    // See onHandleDown — capture failures shouldn't kill the gesture.
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     if (pointersRef.current.size === 1) {

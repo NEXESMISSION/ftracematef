@@ -88,6 +88,13 @@ Deno.serve(async (req) => {
   if (!userId || typeof userId !== 'string') {
     return json({ error: 'user_id is required' }, 400);
   }
+  // Reject non-UUIDs early. PostgREST parameterizes .eq() so this isn't
+  // injection per se, but `customerId` from the resolved profile gets
+  // string-interpolated into a `.or()` filter below — locking the input
+  // shape here keeps that path defended-in-depth.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+    return json({ error: 'user_id must be a UUID' }, 400);
+  }
 
   // Resolve the target's dodo_customer_id so we can scope webhook_events.
   // Free users will have no customer_id and therefore no events — that's the
@@ -100,7 +107,16 @@ Deno.serve(async (req) => {
   if (targetErr) return json({ error: targetErr.message }, 500);
   if (!targetProfile)   return json({ error: 'User not found' }, 404);
 
-  const customerId = targetProfile.dodo_customer_id;
+  // Defense-in-depth: customer_id is set by the dodo-webhook from Dodo's
+  // payload, but it gets string-interpolated into a PostgREST .or() filter
+  // below (which doesn't escape commas or operator chars). Pin the shape to
+  // the alphanumeric/underscore IDs Dodo emits so a hypothetically corrupted
+  // row can't smuggle filter syntax. Anything off-shape → treat as no events.
+  const rawCustomerId = targetProfile.dodo_customer_id;
+  const customerId =
+    typeof rawCustomerId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(rawCustomerId)
+      ? rawCustomerId
+      : null;
 
   const [subHistRes, eventsRes, runsRes, visitsRes] = await Promise.all([
     admin
