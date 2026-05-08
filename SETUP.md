@@ -80,11 +80,13 @@ supabase secrets set \
 # without at least one DODO_PRICE_<PLAN>_CENTS_<CCY> floor set. Cents, per
 # (plan, currency). An incoming event below the floor is rejected, so a
 # replayed/forged event with the wrong amount can't silently upgrade a user.
-# Add a row per currency you accept; one cent below headline is a safe default.
+# Add a row per currency you accept; .env.secrets carries the full 26-currency
+# matrix. Floors should be the listed price in cents (matches Dodo's
+# recurring_pre_tax_amount for tax-exclusive regions).
 supabase secrets set \
-  DODO_PRICE_MONTHLY_CENTS_USD=699       \
-  DODO_PRICE_QUARTERLY_CENTS_USD=999     \
-  DODO_PRICE_LIFETIME_CENTS_USD=2499
+  DODO_PRICE_MONTHLY_CENTS_USD=700       \
+  DODO_PRICE_QUARTERLY_CENTS_USD=1000    \
+  DODO_PRICE_LIFETIME_CENTS_USD=2500
 
 # deploy (6 functions total)
 supabase functions deploy create-checkout
