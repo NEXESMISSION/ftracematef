@@ -27,11 +27,13 @@ function isTracingNow(u) {
   if (!u) return false;
   if (u.current_page !== 'trace') return false;
   // Pre-migration users / users whose run row already got reconciled
-  // out have no heartbeat to gate on; fall back to the looser online
-  // check so we don't suddenly hide tracing rows when the column is
-  // missing.
-  const hb = u.last_trace_heartbeat_at;
-  if (!hb) return isOnline(u.last_seen_at);
+  // out have no last_trace_heartbeat_at field on their row; fall back
+  // to last_seen_at with the SAME tight window so the dashboard
+  // doesn't keep dangling Watch live for two minutes when the edge
+  // function hasn't been redeployed yet. last_seen_at is stamped on
+  // every trace heartbeat too, so the freshness story is identical.
+  const hb = u.last_trace_heartbeat_at || u.last_seen_at;
+  if (!hb) return false;
   const t = new Date(hb).getTime();
   if (!Number.isFinite(t)) return false;
   return Date.now() - t < TRACE_HEARTBEAT_FRESH_MS;
@@ -961,7 +963,7 @@ const SPECTATE_STATUS_LABEL = {
   disconnected: 'Disconnected',
 };
 
-function SpectateModal({ user, onClose }) {
+function SpectateModal({ user, onClose, onUserNotTracing }) {
   const videoRef = useRef(null);
   const viewerRef = useRef(null);
   const [status, setStatus] = useState('waiting');
@@ -1037,7 +1039,9 @@ function SpectateModal({ user, onClose }) {
   //   - 'waiting' means realtime presence sees no broadcaster on the
   //     channel — the user almost certainly already left /trace. Surface
   //     the hint after 3.5s; no point in the operator staring at a
-  //     spinner that will never resolve.
+  //     spinner that will never resolve. Also bubble that signal up to
+  //     the parent so the dashboard row can drop the Watch live button
+  //     even if the heartbeat stamp on profiles is still "fresh".
   //   - any other non-connected status (connecting, reconnecting,
   //     disconnected) means we did see a broadcaster and the WebRTC
   //     handshake is what's struggling. NAT / cached-bundle hint, 8s.
@@ -1049,9 +1053,17 @@ function SpectateModal({ user, onClose }) {
     }
     setStuckHint(false);
     const ms = status === 'waiting' ? 3500 : 8000;
-    const t = setTimeout(() => setStuckHint(true), ms);
+    const t = setTimeout(() => {
+      setStuckHint(true);
+      if (status === 'waiting' && user?.id) {
+        // Realtime says nobody's broadcasting on this channel after the
+        // grace window — definitive "user has left" signal that beats
+        // anything the heartbeat-stamped profile row can tell us.
+        try { onUserNotTracing?.(user.id); } catch { /* ignore */ }
+      }
+    }, ms);
     return () => clearTimeout(t);
-  }, [status, retryNonce]);
+  }, [status, retryNonce, user?.id, onUserNotTracing]);
 
   // Keep the <video>'s muted attribute in sync with our toggle. Setting it
   // imperatively avoids a React re-render churn each toggle.
@@ -1456,6 +1468,25 @@ export default function AdminDashboard() {
     });
   }, [loadUsers]);
 
+  // Called by the SpectateModal when realtime presence proves the user
+  // isn't broadcasting (status stuck at 'waiting' for >3.5s). Beats the
+  // heartbeat-stamped profile row, which can lag by up to one heartbeat
+  // interval after the user closes their tab. Optimistically clears the
+  // tracing fields locally so the row's Watch live button drops on the
+  // next render — and triggers a server refresh so the next list
+  // confirms the row really has been reconciled.
+  const markUserNotTracing = useCallback((id) => {
+    setUsers((cur) => {
+      if (!cur) return cur;
+      return cur.map((u) =>
+        u.id === id
+          ? { ...u, current_page: null, current_image_label: null, spectate_token: null, last_trace_heartbeat_at: null }
+          : u
+      );
+    });
+    loadUsers().catch(() => { /* surfaced via setError */ });
+  }, [loadUsers]);
+
   return (
     <div
       className="admin-shell"
@@ -1759,7 +1790,11 @@ export default function AdminDashboard() {
       </main>
 
       {spectate && (
-        <SpectateModal user={spectate} onClose={() => setSpectate(null)} />
+        <SpectateModal
+          user={spectate}
+          onClose={() => setSpectate(null)}
+          onUserNotTracing={markUserNotTracing}
+        />
       )}
 
       {staleNotice && (
