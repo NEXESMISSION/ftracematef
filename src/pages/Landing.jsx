@@ -6,6 +6,7 @@ import Marquee from '../components/Marquee.jsx';
 import HowItWorks from '../components/HowItWorks.jsx';
 import Gallery from '../components/Gallery.jsx';
 import Pricing from '../components/Pricing.jsx';
+import GetApp from '../components/GetApp.jsx';
 import Footer from '../components/Footer.jsx';
 import WelcomeOverlay from '../components/WelcomeOverlay.jsx';
 import CatPopup from '../components/CatPopup.jsx';
@@ -28,6 +29,7 @@ export default function Landing() {
       <HowItWorks />
       <Gallery />
       {!isPaid && <Pricing />}
+      <GetApp />
       <WelcomeOverlay />
       <CatPopup />
       <VideoModal open={video.open} videoId={video.id} onClose={closeVideo} />
