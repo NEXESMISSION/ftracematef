@@ -28,8 +28,8 @@ const ROUTES = [
   },
   {
     path: '/pricing',
-    title: 'Pricing — TraceMate AR Tracing | $5/mo or $15 lifetime',
-    description: 'TraceMate plans: $5/month, $10/3-months, or $15 one-time lifetime (10 spots). Every new account gets one free tracing session. Cancel anytime on monthly and 3-month plans.',
+    title: 'Pricing — TraceMate AR Tracing | $7/mo or $25 lifetime',
+    description: 'TraceMate plans: $7/month, $10/3-months, or $25 one-time lifetime (10 spots). Every new account gets one free tracing session. Cancel anytime on monthly and 3-month plans.',
   },
   {
     path: '/upload',

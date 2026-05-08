@@ -11,11 +11,11 @@ export const PLANS = [
   {
     id: 'monthly',
     name: 'Monthly',
-    price: 5,
-    wasPrice: 7,
+    price: 7,
+    wasPrice: 9,
     period: '/ month',
     shortPeriod: '/ mo',
-    badge: '29% off',
+    badge: '22% off',
     cta: 'Start Monthly',
     features: [
       'Full quality outlines',
@@ -37,17 +37,17 @@ export const PLANS = [
       'Full quality outlines',
       'All tools unlocked',
       'Works on any device',
-      'Save 33% vs monthly',
+      'Save 52% vs monthly',
     ],
   },
   {
     id: 'lifetime',
     name: 'Lifetime',
-    price: 15,
-    wasPrice: 20,
+    price: 25,
+    wasPrice: 35,
     period: 'one-time · forever',
     shortPeriod: 'one-time',
-    badge: '25% off',
+    badge: '29% off',
     cta: 'Claim Lifetime',
     gold: true,
     features: [
@@ -64,7 +64,7 @@ export const PLAN_BY_ID = Object.fromEntries(PLANS.map((p) => [p.id, p]));
 
 export const PLAN_LABEL = {
   free:      'Free tier',
-  monthly:   'Monthly · $5/mo',
+  monthly:   'Monthly · $7/mo',
   quarterly: '3 Months · $10',
-  lifetime:  'Lifetime · $15',
+  lifetime:  'Lifetime · $25',
 };

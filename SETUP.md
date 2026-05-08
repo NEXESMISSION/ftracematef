@@ -36,9 +36,9 @@ You only do this **once**. Follow it top to bottom.
 
 | Name | Type | Price | Interval | Save the ID as |
 |---|---|---|---|---|
-| Trace Mate Monthly | Subscription | $5 USD | 1 month | `DODO_PRODUCT_MONTHLY` |
+| Trace Mate Monthly | Subscription | $7 USD | 1 month | `DODO_PRODUCT_MONTHLY` |
 | Trace Mate Quarterly | Subscription | $10 USD | 3 months | `DODO_PRODUCT_QUARTERLY` |
-| Trace Mate Lifetime | One-time | $15 USD | — | `DODO_PRODUCT_LIFETIME` |
+| Trace Mate Lifetime | One-time | $25 USD | — | `DODO_PRODUCT_LIFETIME` |
 
 ### Get an API key + webhook secret
 1. **Developer → API Keys** — create a key (start in **test mode**).
@@ -75,6 +75,16 @@ supabase secrets set \
   DODO_PRODUCT_QUARTERLY=prod_xxx        \
   DODO_PRODUCT_LIFETIME=prod_xxx         \
   APP_URL=https://tracemate.art
+
+# Webhook price floors — the dodo-webhook function fails closed on any plan
+# without at least one DODO_PRICE_<PLAN>_CENTS_<CCY> floor set. Cents, per
+# (plan, currency). An incoming event below the floor is rejected, so a
+# replayed/forged event with the wrong amount can't silently upgrade a user.
+# Add a row per currency you accept; one cent below headline is a safe default.
+supabase secrets set \
+  DODO_PRICE_MONTHLY_CENTS_USD=699       \
+  DODO_PRICE_QUARTERLY_CENTS_USD=999     \
+  DODO_PRICE_LIFETIME_CENTS_USD=2499
 
 # deploy (6 functions total)
 supabase functions deploy create-checkout

@@ -55,9 +55,9 @@ export default function Terms() {
             also agree to Dodo's terms.
           </p>
           <ul>
-            <li><strong>Monthly</strong> — $5/month, billed every month, cancel anytime.</li>
+            <li><strong>Monthly</strong> — $7/month, billed every month, cancel anytime.</li>
             <li><strong>3 Months</strong> — $10 every 3 months, cancel anytime.</li>
-            <li><strong>Lifetime</strong> — $15 one-time, capped at 10 spots.</li>
+            <li><strong>Lifetime</strong> — $25 one-time, capped at 10 spots.</li>
           </ul>
           <p>
             Subscriptions renew automatically until you cancel. You can cancel
