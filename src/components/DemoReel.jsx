@@ -1,0 +1,51 @@
+// Silent, looping, non-interactive YouTube Short embed.
+//
+// Uses youtube-nocookie.com for privacy (no third-party cookies set on
+// page load). The transparent overlay div on top of the iframe absorbs
+// every pointer event so visitors can't pause it, click through to
+// YouTube, or expand it to fullscreen — the video is a decorative
+// motion element, not a playable thing.
+//
+// loop=1 only loops a single video when paired with playlist=<videoId>;
+// that's a YouTube quirk, not a typo. mute=1 + playsinline=1 are both
+// required for autoplay to work in mobile Safari and Android Chrome.
+const VIDEO_ID = 'On22FGIuujc';
+
+const SRC =
+  `https://www.youtube-nocookie.com/embed/${VIDEO_ID}` +
+  `?autoplay=1` +
+  `&mute=1` +
+  `&loop=1` +
+  `&playlist=${VIDEO_ID}` +
+  `&controls=0` +
+  `&modestbranding=1` +
+  `&rel=0` +
+  `&playsinline=1` +
+  `&disablekb=1` +
+  `&fs=0` +
+  `&iv_load_policy=3`;
+
+export default function DemoReel() {
+  return (
+    <section className="demo-reel tm-section-pad" aria-label="Trace Mate in action">
+      <div className="section-head">
+        <p className="kicker hand">live demo</p>
+        <h2>See it in action.</h2>
+      </div>
+      <div className="demo-reel-frame" aria-hidden="true">
+        <iframe
+          src={SRC}
+          title="Trace Mate demo"
+          loading="lazy"
+          allow="autoplay; encrypted-media; picture-in-picture"
+          referrerPolicy="strict-origin-when-cross-origin"
+          tabIndex="-1"
+        />
+        {/* Click-blocker. Sits on top of the iframe at full size so any
+            tap, drag, or click never reaches the YouTube player chrome —
+            no pause, no fullscreen, no overlay link. */}
+        <div className="demo-reel-shield" />
+      </div>
+    </section>
+  );
+}
