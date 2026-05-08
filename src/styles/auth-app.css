@@ -115,16 +115,44 @@
   margin-bottom: 12px;
 }
 .studio-paywall .lead {
-  max-width: 560px;
-  margin: 0 auto 36px;
+  max-width: 580px;
+  margin: 0 auto 22px;
 }
+
+/* Trust strip — small, scannable badges right under the lead. The
+   discount of attention here is real: most users decide before they
+   read full plan cards. Three pills, all neutral-positive. */
+.paywall-trust-strip {
+  list-style: none;
+  margin: 0 auto 30px;
+  padding: 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.paywall-trust-strip li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(43, 33, 24, 0.05);
+  border: 1px solid rgba(43, 33, 24, 0.08);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+.paywall-trust-strip li svg { color: var(--coral); flex-shrink: 0; }
 
 .paywall-plans {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: clamp(14px, 1.8vw, 22px);
-  max-width: 880px;
+  max-width: 940px;
   margin: 0 auto;
+  align-items: stretch;
 }
 
 .paywall-plan {
@@ -143,13 +171,23 @@
   cursor: pointer;
   transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
   font-family: 'Nunito', sans-serif;
+  text-align: center;
+  /* Stagger entrance — the inline animation-delay set per card produces
+     a pleasant left-to-right reveal that draws the eye through the row
+     without slowing down the click path. */
+  animation: pwPlanIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes pwPlanIn {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0,   0); }
 }
 .paywall-plan:hover:not(:disabled) {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.6) inset,
-    0 22px 36px -16px rgba(43, 33, 24, 0.22);
+    0 22px 40px -16px rgba(43, 33, 24, 0.24);
 }
+.paywall-plan:active:not(:disabled) { transform: translateY(-2px); }
 .paywall-plan:disabled { opacity: 0.6; cursor: default; }
 
 .paywall-plan-badge {
@@ -170,11 +208,27 @@
   color: var(--ink);
   line-height: 1;
 }
+.paywall-plan-price-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 2px;
+}
+.paywall-plan-was {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: rgba(232, 122, 122, 0.65);
+  opacity: 0.85;
+}
 .paywall-plan-price {
-  font-size: 36px;
+  font-size: 38px;
   font-weight: 800;
   color: var(--ink);
   letter-spacing: -0.02em;
+  line-height: 1;
 }
 .paywall-plan-price small {
   font-size: 14px;
@@ -182,23 +236,124 @@
   color: var(--ink-muted);
   margin-left: 4px;
 }
+.paywall-plan-equiv {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  font-style: italic;
+  letter-spacing: 0.01em;
+  margin-top: -4px;
+}
+.paywall-plan-features {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 12px 0 4px;
+  width: 100%;
+  border-top: 1px dashed rgba(43, 33, 24, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+.paywall-plan-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.35;
+}
+.paywall-feature-check {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--coral);
+}
 .paywall-plan-spots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #c2861a;
-  background: rgba(255, 214, 107, 0.30);
-  padding: 3px 10px;
+  color: #8c5a0e;
+  background: rgba(255, 214, 107, 0.4);
+  padding: 4px 10px;
   border-radius: 999px;
+  /* Soft pulse so the scarcity number reads as live, not static. */
+  animation: pwSpotsPulse 2.4s ease-in-out infinite;
+}
+@keyframes pwSpotsPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 184, 64, 0.55); }
+  50%      { box-shadow: 0 0 0 8px rgba(255, 184, 64, 0);   }
 }
 .paywall-plan-cta {
-  margin-top: 6px;
+  margin-top: 8px;
+  padding: 10px 18px;
   font-size: 13px;
   font-weight: 800;
-  color: var(--coral);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  color: #fff;
+  background: var(--coral);
+  border-radius: 999px;
+  box-shadow: 0 6px 14px -6px rgba(232, 122, 122, 0.6);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.paywall-plan:hover:not(:disabled) .paywall-plan-cta {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px -6px rgba(232, 122, 122, 0.7);
+}
+
+/* Ribbon — flag in the top-right of "Most Popular" / "Best Value"
+   cards so the recommended option stands out without hiding the
+   alternatives. */
+.paywall-plan-ribbon {
+  position: absolute;
+  top: 12px;
+  right: -6px;
+  padding: 5px 12px 5px 14px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--coral);
+  border-radius: 4px 0 0 4px;
+  box-shadow: 0 6px 14px -6px rgba(232, 122, 122, 0.6);
+}
+.paywall-plan-ribbon::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -6px;
+  border: 3px solid transparent;
+  border-top-color: #a04848;
+  border-left-color: #a04848;
+}
+.paywall-plan-ribbon-gold {
+  background: linear-gradient(135deg, #ffd166 0%, #f59e2c 100%);
+  color: #3d2807;
+}
+.paywall-plan-ribbon-gold::after {
+  border-top-color: #8a5a13;
+  border-left-color: #8a5a13;
+}
+
+/* Popular treatment — coral accent so the eye lands here first. */
+.paywall-plan-popular {
+  border-color: rgba(232, 122, 122, 0.55);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 0 0 3px rgba(232, 122, 122, 0.10),
+    0 18px 36px -14px rgba(232, 122, 122, 0.35);
+}
+.paywall-plan-popular:hover:not(:disabled) {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 0 0 3px rgba(232, 122, 122, 0.18),
+    0 24px 44px -14px rgba(232, 122, 122, 0.45);
 }
 
 /* Gold lifetime treatment */
@@ -216,13 +371,50 @@
     0 0 0 4px rgba(217, 158, 42, 0.18),
     0 22px 44px -14px rgba(217, 158, 42, 0.55);
 }
-.paywall-plan-gold .paywall-plan-name  { color: #5c3d10; }
-.paywall-plan-gold .paywall-plan-price { color: #5c3d10; }
-.paywall-plan-gold .paywall-plan-badge { color: #5c3d10; background: rgba(255, 255, 255, 0.55); }
-.paywall-plan-gold .paywall-plan-cta   { color: #5c3d10; }
+.paywall-plan-gold .paywall-plan-name   { color: #5c3d10; }
+.paywall-plan-gold .paywall-plan-price  { color: #5c3d10; }
+.paywall-plan-gold .paywall-plan-badge  { color: #5c3d10; background: rgba(255, 255, 255, 0.55); }
+.paywall-plan-gold .paywall-plan-equiv  { color: #6b4811; }
+.paywall-plan-gold .paywall-plan-was    { color: #8a6420; text-decoration-color: rgba(140, 90, 14, 0.65); }
+.paywall-plan-gold .paywall-plan-features { border-top-color: rgba(92, 61, 16, 0.25); }
+.paywall-plan-gold .paywall-plan-features li { color: #4a3208; }
+.paywall-plan-gold .paywall-feature-check { color: #8c5a0e; }
+.paywall-plan-gold .paywall-plan-cta {
+  color: #3d2807;
+  background: linear-gradient(135deg, #ffd166 0%, #f59e2c 100%);
+  box-shadow: 0 6px 14px -6px rgba(217, 158, 42, 0.7);
+}
+.paywall-plan-gold:hover:not(:disabled) .paywall-plan-cta {
+  box-shadow: 0 10px 20px -6px rgba(217, 158, 42, 0.85);
+}
+
+/* Promise strip — last objection-handlers right under the cards. */
+.paywall-promise {
+  list-style: none;
+  margin: 30px auto 0;
+  padding: 16px 18px;
+  max-width: 720px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  background: rgba(43, 33, 24, 0.04);
+  border: 1px solid rgba(43, 33, 24, 0.08);
+  border-radius: 14px;
+}
+.paywall-promise li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  text-align: left;
+  line-height: 1.3;
+}
+.paywall-promise li svg { color: var(--coral); flex-shrink: 0; }
+.paywall-promise strong { color: var(--ink); font-weight: 800; }
 
 .paywall-foot {
-  margin-top: 30px;
+  margin-top: 24px;
   font-size: 13px;
   color: var(--ink-muted);
 }
@@ -1706,7 +1898,10 @@
 }
 
 @media (max-width: 720px) {
-  .paywall-plans { grid-template-columns: 1fr; max-width: 360px; }
+  .paywall-plans { grid-template-columns: 1fr; max-width: 380px; }
+  .paywall-promise { grid-template-columns: 1fr; max-width: 380px; }
+  .paywall-promise li { justify-content: flex-start; }
+  .paywall-trust-strip { flex-direction: row; }
   .profile-plan-pick { padding: 14px 16px; gap: 12px; }
   .profile-plan-pick-info { gap: 10px; flex-direction: column; align-items: flex-start; }
   .profile-plan-pick-name { font-size: 22px; }

@@ -6,15 +6,40 @@ import { supabase } from '../lib/supabase.js';
 import { PLANS as ALL_PLANS } from '../lib/plans.js';
 import { friendlyError } from '../lib/errors.js';
 
-// Compact plan tiles for the paywall — derived from the central catalog.
+// Paywall-specific copy decorations on top of the central plan catalog.
+// `equiv` is the small grey line under the price — anchors the value
+// (e.g. "less than a coffee") so the user has a comparison they can feel
+// instead of a number floating on its own.
+const PAYWALL_COPY = {
+  monthly:   { equiv: 'less than a coffee a month',  cta: 'Start Monthly'  },
+  quarterly: { equiv: '≈ $3.33 / month',             cta: 'Get 3 Months',  popular: true },
+  lifetime:  { equiv: 'pay once · use forever',      cta: 'Claim Lifetime' },
+};
+
 const PLANS = ALL_PLANS.map((p) => ({
-  id: p.id,
-  name: p.name,
-  price: `$${p.price}`,
-  period: p.shortPeriod,
-  badge: p.id === 'lifetime' ? 'Limited 10' : p.badge,
-  gold: !!p.gold,
+  ...p,
+  badge:   p.id === 'lifetime' ? 'Limited 10' : p.badge,
+  equiv:   PAYWALL_COPY[p.id]?.equiv ?? null,
+  ctaText: PAYWALL_COPY[p.id]?.cta   ?? 'Choose plan',
+  popular: !!PAYWALL_COPY[p.id]?.popular,
 }));
+
+// Tiny inline check icon used in the per-plan feature list. Inline SVG so
+// we don't ship an icon library for one glyph; currentColor lets the gold
+// card override it without a second declaration.
+function FeatureCheck() {
+  return (
+    <svg
+      className="paywall-feature-check"
+      width="14" height="14" viewBox="0 0 14 14"
+      fill="none" stroke="currentColor"
+      strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2 7.5 L5.5 11 L12 4" />
+    </svg>
+  );
+}
 
 /** Shown by <RequirePaid> when a logged-in user hasn't subscribed yet. */
 export default function Paywall({ trialUsed = false }) {
@@ -82,14 +107,43 @@ export default function Paywall({ trialUsed = false }) {
         </p>
         <h1>
           {trialUsed
-            ? 'Your free tracing is used up — pick a plan to keep going.'
-            : 'Pick a plan to step into the studio.'}
+            ? 'Free tracing is used up — pick a plan to keep going.'
+            : 'One unlock. Every tool. Every device.'}
         </h1>
         <p className="lead">
           {trialUsed
             ? 'You used your free studio sessions. Any plan unlocks unlimited tracing — full quality, every tool, every device.'
-            : 'All plans unlock full quality outlines, every tool, every device.'}
+            : 'Trace anything you can photograph — sketches, tattoos, murals, signs. Pick the plan that fits.'}
         </p>
+
+        {/* Trust strip — small, scannable badges right under the lead so
+            objections (cancel? secure?) are answered before the user
+            even thinks about them. */}
+        <ul className="paywall-trust-strip" aria-label="What's included">
+          <li>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M8 1.5 L2 4 V8 a6 6 0 0 0 6 6.5 a6 6 0 0 0 6 -6.5 V4 Z" />
+              <path d="M5.5 8 L7.2 9.7 L10.6 6.3" />
+            </svg>
+            Secure checkout
+          </li>
+          <li>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M8 14 a6 6 0 1 1 6 -6" />
+              <path d="M14 4 V8 H10" />
+            </svg>
+            Cancel anytime
+          </li>
+          <li>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9 1 L3 9 H8 L7 15 L13 7 H8 Z" />
+            </svg>
+            Unlock instantly
+          </li>
+        </ul>
 
         {error && (
           <div className="paywall-error" role="alert">
@@ -99,33 +153,104 @@ export default function Paywall({ trialUsed = false }) {
         )}
 
         <div className="paywall-plans">
-          {PLANS.map((p) => {
+          {PLANS.map((p, i) => {
             const soldOut = p.gold && lifetimeLeft === 0;
             const lifetimeBadge = p.gold && lifetimeLeft != null && lifetimeLeft > 0
-              ? `${lifetimeLeft} left of 10`
+              ? `Only ${lifetimeLeft} of 10 left`
               : null;
 
             return (
               <button
                 key={p.id}
                 type="button"
-                className={`paywall-plan${p.gold ? ' paywall-plan-gold' : ''}`}
+                className={`paywall-plan${p.gold ? ' paywall-plan-gold' : ''}${p.popular ? ' paywall-plan-popular' : ''}`}
                 disabled={busy === p.id || soldOut}
                 onClick={() => onChoose(p.id)}
+                style={{ animationDelay: `${i * 70}ms` }}
               >
+                {p.popular && (
+                  <span className="paywall-plan-ribbon" aria-hidden="true">Most Popular</span>
+                )}
+                {p.gold && (
+                  <span className="paywall-plan-ribbon paywall-plan-ribbon-gold" aria-hidden="true">Best Value</span>
+                )}
+
                 <span className="paywall-plan-badge">{p.badge}</span>
                 <span className="paywall-plan-name">{p.name}</span>
-                <span className="paywall-plan-price">
-                  {p.price}<small>{p.period}</small>
+
+                {/* Anchor pricing — strike-through on the original so the
+                    discount is felt, not just stated in the badge. */}
+                <span className="paywall-plan-price-row">
+                  {p.wasPrice && (
+                    <span className="paywall-plan-was" aria-label="Original price">
+                      ${p.wasPrice}
+                    </span>
+                  )}
+                  <span className="paywall-plan-price">
+                    ${p.price}<small>{p.shortPeriod}</small>
+                  </span>
                 </span>
-                {lifetimeBadge && <span className="paywall-plan-spots">{lifetimeBadge}</span>}
+                {p.equiv && (
+                  <span className="paywall-plan-equiv">{p.equiv}</span>
+                )}
+
+                {/* Feature checklist — sourced from PLANS so the landing
+                    pricing block and the paywall stay in sync. Visible
+                    value beats a vague "unlocks everything" line. */}
+                {Array.isArray(p.features) && p.features.length > 0 && (
+                  <ul className="paywall-plan-features" aria-label={`What's in ${p.name}`}>
+                    {p.features.map((f) => (
+                      <li key={f}>
+                        <FeatureCheck />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {lifetimeBadge && (
+                  <span className="paywall-plan-spots" aria-live="polite">
+                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                         strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M9 1 L3 9 H8 L7 15 L13 7 H8 Z" />
+                    </svg>
+                    {lifetimeBadge}
+                  </span>
+                )}
+
                 <span className="paywall-plan-cta">
-                  {soldOut ? 'Sold out' : busy === p.id ? 'Opening…' : 'Choose →'}
+                  {soldOut ? 'Sold out' : busy === p.id ? 'Opening…' : `${p.ctaText} →`}
                 </span>
               </button>
             );
           })}
         </div>
+
+        {/* Promise strip — last objection handlers right under the cards
+            so they're the final thing the user reads before clicking. */}
+        <ul className="paywall-promise" aria-label="Our promises">
+          <li>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                 strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M8 1.5 L2 4 V8 a6 6 0 0 0 6 6.5 a6 6 0 0 0 6 -6.5 V4 Z" />
+            </svg>
+            <span><strong>Secure</strong> · Dodo-powered checkout</span>
+          </li>
+          <li>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                 strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 8 L7 12 L13 4" />
+            </svg>
+            <span><strong>Cancel anytime</strong> · no lock-in</span>
+          </li>
+          <li>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                 strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9 1 L3 9 H8 L7 15 L13 7 H8 Z" />
+            </svg>
+            <span><strong>Instant access</strong> · the moment you pay</span>
+          </li>
+        </ul>
 
         <p className="paywall-foot">
           Already paid?{' '}
