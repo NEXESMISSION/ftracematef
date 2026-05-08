@@ -69,6 +69,12 @@ create policy trace_session_runs_self_read
 -- open rows for this user" — what we want when they're explicitly opening
 -- a fresh run.
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Drop first in case the remote DB has an older version of the function
+-- with a different return type — Postgres rejects `create or replace
+-- function` on a return-type change. The drops below are harmless on a
+-- DB that already has the right signature, and only matter on remotes
+-- that drifted from migration history.
+drop function if exists public.reconcile_trace_runs_for_user(uuid, int);
 create or replace function public.reconcile_trace_runs_for_user(
   p_user_id uuid,
   p_stale_seconds int default 120
@@ -117,6 +123,7 @@ revoke all on function public.reconcile_trace_runs_for_user(uuid, int) from publ
 -- list-users read so the operator never sees zombie rows. Restricted to the
 -- service role to keep ordinary clients from triggering full-table sweeps.
 -- ─────────────────────────────────────────────────────────────────────────────
+drop function if exists public.reconcile_trace_runs(int);
 create or replace function public.reconcile_trace_runs(p_stale_seconds int default 120)
 returns int
 language plpgsql
@@ -163,6 +170,7 @@ grant execute on function public.reconcile_trace_runs(int) to service_role;
 -- Also bumps profiles.trace_sessions + first/last_trace_at, taking over the
 -- role of start_trace_session() (which we leave in place for older clients).
 -- ─────────────────────────────────────────────────────────────────────────────
+drop function if exists public.start_trace_run(text);
 create or replace function public.start_trace_run(p_image_label text default null)
 returns uuid
 language plpgsql
@@ -222,6 +230,7 @@ grant execute on function public.start_trace_run(text) to authenticated;
 -- — e.g. reconciled mid-flight in another transaction. The client doesn't
 -- need to know.
 -- ─────────────────────────────────────────────────────────────────────────────
+drop function if exists public.heartbeat_trace_run(uuid);
 create or replace function public.heartbeat_trace_run(p_run_id uuid)
 returns void
 language plpgsql
@@ -274,6 +283,7 @@ grant execute on function public.heartbeat_trace_run(uuid) to authenticated;
 -- to profiles.total_trace_seconds, and clears the user's "currently tracing"
 -- presence so the admin dashboard stops showing them in the studio.
 -- ─────────────────────────────────────────────────────────────────────────────
+drop function if exists public.end_trace_run(uuid, text);
 create or replace function public.end_trace_run(
   p_run_id uuid,
   p_reason text default 'client_end'

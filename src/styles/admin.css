@@ -1532,3 +1532,43 @@
   border-radius: 6px;
   word-break: break-word;
 }
+
+/* Acquisition-by-source table — small 4-col grid living below the stats
+   panel on the Stats tab. Same visual language (cream header, ink border)
+   as the surrounding cards so it doesn't read as a foreign element. */
+.admin-shell .admin-acq-table {
+  padding: 4px 0 6px;
+}
+.admin-shell .admin-acq-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 80px 70px;
+  gap: 12px;
+  padding: 10px 18px;
+  align-items: baseline;
+  font-size: 13px;
+  border-bottom: 1px solid var(--cream-deep);
+}
+.admin-shell .admin-acq-row:last-child {
+  border-bottom: none;
+}
+.admin-shell .admin-acq-head {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  background: var(--cream-deep);
+  font-weight: 600;
+}
+.admin-shell .admin-acq-foot {
+  background: var(--cream-deep);
+  font-size: 13px;
+}
+.admin-shell .admin-acq-source {
+  font-weight: 600;
+  word-break: break-word;
+}
+.admin-shell .admin-acq-row-muted .admin-acq-source {
+  color: var(--ink-soft);
+  font-style: italic;
+  font-weight: 500;
+}

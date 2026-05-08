@@ -19,7 +19,18 @@ import CheckoutSuccess from './pages/CheckoutSuccess.jsx';
 import PricingPage from './pages/PricingPage.jsx';
 import Terms from './pages/Terms.jsx';
 import Privacy from './pages/Privacy.jsx';
+import RefRedirect from './pages/RefRedirect.jsx';
 import NotFound from './pages/NotFound.jsx';
+
+// Pretty-alias short links for the platforms we'll actually share most.
+// Each one renders <RefRedirect source="..."/> and bounces to '/'. The
+// slug is stamped to localStorage so the next time this browser signs up,
+// AuthProvider attributes the new account to that source.
+//
+// Adding a new platform = one line below. Anything one-off (TikTok video
+// 3, Reddit r/foo thread) should use the open-ended /r/:source route
+// instead of grabbing a new top-level path.
+const REF_ALIASES = ['tiktok', 'tt', 'reddit', 'yt', 'ig', 'x', 'threads'];
 
 // Admin dashboard is operator-only and ships its own bundle of UI + data
 // fetching helpers. Lazy-loaded so non-admins never download the chunk.
@@ -83,6 +94,15 @@ export default function App() {
       <AnalyticsRouteTracker />
       <DeepLinkRouter />
       <Routes>
+        {/* Traffic-source attribution — /r/:source plus a hand-picked set of
+            pretty aliases (tracemate.art/tiktok, /reddit, etc.) for the
+            platforms we'll share most often. Both forms stamp localStorage
+            and immediately bounce to '/'. */}
+        <Route path="/r/:source" element={<RefRedirect />} />
+        {REF_ALIASES.map((slug) => (
+          <Route key={slug} path={`/${slug}`} element={<RefRedirect source={slug} />} />
+        ))}
+
         {/* Public — anyone can browse + start an upload */}
         <Route path="/"              element={<Home />} />
         <Route path="/welcome"       element={<Landing />} />

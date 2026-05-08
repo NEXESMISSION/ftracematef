@@ -29,7 +29,7 @@ exception when duplicate_object then null; end $$;
 
 -- ── support_threads (1:1 with users — UNIQUE user_id) ────────────────────
 create table if not exists public.support_threads (
-  id                  uuid primary key default uuid_generate_v4(),
+  id                  uuid primary key default gen_random_uuid(),
   user_id             uuid not null unique references public.profiles(id) on delete cascade,
   last_message_at     timestamptz not null default now(),
   last_admin_read_at  timestamptz,
@@ -43,7 +43,7 @@ create index if not exists support_threads_last_message_at_idx
 
 -- ── support_messages ─────────────────────────────────────────────────────
 create table if not exists public.support_messages (
-  id           uuid primary key default uuid_generate_v4(),
+  id           uuid primary key default gen_random_uuid(),
   thread_id    uuid not null references public.support_threads(id) on delete cascade,
   sender_role  support_sender_role not null,
   -- Audit only. Nullable so a deleted admin profile doesn't wipe their

@@ -213,12 +213,28 @@ export function AuthProvider({ children }) {
     const referrer = (() => {
       try { return document.referrer || ''; } catch { return ''; }
     })();
+    // Traffic-source attribution: read the first-touch slug stamped by
+    // RefRedirect on /r/:source (or a pretty-alias route like /tiktok).
+    // We DON'T clear these keys after reading — re-reading the same value
+    // is harmless because the RPC is idempotent (only writes if the column
+    // is still null), and keeping them around lets us debug an unstamped
+    // signup ("did the link click happen at all?") from the user's browser.
+    const { source, campaign } = (() => {
+      try {
+        return {
+          source:   window.localStorage.getItem('tm:ref')          || '',
+          campaign: window.localStorage.getItem('tm:ref-campaign') || '',
+        };
+      } catch { return { source: '', campaign: '' }; }
+    })();
     // PostgrestBuilder is PromiseLike (only .then) — using .catch directly
     // throws "x.catch is not a function". Pass a no-op error handler as
     // the second .then argument instead. Same intent: silent on failure.
     supabase.rpc('record_signup_context', {
-      p_landing: landing.slice(0, 60),
+      p_landing:  landing.slice(0, 60),
       p_referrer: referrer.slice(0, 500),
+      p_source:   source.slice(0, 32),
+      p_campaign: campaign.slice(0, 60),
     }).then(() => {}, () => {});
   }, [profile]);
 

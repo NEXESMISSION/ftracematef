@@ -622,6 +622,107 @@ function StatsPanel({ stats, error, loading }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
+/* Acquisition — group signups by signup_source (set by /r/:source clicks).
+   Computed entirely client-side from the user list we already fetched, so
+   there's no extra round-trip when this panel mounts. Rows sort by signup
+   count descending so the channel sending the most volume is on top.    */
+
+function AcquisitionPanel({ users }) {
+  const rows = useMemo(() => {
+    if (!Array.isArray(users)) return [];
+    const bySource = new Map();
+    let unattributed = 0;
+    let unattributedPaid = 0;
+    for (const u of users) {
+      const src = (u?.signup_source || '').trim();
+      if (!src) {
+        unattributed += 1;
+        if (u?.is_paid) unattributedPaid += 1;
+        continue;
+      }
+      const cur = bySource.get(src) ?? { source: src, signups: 0, paid: 0 };
+      cur.signups += 1;
+      if (u.is_paid) cur.paid += 1;
+      bySource.set(src, cur);
+    }
+    const list = Array.from(bySource.values()).sort((a, b) => b.signups - a.signups);
+    // Always pin "(direct / unknown)" at the bottom — it's the catch-all
+    // bucket for users who came in before /r/:source existed, typed the
+    // URL directly, or arrived via a channel we haven't tagged. Useful as
+    // a sanity check ("what % of signups are still unattributed?") but
+    // never the lead row.
+    if (unattributed > 0) {
+      list.push({
+        source: '(direct / unknown)',
+        signups: unattributed,
+        paid: unattributedPaid,
+        muted: true,
+      });
+    }
+    return list;
+  }, [users]);
+
+  const totals = rows.reduce(
+    (acc, r) => ({ signups: acc.signups + r.signups, paid: acc.paid + r.paid }),
+    { signups: 0, paid: 0 },
+  );
+
+  return (
+    <section className="admin-stats" aria-labelledby="admin-acq-title">
+      <header className="admin-stats-head">
+        <h2 id="admin-acq-title">Acquisition by source</h2>
+        <span className="admin-stats-when">
+          share <code>tracemate.art/r/&lt;source&gt;</code> or one of the
+          aliases (<code>/tiktok</code>, <code>/reddit</code>, <code>/yt</code>,
+          <code>/ig</code>, <code>/x</code>, <code>/threads</code>, <code>/tt</code>)
+          and the slug shows up here. Add <code>?c=&lt;label&gt;</code> for
+          per-post breakdowns.
+        </span>
+      </header>
+      {rows.length === 0 ? (
+        <div className="admin-stats-empty" style={{ padding: 16 }}>
+          No signups yet — share a tagged link to start tracking.
+        </div>
+      ) : (
+        <div className="admin-acq-table" role="table">
+          <div className="admin-acq-row admin-acq-head" role="row">
+            <span role="columnheader">Source</span>
+            <span role="columnheader">Signups</span>
+            <span role="columnheader">Paid</span>
+            <span role="columnheader">Conv.</span>
+          </div>
+          {rows.map((r) => {
+            const conv = r.signups > 0 ? Math.round((r.paid / r.signups) * 100) : 0;
+            return (
+              <div
+                key={r.source}
+                className={`admin-acq-row ${r.muted ? 'admin-acq-row-muted' : ''}`}
+                role="row"
+              >
+                <span className="admin-acq-source" role="cell">{r.source}</span>
+                <span role="cell">{r.signups}</span>
+                <span role="cell">{r.paid}</span>
+                <span role="cell">{conv}%</span>
+              </div>
+            );
+          })}
+          <div className="admin-acq-row admin-acq-foot" role="row">
+            <span role="cell"><strong>Total</strong></span>
+            <span role="cell"><strong>{totals.signups}</strong></span>
+            <span role="cell"><strong>{totals.paid}</strong></span>
+            <span role="cell">
+              <strong>
+                {totals.signups > 0 ? Math.round((totals.paid / totals.signups) * 100) : 0}%
+              </strong>
+            </span>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
 /* Webhook health — stuck-event count + recent list. Mounted above the
    tab nav so anything stuck for >24h is impossible to miss regardless of
    which tab the operator is currently on.                                */
@@ -1075,11 +1176,22 @@ function ActivityPanel({ user }) {
     const out = [];
     if (user.created_at) {
       const where = user.signup_landing ? ` (from /${user.signup_landing})` : '';
+      // Compose the detail line out of the strongest available signal.
+      // signup_source is first-touch attribution from the /r/:source link
+      // they clicked; signup_referrer is the unreliable document.referrer
+      // fallback. Prefer the former; show both when both exist.
+      const bits = [];
+      if (user.signup_source) {
+        bits.push(`source: ${user.signup_source}${user.signup_campaign ? ` / ${user.signup_campaign}` : ''}`);
+      }
+      if (user.signup_referrer) {
+        bits.push(`referrer: ${user.signup_referrer.slice(0, 100)}`);
+      }
       out.push({
         kind: 'journey-signup',
         at: user.created_at,
         title: `Signed up${where}`,
-        detail: user.signup_referrer ? `referrer: ${user.signup_referrer.slice(0, 100)}` : null,
+        detail: bits.length ? bits.join(' · ') : null,
       });
     }
     if (user.first_pricing_at) {
@@ -1339,7 +1451,10 @@ export default function AdminDashboard() {
         </nav>
 
         {view === 'stats' && (
-          <StatsPanel stats={meta.stats} error={meta.error} loading={meta.loading} />
+          <>
+            <StatsPanel stats={meta.stats} error={meta.error} loading={meta.loading} />
+            <AcquisitionPanel users={users} />
+          </>
         )}
         {view === 'traffic' && <TrafficPanel />}
 
