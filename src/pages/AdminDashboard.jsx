@@ -1200,6 +1200,19 @@ function SpectateModal({ user, onClose, onUserNotTracing }) {
           </div>
         </header>
 
+        {/* Visible diagnostic strip — shows the operator the EXACT
+            realtime channel and the user's reported broadcast_state at a
+            glance, no devtools required. Surfaces channel-name mismatches
+            (stale spectate_token vs the one /trace is broadcasting on)
+            and broadcaster-side failure modes in one place so you don't
+            have to cross-reference the modal copy with the database. */}
+        <div className="admin-spectate-debug">
+          <span><strong>chan</strong> tw:{(user?.spectate_token ?? user?.id ?? '???')}</span>
+          <span><strong>status</strong> {status}{error ? ` (${error})` : ''}</span>
+          <span><strong>bcast_state</strong> {user?.broadcast_state ?? '—'}</span>
+          <span><strong>last hb</strong> {user?.last_trace_heartbeat_at ? formatRelative(user.last_trace_heartbeat_at) : '—'}</span>
+        </div>
+
         <div className="admin-spectate-stage">
           <div className="admin-spectate-video-wrap">
             <video

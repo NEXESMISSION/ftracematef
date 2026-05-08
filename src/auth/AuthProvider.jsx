@@ -141,6 +141,20 @@ export function AuthProvider({ children }) {
       const newUid = next?.user?.id ?? null;
       const needsLoad = fetchedForUidRef.current !== newUid;
       setSession(next);
+      // Hand the realtime client the latest user JWT so authenticated
+      // channels (broadcast+presence on tw:* / live:* in livePreview.js)
+      // can subscribe successfully. Without this, on supabase-js >=2.45
+      // the WebSocket connects with the anon key only, and any project
+      // that has realtime authorization configured at all will silently
+      // drop SUBSCRIBED → CHANNEL_ERROR. Symptom: AuthProvider's
+      // postgres_changes channel works (uses RLS), but our broadcast
+      // channels never wire up presence between two peers.
+      // No-op if next is null (signed out) — pass empty string to clear.
+      try {
+        supabase.realtime.setAuth(next?.access_token ?? '');
+      } catch (err) {
+        console.warn('[AuthProvider] realtime.setAuth failed:', err);
+      }
       // User changed — show the spinner while we refetch. Without this,
       // a fresh sign-in renders /account with session set but profile
       // still null, and the "We couldn't load your profile" screen

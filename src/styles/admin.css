@@ -1209,6 +1209,25 @@
    gives the video the bulk of the space and keeps the reference panel a
    readable size (~30%) regardless of screen width. Stacks on narrow
    viewports — the video sits on top, the reference below. */
+.admin-spectate-debug {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 6px 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  background: #1c1c1c;
+  color: #d6d6d6;
+  border-bottom: 1.5px solid var(--ink);
+  word-break: break-all;
+}
+.admin-spectate-debug strong {
+  color: #f5b14a;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
 .admin-spectate-stage {
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(180px, 3fr);
