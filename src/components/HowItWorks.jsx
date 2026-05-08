@@ -49,6 +49,7 @@ export default function HowItWorks() {
 
       <div className="shorts-row">
         <DemoReel />
+        <DemoReel videoId="ooT9NYDX6oc" />
       </div>
     </section>
   );
