@@ -81,28 +81,40 @@ export function AuthProvider({ children }) {
         console.error('[AuthProvider] subscriptions query error:', subRes.error);
       }
 
-      // Self-heal a missing profile row. The on_auth_user_created trigger
-      // creates one on signup, but a small fraction of accounts hit the
-      // "We couldn't load your profile" screen — most often a transient
-      // SELECT blip right after sign-in, occasionally a silently-failed
-      // trigger from a past Supabase incident, or a stale OAuth cache.
-      // Two-step recovery, transparent to the user:
-      //   1. Brief retry (250ms) — absorbs read-after-write replication
-      //      lag and one-off RLS hiccups without a server round-trip.
-      //   2. ensure_profile() RPC — security-definer; creates the row
-      //      from auth.users metadata if still missing. Idempotent.
-      // Only runs when the SELECT succeeded but returned no row, so we
-      // don't paper over a real RLS denial or a network failure.
-      if (!profileRes.error && !profileRes.data) {
-        await new Promise((r) => setTimeout(r, 250));
+      // Self-heal a missing profile row. The "We couldn't load your profile"
+      // screen used to render any time the SELECT didn't return a row —
+      // whether the row was genuinely missing (signup-trigger failed,
+      // row deleted) or the SELECT itself errored (transient RLS blip,
+      // network glitch, stale cache).
+      //
+      // Recovery (transparent to the user):
+      //   1. Brief 300ms retry on a clean empty result — absorbs read-
+      //      after-write replication lag without a server round-trip.
+      //   2. ensure_profile() RPC — security-definer; bypasses RLS, so
+      //      it works even when the direct SELECT was failing. Returns
+      //      the existing row or creates one from auth.users metadata.
+      //      Idempotent. Fires for BOTH the empty-result and error
+      //      branches, since either case means we lack data to render
+      //      the studio and the RPC's worst case is a no-op SELECT.
+      const profileMissing = !profileRes.data;
+      if (profileMissing && !profileRes.error) {
+        // Clean empty result — give the trigger a beat to commit.
+        await new Promise((r) => setTimeout(r, 300));
         profileRes = await supabase
           .from('profiles').select('*').eq('id', userId).maybeSingle();
-        if (!profileRes.error && !profileRes.data) {
-          const heal = await supabase.rpc('ensure_profile');
-          if (heal.error) {
-            console.error('[AuthProvider] ensure_profile RPC failed:', heal.error);
-          } else if (heal.data) {
-            profileRes = { data: heal.data, error: null };
+      }
+      if (!profileRes.data) {
+        console.warn('[AuthProvider] profile fetch did not return a row, calling ensure_profile RPC', {
+          had_error: !!profileRes.error,
+        });
+        const heal = await supabase.rpc('ensure_profile');
+        if (heal.error) {
+          console.error('[AuthProvider] ensure_profile RPC failed:', heal.error);
+        } else if (heal.data) {
+          // PostgREST may wrap a single-composite return as an array — handle both.
+          const row = Array.isArray(heal.data) ? heal.data[0] : heal.data;
+          if (row) {
+            profileRes = { data: row, error: null };
             // The RPC also makes sure a free subscription exists. Refetch
             // it so the UI sees the freshly-created row instead of null.
             if (!subRes.data) {
