@@ -15,6 +15,28 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 // gives one missed-tick of slack before the dot drops.
 const ONLINE_WINDOW_MS = 2 * 60 * 1000;
 
+// "User is currently tracing" requires the trace_session_runs heartbeat
+// (every 30s) to be fresher than this. Anything older means the user
+// almost certainly left and their run just hasn't been reconciled yet —
+// so we hide "Watch live" rather than dangling a button that opens a
+// modal the broadcaster will never join. 45s = one heartbeat interval +
+// 15s grace, matching the server-side reconcile threshold.
+const TRACE_HEARTBEAT_FRESH_MS = 45 * 1000;
+
+function isTracingNow(u) {
+  if (!u) return false;
+  if (u.current_page !== 'trace') return false;
+  // Pre-migration users / users whose run row already got reconciled
+  // out have no heartbeat to gate on; fall back to the looser online
+  // check so we don't suddenly hide tracing rows when the column is
+  // missing.
+  const hb = u.last_trace_heartbeat_at;
+  if (!hb) return isOnline(u.last_seen_at);
+  const t = new Date(hb).getTime();
+  if (!Number.isFinite(t)) return false;
+  return Date.now() - t < TRACE_HEARTBEAT_FRESH_MS;
+}
+
 const STATUS_TONE = {
   active:    'good',
   on_hold:   'warn',
@@ -118,10 +140,14 @@ const PAGE_LABEL = {
 // quotes; other pages just show the page label.
 function lastSeenLabel(u, online) {
   if (online) {
-    if (u.current_page === 'trace' && u.current_image_label) {
+    // Only claim "Tracing X" when the trace heartbeat is fresh — a stale
+    // current_page='trace' on the profile (run in flight, no heartbeats
+    // for >45s) means the user almost certainly already left. Falls
+    // through to the generic "In the app now" so the row doesn't lie.
+    if (isTracingNow(u) && u.current_image_label) {
       return `Tracing "${u.current_image_label}"`;
     }
-    if (u.current_page && PAGE_LABEL[u.current_page]) {
+    if (u.current_page && u.current_page !== 'trace' && PAGE_LABEL[u.current_page]) {
       return `On ${PAGE_LABEL[u.current_page]}`;
     }
     return 'In the app now';
@@ -1007,18 +1033,23 @@ function SpectateModal({ user, onClose }) {
     //  - manual Retry (retryNonce bump)
   }, [user?.id, user?.spectate_token, retryNonce]);
 
-  // Stuck-hint timer: if we're not connected after 8 seconds, show the
-  // operator a why-might-this-be-stuck note + Retry button. The most
-  // common cause is the user's tab still running an old cached bundle
-  // that broadcasts on a different channel — a refresh on their side
-  // pairs them up. Resets when status flips to 'connected'.
+  // Stuck-hint timer. Two thresholds depending on what the channel told us:
+  //   - 'waiting' means realtime presence sees no broadcaster on the
+  //     channel — the user almost certainly already left /trace. Surface
+  //     the hint after 3.5s; no point in the operator staring at a
+  //     spinner that will never resolve.
+  //   - any other non-connected status (connecting, reconnecting,
+  //     disconnected) means we did see a broadcaster and the WebRTC
+  //     handshake is what's struggling. NAT / cached-bundle hint, 8s.
+  // Resets when status flips to 'connected'.
   useEffect(() => {
     if (status === 'connected') {
       setStuckHint(false);
       return;
     }
     setStuckHint(false);
-    const t = setTimeout(() => setStuckHint(true), 8000);
+    const ms = status === 'waiting' ? 3500 : 8000;
+    const t = setTimeout(() => setStuckHint(true), ms);
     return () => clearTimeout(t);
   }, [status, retryNonce]);
 
@@ -1105,24 +1136,44 @@ function SpectateModal({ user, onClose }) {
             >
               {error ? error : SPECTATE_STATUS_LABEL[status] ?? status}
             </div>
-            {/* If we've been waiting for >8s without a frame, surface a
-                hint so the operator isn't staring at a blank box wondering
-                if the tool is broken. Most common cause is the user's
-                tab on a stale cached bundle — Retry re-mounts the viewer
-                in case the dashboard meanwhile picked up a fresh token. */}
+            {/* If we've been waiting / connecting longer than the
+                threshold, surface a hint so the operator isn't staring at
+                a blank box wondering if the tool is broken. The message
+                differs by signal: 'waiting' = realtime presence sees no
+                broadcaster (user has already left /trace, no point in
+                retrying); anything else = handshake is struggling, retry
+                might help (NAT / stale cached bundle). */}
             {stuckHint && status !== 'connected' && (
               <div className="admin-spectate-hint" role="status">
-                <p>
-                  Not connecting. The user may need to refresh their tab,
-                  or they're behind a strict NAT.
-                </p>
-                <button
-                  type="button"
-                  className="admin-spectate-retry"
-                  onClick={() => setRetryNonce((n) => n + 1)}
-                >
-                  Retry
-                </button>
+                {status === 'waiting' ? (
+                  <>
+                    <p>
+                      User is no longer broadcasting from /trace — they
+                      likely closed the tab or navigated away.
+                    </p>
+                    <button
+                      type="button"
+                      className="admin-spectate-retry"
+                      onClick={onClose}
+                    >
+                      Close
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p>
+                      Not connecting. The user may need to refresh their
+                      tab, or they're behind a strict NAT.
+                    </p>
+                    <button
+                      type="button"
+                      className="admin-spectate-retry"
+                      onClick={() => setRetryNonce((n) => n + 1)}
+                    >
+                      Retry
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -1287,6 +1338,16 @@ export default function AdminDashboard() {
     return () => { cancelled = true; clearInterval(id); };
   }, [loadUsers]);
 
+  // Lightweight local tick — only re-evaluates the heartbeat-fresh
+  // computations against the current data, no network round-trip. Lets
+  // a row's "tracing" state (and the Watch live button) flip off as
+  // soon as last_trace_heartbeat_at goes stale, instead of waiting up
+  // to 30s for the next list refresh to confirm what we already know.
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 5_000);
+    return () => clearInterval(id);
+  }, []);
+
   // Pull-to-refresh on mobile (PWA): drag down from the top of the page
   // to force a fresh fetch without hunting for the URL bar. Desktop
   // mouse-drag works too — handy for testing.
@@ -1303,7 +1364,7 @@ export default function AdminDashboard() {
       if (u.is_paid) paid++;
       if (isOnline(u.last_seen_at)) {
         online++;
-        if (u.current_page === 'trace') tracing++;
+        if (isTracingNow(u)) tracing++;
       }
       const stage = userStage(u);
       if      (stage === 'ghost')  ghost++;
@@ -1329,9 +1390,7 @@ export default function AdminDashboard() {
       if (filter === 'unpaid'  &&  u.is_paid) return false;
       if (['ghost','cold','warm','trying'].includes(filter) && userStage(u) !== filter) return false;
       if (filter === 'online'  && !isOnline(u.last_seen_at)) return false;
-      if (filter === 'tracing' && (
-        !isOnline(u.last_seen_at) || u.current_page !== 'trace'
-      )) return false;
+      if (filter === 'tracing' && !isTracingNow(u)) return false;
       if (q && !(u.email ?? '').toLowerCase().includes(q)
             && !(u.display_name ?? '').toLowerCase().includes(q)) {
         return false;
@@ -1367,6 +1426,35 @@ export default function AdminDashboard() {
   const toggleExpand = useCallback((id) => {
     setExpanded((cur) => (cur === id ? null : id));
   }, []);
+
+  // "User just left" toast — shown when a Watch live click is rejected by
+  // the pre-flight refresh because the user is no longer tracing. Auto-
+  // dismisses after a few seconds so it doesn't pile up if the operator
+  // mashes the button.
+  const [staleNotice, setStaleNotice] = useState(null);
+  useEffect(() => {
+    if (!staleNotice) return;
+    const id = setTimeout(() => setStaleNotice(null), 4_000);
+    return () => clearTimeout(id);
+  }, [staleNotice]);
+
+  // Pre-flight refresh before opening the spectate modal: the user list
+  // can be up to 30s stale, and a click on a row whose user already left
+  // would otherwise dump the operator into a "Connecting…" modal that
+  // never connects. Refresh, look the user up again, and only open the
+  // modal if they're still genuinely tracing.
+  const openSpectate = useCallback(async (u) => {
+    try { await loadUsers(); } catch { /* surfaced via setError */ }
+    setUsers((cur) => {
+      const fresh = (cur ?? []).find((x) => x.id === u.id) ?? u;
+      if (isTracingNow(fresh) && fresh.spectate_token) {
+        setSpectate(fresh);
+      } else {
+        setStaleNotice(`${u.email ?? 'User'} is no longer tracing.`);
+      }
+      return cur;
+    });
+  }, [loadUsers]);
 
   return (
     <div
@@ -1541,7 +1629,7 @@ export default function AdminDashboard() {
           <ul className="admin-list">
             {filtered.map((u) => {
               const online    = isOnline(u.last_seen_at);
-              const tracing   = online && u.current_page === 'trace';
+              const tracing   = isTracingNow(u);
               const tone      = STATUS_TONE[u.status] ?? 'neutral';
               const planLabel = u.plan ? (PLAN_LABEL[u.plan] ?? u.plan) : 'No plan';
               const isOpen    = expanded === u.id;
@@ -1630,7 +1718,7 @@ export default function AdminDashboard() {
                         <button
                           type="button"
                           className="admin-row-watch"
-                          onClick={() => setSpectate(u)}
+                          onClick={() => openSpectate(u)}
                           aria-label={`Watch ${u.email ?? 'user'} live`}
                           title="Live camera view"
                         >
@@ -1672,6 +1760,12 @@ export default function AdminDashboard() {
 
       {spectate && (
         <SpectateModal user={spectate} onClose={() => setSpectate(null)} />
+      )}
+
+      {staleNotice && (
+        <div className="admin-stale-notice" role="status">
+          {staleNotice}
+        </div>
       )}
     </div>
   );

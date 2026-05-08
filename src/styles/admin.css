@@ -1400,6 +1400,24 @@
   background: #fea44c;
 }
 
+/* "User just left" toast — shown when a Watch live click is rejected by
+   the pre-flight refresh because the user is no longer tracing. */
+.admin-shell .admin-stale-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  z-index: 50;
+  pointer-events: none;
+}
+
 /* ─── Top-level view tabs (Users / Stats / Traffic) ─────────────────────── */
 .admin-shell .admin-views {
   display: flex;
