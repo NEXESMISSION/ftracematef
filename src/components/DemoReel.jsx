@@ -25,27 +25,23 @@ const SRC =
   `&fs=0` +
   `&iv_load_policy=3`;
 
+// Pure video frame — no section wrapper or heading. Mounted inside the
+// HowItWorks "See it in action" subsection, which already provides those.
 export default function DemoReel() {
   return (
-    <section className="demo-reel tm-section-pad" aria-label="Trace Mate in action">
-      <div className="section-head">
-        <p className="kicker hand">live demo</p>
-        <h2>See it in action.</h2>
-      </div>
-      <div className="demo-reel-frame" aria-hidden="true">
-        <iframe
-          src={SRC}
-          title="Trace Mate demo"
-          loading="lazy"
-          allow="autoplay; encrypted-media; picture-in-picture"
-          referrerPolicy="strict-origin-when-cross-origin"
-          tabIndex="-1"
-        />
-        {/* Click-blocker. Sits on top of the iframe at full size so any
-            tap, drag, or click never reaches the YouTube player chrome —
-            no pause, no fullscreen, no overlay link. */}
-        <div className="demo-reel-shield" />
-      </div>
-    </section>
+    <div className="demo-reel-frame" aria-hidden="true">
+      <iframe
+        src={SRC}
+        title="Trace Mate demo"
+        loading="lazy"
+        allow="autoplay; encrypted-media; picture-in-picture"
+        referrerPolicy="strict-origin-when-cross-origin"
+        tabIndex="-1"
+      />
+      {/* Click-blocker. Sits on top of the iframe at full size so any
+          tap, drag, or click never reaches the YouTube player chrome —
+          no pause, no fullscreen, no overlay link. */}
+      <div className="demo-reel-shield" />
+    </div>
   );
 }

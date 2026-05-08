@@ -590,11 +590,10 @@ main, header, section, footer { position: relative; z-index: 1; }
 }
 
 .shorts-row {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
   gap: clamp(12px, 1.6vw, 22px);
-  align-items: start;
-  justify-items: center;
 }
 
 .short-card {
@@ -652,12 +651,7 @@ main, header, section, footer { position: relative; z-index: 1; }
 @media (max-width: 960px) {
   .how-shorts-head { margin-top: 36px; margin-bottom: 18px; }
   .how-shorts-head h3 { font-size: 22px; }
-  /* Mobile + tablet: always 2 per row. Big enough to read as actual
-     phone-shaped video previews without going single-column. */
-  .shorts-row { grid-template-columns: repeat(2, 1fr); gap: 14px; max-width: 520px; margin: 0 auto; padding: 0 12px; }
-  .short-card { max-width: 100%; border-radius: 14px; box-shadow: 5px 5px 0 var(--ink); }
-  .short-card:hover { box-shadow: 7px 7px 0 var(--ink); }
-  .short-placeholder svg { width: 44px; height: 44px; }
+  .shorts-row { gap: 14px; max-width: 520px; margin: 0 auto; padding: 0 12px; }
 }
 
 /* ============ HOW ============ */
@@ -2302,21 +2296,14 @@ main, header, section, footer { position: relative; z-index: 1; }
 }
 
 /* ── Demo reel — silent, looping, non-interactive YouTube Short embed.
-   Vertical phone-shaped frame matching the polaroid look used elsewhere
-   on the landing page. The shield overlay sits on top of the iframe to
-   absorb every pointer event so visitors can't pause, click through, or
-   open fullscreen. ─────────────────────────────────────────────────── */
-.demo-reel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
+   Lives inside HowItWorks's "shorts-row" (the "See it in action" sub-
+   section). Vertical phone-shaped frame; the shield overlay sits on
+   top of the iframe to absorb every pointer event so visitors can't
+   pause, click through, or open fullscreen. ──────────────────────── */
 .demo-reel-frame {
   position: relative;
   width: min(320px, 80vw);
   aspect-ratio: 9 / 16;
-  margin-top: 24px;
   background: var(--ink);
   border: 2px solid var(--ink);
   border-radius: 22px;

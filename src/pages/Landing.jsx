@@ -3,7 +3,6 @@ import SvgDefs from '../components/SvgDefs.jsx';
 import Nav from '../components/Nav.jsx';
 import Hero from '../components/Hero.jsx';
 import Marquee from '../components/Marquee.jsx';
-import DemoReel from '../components/DemoReel.jsx';
 import HowItWorks from '../components/HowItWorks.jsx';
 import Gallery from '../components/Gallery.jsx';
 import Pricing from '../components/Pricing.jsx';
@@ -26,7 +25,6 @@ export default function Landing() {
       <Nav />
       <Hero onPlayClick={openVideo} />
       <Marquee />
-      <DemoReel />
       <HowItWorks />
       <Gallery />
       {!isPaid && <Pricing />}
