@@ -63,7 +63,7 @@ export function AuthProvider({ children }) {
       return true;
     }
     try {
-      const [profileRes, subRes] = await Promise.all([
+      let [profileRes, subRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
         supabase
           .from('subscriptions')
@@ -79,6 +79,39 @@ export function AuthProvider({ children }) {
       }
       if (subRes.error) {
         console.error('[AuthProvider] subscriptions query error:', subRes.error);
+      }
+
+      // Self-heal a missing profile row. The on_auth_user_created trigger
+      // creates one on signup, but a small fraction of accounts hit the
+      // "We couldn't load your profile" screen — most often a transient
+      // SELECT blip right after sign-in, occasionally a silently-failed
+      // trigger from a past Supabase incident, or a stale OAuth cache.
+      // Two-step recovery, transparent to the user:
+      //   1. Brief retry (250ms) — absorbs read-after-write replication
+      //      lag and one-off RLS hiccups without a server round-trip.
+      //   2. ensure_profile() RPC — security-definer; creates the row
+      //      from auth.users metadata if still missing. Idempotent.
+      // Only runs when the SELECT succeeded but returned no row, so we
+      // don't paper over a real RLS denial or a network failure.
+      if (!profileRes.error && !profileRes.data) {
+        await new Promise((r) => setTimeout(r, 250));
+        profileRes = await supabase
+          .from('profiles').select('*').eq('id', userId).maybeSingle();
+        if (!profileRes.error && !profileRes.data) {
+          const heal = await supabase.rpc('ensure_profile');
+          if (heal.error) {
+            console.error('[AuthProvider] ensure_profile RPC failed:', heal.error);
+          } else if (heal.data) {
+            profileRes = { data: heal.data, error: null };
+            // The RPC also makes sure a free subscription exists. Refetch
+            // it so the UI sees the freshly-created row instead of null.
+            if (!subRes.data) {
+              subRes = await supabase
+                .from('subscriptions').select('*')
+                .eq('user_id', userId).eq('status', 'active').maybeSingle();
+            }
+          }
+        }
       }
 
       // Single-session check. Only fires when:
