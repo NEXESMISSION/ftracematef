@@ -852,7 +852,8 @@ export default function Trace() {
 
       {/* Bottom controls — collapsible compact dock */}
       <footer className={`trace-dock ${controlsHidden ? 'is-hidden' : ''}`}>
-        {/* Slim grab handle — toggles hide/show */}
+        {/* Chevron handle — points up when hidden ("tap to expand"), down
+            when shown ("tap to collapse"). Big tap target. */}
         <button
           type="button"
           className="trace-dock-handle"
@@ -860,7 +861,24 @@ export default function Trace() {
           aria-label={controlsHidden ? 'Show controls' : 'Hide controls'}
           aria-expanded={!controlsHidden}
         >
-          <span className="trace-dock-handle-pill" aria-hidden="true" />
+          <svg
+            className="trace-dock-handle-icon"
+            width="22"
+            height="22"
+            viewBox="0 0 22 22"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            {controlsHidden ? (
+              <path d="M5 13 L11 7 L17 13" />
+            ) : (
+              <path d="M5 9 L11 15 L17 9" />
+            )}
+          </svg>
         </button>
 
         {!controlsHidden && (
