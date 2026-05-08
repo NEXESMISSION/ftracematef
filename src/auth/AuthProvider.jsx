@@ -204,35 +204,47 @@ export function AuthProvider({ children }) {
       if (!newUid) {
         localSessionIdRef.current = null;
         try { window.localStorage.removeItem('tm:session-id'); } catch { /* ignore */ }
-      } else if (!needsLoad) {
-        // Same user, already loaded — hydrate sid from localStorage if
-        // we lost it (e.g. component remount).
-        if (!localSessionIdRef.current) {
-          try {
-            const cached = JSON.parse(window.localStorage.getItem('tm:session-id') ?? 'null');
-            if (cached?.uid === newUid && typeof cached?.sid === 'string') {
-              localSessionIdRef.current = cached.sid;
-            }
-          } catch { /* ignore */ }
-        }
       } else {
-        // Fresh sign-in for this device. Mint a sid + claim before we
-        // load profile, so the loadUserData session-mismatch check
-        // doesn't false-trigger against a previous device's stamp.
-        const sid = (typeof crypto !== 'undefined' && crypto.randomUUID)
-          ? crypto.randomUUID()
-          : (Math.random().toString(36).slice(2) + Date.now().toString(36));
-        localSessionIdRef.current = sid;
+        // Hydrate first. If localStorage already has a sid for this uid,
+        // it means we've previously claimed on this device — a page
+        // reload, a token refresh, or another tab in the same browser.
+        // We must NOT re-mint in those cases: re-minting + re-claiming
+        // would race other tabs of the same browser, and a stale loadUser
+        // pass would see a sid that doesn't match the DB and incorrectly
+        // sign the user out. Reuse the cached sid; the DB still has it.
+        let cachedSid = null;
         try {
-          window.localStorage.setItem('tm:session-id', JSON.stringify({ uid: newUid, sid }));
+          const cached = JSON.parse(window.localStorage.getItem('tm:session-id') ?? 'null');
+          if (cached?.uid === newUid && typeof cached?.sid === 'string') {
+            cachedSid = cached.sid;
+          }
         } catch { /* ignore */ }
-        try {
-          await supabase.rpc('claim_session', { p_session_id: sid });
-        } catch (err) {
-          // Best-effort. If the column doesn't exist yet (pre-migration),
-          // RPC errors out; the DB-side check just silently no-ops the
-          // single-session feature. Don't block sign-in on it.
-          console.warn('[AuthProvider] claim_session failed:', err);
+
+        if (cachedSid) {
+          localSessionIdRef.current = cachedSid;
+          // Don't claim — already claimed. If another device has since
+          // overwritten current_session_id, loadUserData will detect the
+          // mismatch and kick this device, which is the intended outcome.
+        } else if (needsLoad) {
+          // Genuine fresh sign-in / sign-up on this device — no prior sid
+          // for this uid. Mint, persist, claim. The await ensures the DB
+          // is stamped before loadUserData reads it (otherwise we'd race
+          // a previous device's stamp and false-trigger the mismatch).
+          const sid = (typeof crypto !== 'undefined' && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : (Math.random().toString(36).slice(2) + Date.now().toString(36));
+          localSessionIdRef.current = sid;
+          try {
+            window.localStorage.setItem('tm:session-id', JSON.stringify({ uid: newUid, sid }));
+          } catch { /* ignore */ }
+          try {
+            await supabase.rpc('claim_session', { p_session_id: sid });
+          } catch (err) {
+            // Best-effort. If the column doesn't exist yet (pre-migration),
+            // RPC errors out; the DB-side check just silently no-ops the
+            // single-session feature. Don't block sign-in on it.
+            console.warn('[AuthProvider] claim_session failed:', err);
+          }
         }
       }
       // User changed — show the spinner while we refetch. Without this,
@@ -592,9 +604,13 @@ export function AuthProvider({ children }) {
     window.location.replace('/login');
   }, [session?.user?.id]);
 
+  // Depend on the user id, NOT the whole `session` object — supabase mints a
+  // new session reference on every silent token refresh (every ~30 min). Tying
+  // `refresh` to the object would re-create this callback each rotation and
+  // re-fire any effect that depends on it (Trace.jsx, /upload, /account).
   const refresh = useCallback(
     () => loadUserData(session?.user?.id),
-    [session, loadUserData]
+    [session?.user?.id, loadUserData]
   );
 
   // Lifetime never has a period_end. Recurring plans must still be inside
