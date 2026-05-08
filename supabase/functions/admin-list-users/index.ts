@@ -85,11 +85,6 @@ Deno.serve(async (req) => {
   // Closes any run whose heartbeat has been silent for >45s, crediting the
   // duration up to the last heartbeat. Idempotent — safe to call on every
   // request, only touches rows that need it.
-  //
-  // Why 45s: the client heartbeat is every 30s, so 45s = "missed at least
-  // one heartbeat with a 15s grace." Tighter than the previous 120s so the
-  // admin's "Watch live" button stops showing within ~one refresh cycle of
-  // the user's tab dying, instead of two and a half minutes later.
   const { error: reconcileErr } = await admin.rpc('reconcile_trace_runs', {
     p_stale_seconds: 45,
   });
@@ -115,45 +110,6 @@ Deno.serve(async (req) => {
     .select('user_id, plan, status, current_period_end, cancel_at_next_billing_date, amount_cents, currency, dodo_subscription_id, created_at, updated_at, cancelled_at')
     .order('created_at', { ascending: false });
   if (subsErr) return json({ error: subsErr.message }, 500);
-
-  // Pull spectate_tokens for currently-open trace sessions. Tokens are
-  // server-issued per session and never leave the user's profile (RLS
-  // restricts SELECT on trace_session_runs to the row's owner). Admin
-  // gets them via service-role here so the dashboard's Watch live button
-  // can authorise its WebRTC subscriber on a non-guessable channel.
-  const { data: openRuns, error: openRunsErr } = await admin
-    .from('trace_session_runs')
-    .select('id, spectate_token, last_heartbeat_at, broadcast_state, broadcast_state_at')
-    .is('ended_at', null);
-  if (openRunsErr) {
-    // Non-fatal — the dashboard is still useful without spectate. Log and
-    // continue; tracing rows just won't get a spectate_token attached.
-    console.warn('[admin-list-users] open-runs lookup failed:', openRunsErr);
-  }
-  type OpenRunMeta = {
-    token: string | null;
-    lastHeartbeatAt: string | null;
-    // Latest self-reported broadcaster state from the user's /trace tab
-    // ('up' | 'starting' | 'camera_denied' | 'no_camera' | 'camera_error'
-    // | 'realtime_failed' | null). Drives the dashboard's accurate
-    // "user is on /trace but camera failed" hinting. Nullable for runs
-    // that started before migration 20260508000001 landed (rows without
-    // the column default to null) and for runs whose client hasn't yet
-    // dialed in any state.
-    broadcastState: string | null;
-    broadcastStateAt: string | null;
-  };
-  const runMetaById = new Map<string, OpenRunMeta>();
-  for (const r of (openRuns ?? [])) {
-    if (r?.id) {
-      runMetaById.set(r.id as string, {
-        token: (r.spectate_token as string | null) ?? null,
-        lastHeartbeatAt: (r.last_heartbeat_at as string | null) ?? null,
-        broadcastState: (r.broadcast_state as string | null) ?? null,
-        broadcastStateAt: (r.broadcast_state_at as string | null) ?? null,
-      });
-    }
-  }
 
   // Pull auth.users.last_sign_in_at so users who haven't pinged the heartbeat
   // since the column was added still show a meaningful "last seen". This is
@@ -218,7 +174,6 @@ Deno.serve(async (req) => {
 
   const users = (profiles ?? []).map((p) => {
     const sub = activeByUser.get(p.id) ?? latestByUser.get(p.id) ?? null;
-    const runMeta = p.current_run_id ? runMetaById.get(p.current_run_id) : null;
     return {
       id:                  p.id,
       email:               p.email,
@@ -273,26 +228,6 @@ Deno.serve(async (req) => {
       current_page:        p.current_page ?? null,
       current_image_label: p.current_image_label ?? null,
       current_run_id:      p.current_run_id ?? null,
-      // Per-session spectate_token. Only attached when the user actually
-      // has an open run (current_run_id present AND that row is still
-      // open in trace_session_runs). The token itself is the auth secret
-      // for the WebRTC signaling channel — without it, no one can join
-      // as a viewer.
-      spectate_token:      runMeta?.token ?? null,
-      // Last heartbeat from the user's currently-open trace run. The
-      // dashboard uses this as a freshness gate on "Watch live" — when the
-      // heartbeat goes stale (> ~one heartbeat interval) the user is
-      // presumed gone, so the button stops showing even before the next
-      // server-side reconcile sweep closes the run.
-      last_trace_heartbeat_at: runMeta?.lastHeartbeatAt ?? null,
-      // Self-reported broadcaster state from the /trace tab. Null for
-      // pre-migration runs and for runs whose client hasn't reported
-      // yet. Dashboard uses this to distinguish "user closed the tab"
-      // (presence empty + state == null|stopped) from "user is here but
-      // camera/realtime failed" (presence empty + state in
-      // camera_denied / no_camera / camera_error / realtime_failed).
-      broadcast_state:    runMeta?.broadcastState ?? null,
-      broadcast_state_at: runMeta?.broadcastStateAt ?? null,
     };
   });
 

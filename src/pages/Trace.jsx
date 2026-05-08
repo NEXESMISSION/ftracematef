@@ -6,8 +6,6 @@ import { loadPendingImage } from '../lib/pendingImage.js';
 import { consumeFreeSession, trialAlreadyConsumedThisVisit } from '../lib/freeTrial.js';
 import { setPresence, clearPresence } from '../lib/presence.js';
 import { setTracing } from '../lib/tracing-state.js';
-import { startBroadcaster } from '../lib/livePreview.js';
-import { downscaleToDataUrl } from '../lib/imageDownscale.js';
 import { startRecording, isRecordingSupported } from '../lib/recorder.js';
 import {
   cssMatrix3d,
@@ -72,6 +70,11 @@ export default function Trace() {
   const [corners, setCorners]               = useState(null);
   const [baseSize, setBaseSize]             = useState(null);
   const handleDragRef                       = useRef(null);
+  // Bottom-dock segmented control. 'opacity' = the single opacity slider
+  // (default; cheapest to render), 'adjust' = the move/zoom/rotate
+  // sliders, 'flicker' = the pulse-mode panel. Stored locally so a tab
+  // refresh doesn't dump the user back into Opacity mid-tracing.
+  const [panelTab, setPanelTab] = useLocalState('tm:panelTab', 'opacity');
 
   // Idle dim. After 10s with no click/tap/wheel/keypress the on-screen
   // chrome (topbar, controls dock, warp reset) fades to a low opacity so
@@ -131,59 +134,6 @@ export default function Trace() {
     };
   }, [imageUrl]);
 
-  // Start (or restart) the camera whenever facingMode changes.
-  // Cache the downsampled reference-image thumbnail across camera-effect
-  // re-runs (front ↔ back switch). Recomputing the canvas resize is cheap
-  // but pointless when the image hasn't changed.
-  const thumbCacheRef = useRef({ src: null, dataUrl: null });
-  const getReferenceThumb = useCallback(async () => {
-    if (!imageUrl) return null;
-    if (thumbCacheRef.current.src === imageUrl && thumbCacheRef.current.dataUrl) {
-      return thumbCacheRef.current.dataUrl;
-    }
-    try {
-      const dataUrl = await downscaleToDataUrl(imageUrl, 640, 0.85);
-      thumbCacheRef.current = { src: imageUrl, dataUrl };
-      return dataUrl;
-    } catch (err) {
-      console.warn('[trace] reference thumbnail failed:', err);
-      return null;
-    }
-  }, [imageUrl]);
-
-  // streamRev increments each time the camera effect produces a fresh
-  // stream. The broadcaster effect (further down) reads streamRef.current
-  // but needs a reactive trigger to know the stream changed — `streamRev`
-  // is that trigger without forcing the camera effect to keep the stream
-  // in React state.
-  const [streamRev, setStreamRev] = useState(0);
-  // Per-session spectate token (random UUID server-issued by
-  // start_trace_run). Declared up here — NOT down with the rest of the
-  // session-tracking refs — because the broadcaster effect immediately
-  // below references it in its dependency array, and a function-scope
-  // const can't be referenced before its declaration line is executed
-  // (temporal dead zone). Putting both states together also makes the
-  // broadcaster effect's deps list read top-to-bottom in the file.
-  const [spectateToken, setSpectateToken] = useState(null);
-  // Mirror of runIdRef.current in React state. The runId itself only ever
-  // needs to live in a ref (the heartbeat / end-of-session callbacks read
-  // it imperatively), but the broadcast-state reporter effect below has
-  // to *react* to runId arriving so it can flush whatever state was
-  // queued before start_trace_run resolved (e.g. camera permission
-  // denied within 200ms of mount, before the RPC came back).
-  const [runId, setRunId] = useState(null);
-  // Latest broadcaster-state to report on the open run row. Drives the
-  // accuracy of the admin "Watch live" UI:
-  //   'starting'        — broadcaster effect ran, channel not yet up
-  //   'up'              — broadcaster subscribed to realtime
-  //   'camera_denied'   — getUserMedia rejected with NotAllowedError
-  //   'no_camera'       — mediaDevices unavailable / no device
-  //   'camera_error'    — getUserMedia threw something else
-  //   'realtime_failed' — channel.subscribe reported error / timeout
-  // Setting the same string twice is a no-op (React bails out on Object.is
-  // equality), so the reporter effect fires exactly once per transition.
-  const [broadcastReport, setBroadcastReport] = useState(null);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -220,7 +170,6 @@ export default function Trace() {
       // didn't.
       if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
         setCameraError('Your browser blocks camera access. Open this page in Safari or Chrome instead of an in-app browser.');
-        setBroadcastReport('no_camera');
         return;
       }
 
@@ -231,7 +180,6 @@ export default function Trace() {
           audio: audioConstraints,
         });
       } catch {
-        // Audio denied or unavailable — retry video-only.
         if (!cancelled) {
           try {
             stream = await navigator.mediaDevices.getUserMedia({
@@ -245,20 +193,6 @@ export default function Trace() {
                 ? 'Camera access was blocked. Allow it in your browser settings to start tracing.'
                 : 'Could not start the camera. Try a different browser or device.'
             );
-            // Map browser error names to broadcast-state values the admin
-            // dashboard understands. NotAllowedError = user / OS denial,
-            // NotFoundError = no camera hardware enumerable, anything
-            // else (OverconstrainedError, NotReadableError from another
-            // app holding the camera, generic AbortError) bucketed as
-            // camera_error so the operator can at least tell it's not a
-            // permission problem.
-            if (err2?.name === 'NotAllowedError') {
-              setBroadcastReport('camera_denied');
-            } else if (err2?.name === 'NotFoundError') {
-              setBroadcastReport('no_camera');
-            } else {
-              setBroadcastReport('camera_error');
-            }
             return;
           }
         }
@@ -281,9 +215,6 @@ export default function Trace() {
         if (caps?.torch) setTorchSupported(true);
       }
       setCameraError('');
-
-      // Trigger the broadcaster effect now that we have a fresh stream.
-      if (!cancelled) setStreamRev((r) => r + 1);
     }
 
     startCamera();
@@ -294,121 +225,6 @@ export default function Trace() {
       streamRef.current = null;
     };
   }, [facingMode]);
-
-  // Operator-side spectator broadcaster. Decoupled from the camera effect
-  // because it depends on BOTH the live MediaStream (streamRev bumps
-  // whenever the camera produces a fresh one) AND the per-session
-  // spectate_token (server-issued via start_trace_run RPC). Sits in
-  // 'waiting' (presence-only realtime subscription, zero peer-connection
-  // cost) until an admin actually opens the modal. No UI surface — the
-  // user is unaware of this effect entirely.
-  useEffect(() => {
-    // Diagnostic — prints exactly which prerequisite is missing on
-    // every render, so when a user reports "spectate doesn't work" we
-    // can see in their console whether the broadcaster effect skipped
-    // because of (a) no auth user, (b) no spectate_token from
-    // start_trace_run, or (c) no camera stream. The most common silent
-    // failure is start_trace_run hitting the per-user rate limit and
-    // returning {run_id:null, spectate_token:null}, which leaves the
-    // dashboard's "Watch live" button gone but produces no on-screen
-    // user feedback. The tag matches the log shape in livePreview.js
-    // so they line up in devtools.
-    console.log(
-      '[trace bcast effect]',
-      'user=', user?.id ? user.id.slice(0, 6) : 'none',
-      'spectateToken=', spectateToken ? spectateToken.slice(0, 6) : 'none',
-      'stream=', streamRef.current ? 'ok' : 'none',
-      'streamRev=', streamRev,
-    );
-    if (!user?.id) return;
-    if (!spectateToken) return;
-    const stream = streamRef.current;
-    if (!stream) return;
-
-    let cancelled = false;
-    let broadcaster = null;
-
-    // Tell the dashboard we're trying. The reporter effect below RPCs
-    // this onto the open run row as soon as runId is known. If the
-    // channel comes up cleanly we'll overwrite with 'up' a beat later;
-    // if it never connects, the operator sees 'starting' and knows it's
-    // not a "user denied camera" case.
-    setBroadcastReport('starting');
-
-    (async () => {
-      const referenceThumb = await getReferenceThumb();
-      if (cancelled) return;
-      try {
-        broadcaster = startBroadcaster({
-          // The "userId" param is just the channel-key suffix in
-          // livePreview.js. We pass the spectate_token here so the
-          // signaling channel becomes `tw:${random_token}` — only the
-          // user themselves and an admin (via service-role read) ever
-          // know it.
-          userId: spectateToken,
-          kind: 'tw',
-          stream,
-          referenceImageDataUrl: referenceThumb,
-          // First non-error status from livePreview means realtime
-          // SUBSCRIBED + presence tracked — i.e. an admin viewer would
-          // be discoverable. Any of {waiting, connecting, connected,
-          // reconnecting} all imply the broadcaster side is healthy.
-          // We collapse them all to 'up' for the dashboard signal.
-          onStatus: (s) => {
-            if (cancelled) return;
-            if (s === 'waiting' || s === 'connecting' || s === 'connected' || s === 'reconnecting') {
-              setBroadcastReport('up');
-            }
-          },
-          // Realtime channel CHANNEL_ERROR / TIMED_OUT / CLOSED. Common
-          // cause: corporate / captive WiFi blocking WebSocket while
-          // letting plain HTTPS through, so heartbeat keeps firing but
-          // signaling can't run.
-          onError: () => {
-            if (cancelled) return;
-            setBroadcastReport('realtime_failed');
-          },
-        });
-      } catch {
-        // startBroadcaster itself threw — the channel object couldn't
-        // even be constructed. Treat as a realtime failure for the
-        // dashboard's purposes.
-        if (!cancelled) setBroadcastReport('realtime_failed');
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (broadcaster) { try { broadcaster.stop(); } catch { /* ignore */ } broadcaster = null; }
-    };
-  }, [streamRev, spectateToken, user?.id, getReferenceThumb]);
-
-  // Report the broadcaster's state to the open run row so the admin
-  // dashboard can render accurate "Watch live" affordances (and accurate
-  // copy when the channel doesn't come up). Fires on every distinct
-  // (runId, broadcastReport) transition. Best-effort: a failed RPC just
-  // means the badge stays stale, which is strictly less bad than the
-  // pre-fix behavior of always showing "user closed the tab" for any
-  // empty-presence case. Server enforces ownership + ended_at IS NULL,
-  // so a late RPC after end_trace_run is a safe no-op.
-  useEffect(() => {
-    if (!runId || !broadcastReport) return;
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey     = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    const accessToken = accessTokenRef.current;
-    if (!supabaseUrl || !anonKey || !accessToken) return;
-    try {
-      fetch(`${supabaseUrl}/rest/v1/rpc/set_trace_broadcast_state`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': anonKey,
-          'Authorization': `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ p_run_id: runId, p_state: broadcastReport }),
-      }).catch(() => { /* best-effort; admin UX-only */ });
-    } catch { /* ignore */ }
-  }, [runId, broadcastReport]);
 
   // Auto-hide the gesture hint after a moment
   useEffect(() => {
@@ -559,9 +375,6 @@ export default function Trace() {
   const endedRef      = useRef(false);
   const runIdRef      = useRef(null);
   const accessTokenRef = useRef(null);
-  // (spectateToken state is declared up near streamRev — see the comment
-  // there for why it can't live next to the rest of the session-tracking
-  // refs. The session effect below populates it via setSpectateToken.)
   useEffect(() => {
     accessTokenRef.current = session?.access_token || null;
   }, [session?.access_token]);
@@ -605,25 +418,13 @@ export default function Trace() {
           })
             .then((res) => res.ok ? res.json() : null)
             .then((data) => {
-              // Accept BOTH RPC response shapes so the deploy ordering
-              // (client first, SQL migration later) doesn't break session
-              // tracking:
-              //   - Pre-migration-7: bare uuid string. We get a run_id,
-              //     no spectate_token → spectator feature unavailable
-              //     until SQL is run, but heartbeats + duration tracking
-              //     keep working.
-              //   - Post-migration-7: { run_id, spectate_token } object.
-              //     Both fields adopted; spectator wires up.
+              // start_trace_run returns either a bare uuid (legacy) or an
+              // object { run_id, ... } — accept both.
               if (typeof data === 'string' && data.length === 36) {
                 runIdRef.current = data;
-                setRunId(data);
               } else if (data && typeof data === 'object') {
                 if (typeof data.run_id === 'string' && data.run_id.length === 36) {
                   runIdRef.current = data.run_id;
-                  setRunId(data.run_id);
-                }
-                if (typeof data.spectate_token === 'string' && data.spectate_token.length === 36) {
-                  setSpectateToken(data.spectate_token);
                 }
               }
             })
@@ -679,11 +480,6 @@ export default function Trace() {
       stopHeartbeat();
       clearPresence();
       setTracing(false);
-      // Drop the React-state runId so any in-flight broadcast-state
-      // reporter effects don't fire RPCs against the row we just closed.
-      // (The server-side filter `where ended_at is null` would no-op them
-      // anyway, but skipping the request is cheaper.)
-      setRunId(null);
 
       const runId = runIdRef.current;
 
@@ -1055,178 +851,265 @@ export default function Trace() {
       )}
 
       {/* Bottom controls — collapsible compact dock */}
-      <footer className={`trace-controls ${controlsHidden ? 'is-hidden' : ''}`}>
-        {/* Big chevron handle — toggles hide/show */}
+      <footer className={`trace-dock ${controlsHidden ? 'is-hidden' : ''}`}>
+        {/* Slim grab handle — toggles hide/show */}
         <button
           type="button"
-          className="trace-handle"
+          className="trace-dock-handle"
           onClick={() => setControlsHidden((v) => !v)}
           aria-label={controlsHidden ? 'Show controls' : 'Hide controls'}
           aria-expanded={!controlsHidden}
         >
-          <svg
-            className="trace-handle-icon"
-            width="22"
-            height="22"
-            viewBox="0 0 22 22"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            {controlsHidden ? (
-              <path d="M5 13 L11 7 L17 13" />
-            ) : (
-              <path d="M5 9 L11 15 L17 9" />
-            )}
-          </svg>
+          <span className="trace-dock-handle-pill" aria-hidden="true" />
         </button>
 
         {!controlsHidden && (
-          <div className="trace-controls-inner">
-            {recordSupported && !recording && (
-              <label className="trace-checkbox">
-                <input
-                  type="checkbox"
-                  checked={recordIncludeOverlay}
-                  onChange={(e) => setRecordIncludeOverlay(e.target.checked)}
-                />
-                <span className="trace-checkbox-box" aria-hidden="true">
-                  <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor"
-                       strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2.5 7.5 L6 11 L11.5 3.5" />
-                  </svg>
-                </span>
-                <span className="trace-checkbox-label">Include drawing overlay in recording</span>
-              </label>
-            )}
+          <div className="trace-dock-body">
             {recordError && (
               <div className="trace-rec-error" role="alert">{recordError}</div>
             )}
 
-            <div className="trace-slider">
-              <input
-                id="opacity"
-                type="range"
-                min="0.05"
-                max="1"
-                step="0.01"
-                value={opacity}
-                onChange={(e) => setOpacity(parseFloat(e.target.value))}
-                disabled={flickerOn}
-                aria-label="Opacity"
-                style={{ '--tm-slider-fill': `${(opacity - 0.05) / 0.95 * 100}%` }}
-              />
-              <span className="trace-slider-value">{Math.round(opacity * 100)}%</span>
+            {/* Segmented tab control. Three modes; switching is instant. */}
+            <div className="trace-dock-tabs" role="tablist" aria-label="Adjust mode">
+              {[
+                { id: 'opacity', label: 'Opacity' },
+                { id: 'adjust',  label: 'Adjust'  },
+                { id: 'flicker', label: 'Flicker' },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={panelTab === t.id}
+                  className={`trace-dock-tab ${panelTab === t.id ? 'is-active' : ''}`}
+                  onClick={() => setPanelTab(t.id)}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
 
-            {flickerOn && (
-              <>
+            {/* Slider region — re-renders per tab, height adapts. */}
+            <div className="trace-dock-panel">
+              {panelTab === 'opacity' && (
                 <div className="trace-slider">
-                  <span className="trace-slider-label" aria-hidden="true">Speed</span>
                   <input
-                    id="flicker-speed"
+                    id="opacity"
                     type="range"
-                    min="1"
-                    max="10"
-                    step="0.5"
-                    value={flickerSpeed}
-                    onChange={(e) => setFlickerSpeed(parseFloat(e.target.value))}
-                    aria-label="Flicker speed"
-                    style={{ '--tm-slider-fill': `${(flickerSpeed - 1) / 9 * 100}%` }}
-                  />
-                  <span className="trace-slider-value">{flickerSpeed.toFixed(1)}×</span>
-                </div>
-                {/* Min / Max bound the oscillation so the overlay never
-                    blanks (good for keeping reference visible at all times)
-                    or fully blocks the camera. We clamp Min to stay <= Max
-                    minus a small gap, and vice-versa, so users can drag
-                    them freely without the bounds crossing. */}
-                <div className="trace-slider">
-                  <span className="trace-slider-label" aria-hidden="true">Min</span>
-                  <input
-                    id="flicker-min"
-                    type="range"
-                    min="0"
+                    min="0.05"
                     max="1"
                     step="0.01"
-                    value={flickerMin}
-                    onChange={(e) => {
-                      const next = parseFloat(e.target.value);
-                      setFlickerMin(next);
-                      if (next >= flickerMax - 0.05) {
-                        setFlickerMax(Math.min(1, next + 0.05));
-                      }
-                    }}
-                    aria-label="Flicker minimum opacity"
-                    style={{ '--tm-slider-fill': `${flickerMin * 100}%` }}
+                    value={opacity}
+                    onChange={(e) => setOpacity(parseFloat(e.target.value))}
+                    disabled={flickerOn}
+                    aria-label="Opacity"
+                    style={{ '--tm-slider-fill': `${(opacity - 0.05) / 0.95 * 100}%` }}
                   />
-                  <span className="trace-slider-value">{Math.round(flickerMin * 100)}%</span>
+                  <span className="trace-slider-value">{Math.round(opacity * 100)}%</span>
                 </div>
-                <div className="trace-slider">
-                  <span className="trace-slider-label" aria-hidden="true">Max</span>
-                  <input
-                    id="flicker-max"
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={flickerMax}
-                    onChange={(e) => {
-                      const next = parseFloat(e.target.value);
-                      setFlickerMax(next);
-                      if (next <= flickerMin + 0.05) {
-                        setFlickerMin(Math.max(0, next - 0.05));
-                      }
-                    }}
-                    aria-label="Flicker maximum opacity"
-                    style={{ '--tm-slider-fill': `${flickerMax * 100}%` }}
-                  />
-                  <span className="trace-slider-value">{Math.round(flickerMax * 100)}%</span>
-                </div>
-              </>
-            )}
+              )}
 
-            <div className="trace-toggles">
+              {panelTab === 'adjust' && (
+                <div className="trace-slider-grid">
+                  {/* Move X — bounds chosen to comfortably cover any
+                      typical phone/tablet viewport without a hard wall. */}
+                  <div className="trace-slider trace-slider-compact">
+                    <span className="trace-slider-label" aria-hidden="true">X</span>
+                    <input
+                      type="range"
+                      min={-600}
+                      max={600}
+                      step={1}
+                      value={Math.round(transform.x)}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        setTransform((t) => ({ ...t, x: v }));
+                      }}
+                      aria-label="Move horizontally"
+                      style={{ '--tm-slider-fill': `${((transform.x + 600) / 1200) * 100}%` }}
+                    />
+                    <span className="trace-slider-value">{Math.round(transform.x)}</span>
+                  </div>
+                  <div className="trace-slider trace-slider-compact">
+                    <span className="trace-slider-label" aria-hidden="true">Y</span>
+                    <input
+                      type="range"
+                      min={-600}
+                      max={600}
+                      step={1}
+                      value={Math.round(transform.y)}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        setTransform((t) => ({ ...t, y: v }));
+                      }}
+                      aria-label="Move vertically"
+                      style={{ '--tm-slider-fill': `${((transform.y + 600) / 1200) * 100}%` }}
+                    />
+                    <span className="trace-slider-value">{Math.round(transform.y)}</span>
+                  </div>
+                  {/* Zoom — same 0.2..8 bounds as gesture pinch (see
+                      onPointerMove). Stepped at 0.01 for fine control. */}
+                  <div className="trace-slider trace-slider-compact">
+                    <span className="trace-slider-label" aria-hidden="true">Zoom</span>
+                    <input
+                      type="range"
+                      min={0.2}
+                      max={8}
+                      step={0.01}
+                      value={transform.scale}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        setTransform((t) => ({ ...t, scale: v }));
+                      }}
+                      aria-label="Zoom"
+                      style={{ '--tm-slider-fill': `${((transform.scale - 0.2) / 7.8) * 100}%` }}
+                    />
+                    <span className="trace-slider-value">{transform.scale.toFixed(2)}×</span>
+                  </div>
+                  {/* Rotate — gestures can push rotation past ±180 (no
+                      modulo); the slider clamps when used. Display in
+                      degrees, normalized into the slider's range so a
+                      "spun" overlay still has a sensible thumb position. */}
+                  <div className="trace-slider trace-slider-compact">
+                    <span className="trace-slider-label" aria-hidden="true">Rotate</span>
+                    <input
+                      type="range"
+                      min={-180}
+                      max={180}
+                      step={1}
+                      value={Math.max(-180, Math.min(180, Math.round(transform.rotation)))}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        setTransform((t) => ({ ...t, rotation: v }));
+                      }}
+                      aria-label="Rotate"
+                      style={{ '--tm-slider-fill': `${((Math.max(-180, Math.min(180, transform.rotation)) + 180) / 360) * 100}%` }}
+                    />
+                    <span className="trace-slider-value">{Math.round(transform.rotation)}°</span>
+                  </div>
+                </div>
+              )}
+
+              {panelTab === 'flicker' && (
+                <div className="trace-flicker-pane">
+                  {/* Flicker on/off lives here so the tab is fully self-
+                      contained — toggle the mode where you tune it. */}
+                  <label className="trace-switch">
+                    <input
+                      type="checkbox"
+                      checked={flickerOn}
+                      onChange={(e) => setFlickerOn(e.target.checked)}
+                    />
+                    <span className="trace-switch-track" aria-hidden="true">
+                      <span className="trace-switch-thumb" />
+                    </span>
+                    <span className="trace-switch-label">{flickerOn ? 'Pulsing' : 'Off'}</span>
+                  </label>
+
+                  {flickerOn && (
+                    <>
+                      <div className="trace-slider trace-slider-compact">
+                        <span className="trace-slider-label" aria-hidden="true">Speed</span>
+                        <input
+                          type="range"
+                          min="1"
+                          max="10"
+                          step="0.5"
+                          value={flickerSpeed}
+                          onChange={(e) => setFlickerSpeed(parseFloat(e.target.value))}
+                          aria-label="Flicker speed"
+                          style={{ '--tm-slider-fill': `${(flickerSpeed - 1) / 9 * 100}%` }}
+                        />
+                        <span className="trace-slider-value">{flickerSpeed.toFixed(1)}×</span>
+                      </div>
+                      <div className="trace-slider trace-slider-compact">
+                        <span className="trace-slider-label" aria-hidden="true">Min</span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={flickerMin}
+                          onChange={(e) => {
+                            const next = parseFloat(e.target.value);
+                            setFlickerMin(next);
+                            if (next >= flickerMax - 0.05) {
+                              setFlickerMax(Math.min(1, next + 0.05));
+                            }
+                          }}
+                          aria-label="Flicker minimum opacity"
+                          style={{ '--tm-slider-fill': `${flickerMin * 100}%` }}
+                        />
+                        <span className="trace-slider-value">{Math.round(flickerMin * 100)}%</span>
+                      </div>
+                      <div className="trace-slider trace-slider-compact">
+                        <span className="trace-slider-label" aria-hidden="true">Max</span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={flickerMax}
+                          onChange={(e) => {
+                            const next = parseFloat(e.target.value);
+                            setFlickerMax(next);
+                            if (next <= flickerMin + 0.05) {
+                              setFlickerMin(Math.max(0, next - 0.05));
+                            }
+                          }}
+                          aria-label="Flicker maximum opacity"
+                          style={{ '--tm-slider-fill': `${flickerMax * 100}%` }}
+                        />
+                        <span className="trace-slider-value">{Math.round(flickerMax * 100)}%</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Compact actions row. Center moved out of here into the
+                Adjust tab is tempting but a one-tap recenter is the most
+                common shortcut, so it stays. Flicker moved out — it
+                lives in the Flicker tab now. */}
+            <div className="trace-dock-actions">
               <button
                 type="button"
-                className={`trace-action-btn ${flickerOn ? 'is-active' : ''}`}
-                onClick={() => setFlickerOn((v) => !v)}
-                aria-pressed={flickerOn}
-                aria-label={flickerOn ? 'Turn flicker off' : 'Turn flicker on'}
+                className="trace-icon-btn"
+                onClick={recenter}
+                aria-label="Recenter overlay"
+                title="Center"
               >
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-                     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M2 10 L5 10 L7 5 L10 15 L13 5 L15 10 L18 10" />
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                     strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="10" cy="10" r="6.5" />
+                  <circle cx="10" cy="10" r="1.4" fill="currentColor" />
+                  <path d="M10 1.5 V4 M10 16 V18.5 M1.5 10 H4 M16 10 H18.5" />
                 </svg>
-                <span>Flicker</span>
               </button>
-
               <button
                 type="button"
-                className="trace-action-btn"
+                className="trace-icon-btn"
                 onClick={flipHorizontal}
                 aria-label="Flip horizontally"
+                title="Flip"
               >
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-                     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                     strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M10 3 V17" strokeDasharray="2 2" />
                   <path d="M3 6 L8 6 L8 14 L3 14 Z" />
                   <path d="M17 6 L12 6 L12 14 L17 14 Z" fill="currentColor" fillOpacity="0.25" />
                 </svg>
-                <span>Flip</span>
               </button>
-
               <button
                 type="button"
-                className={`trace-action-btn ${warpMode ? 'is-active' : ''}`}
+                className={`trace-icon-btn ${warpMode ? 'is-active' : ''}`}
                 onClick={() => setWarpMode((v) => !v)}
                 aria-pressed={warpMode}
                 aria-label={warpMode ? 'Exit warp mode' : 'Enter warp mode'}
+                title="Warp"
               >
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
                      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M3.5 4 L16 5 L17 16 L4.5 14.5 Z" />
                   <circle cx="3.5" cy="4"   r="1.4" fill="currentColor" />
@@ -1234,78 +1117,76 @@ export default function Trace() {
                   <circle cx="17"  cy="16"  r="1.4" fill="currentColor" />
                   <circle cx="4.5" cy="14.5" r="1.4" fill="currentColor" />
                 </svg>
-                <span>Warp</span>
               </button>
-
               <button
                 type="button"
-                className="trace-action-btn"
-                onClick={recenter}
-                aria-label="Center overlay"
-              >
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-                     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="10" cy="10" r="6.5" />
-                  <circle cx="10" cy="10" r="1.4" fill="currentColor" />
-                  <path d="M10 1.5 V4 M10 16 V18.5 M1.5 10 H4 M16 10 H18.5" />
-                </svg>
-                <span>Center</span>
-              </button>
-
-              <button
-                type="button"
-                className="trace-action-btn"
+                className="trace-icon-btn"
                 onClick={switchCamera}
                 aria-label="Switch camera"
+                title="Camera"
               >
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-                     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                     strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M3 6.5 H6 L7.5 5 H12.5 L14 6.5 H17 a1 1 0 0 1 1 1 V15 a1 1 0 0 1 -1 1 H3 a1 1 0 0 1 -1 -1 V7.5 a1 1 0 0 1 1 -1 Z" />
                   <path d="M10 9.5 a2 2 0 1 0 2 2" />
                   <path d="M12 9.5 V8 H10.5" />
                 </svg>
-                <span>Camera</span>
               </button>
-
+              {torchSupported && (
+                <button
+                  type="button"
+                  className={`trace-icon-btn ${torchOn ? 'is-active' : ''}`}
+                  onClick={toggleTorch}
+                  aria-pressed={torchOn}
+                  aria-label={torchOn ? 'Turn flash off' : 'Turn flash on'}
+                  title="Flash"
+                >
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                       strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 2 L4.5 11 H9.5 L8 18 L15.5 9 H10.5 L12 2 Z" />
+                  </svg>
+                </button>
+              )}
               {recordSupported && (
                 <button
                   type="button"
-                  className={`trace-action-btn trace-record-btn ${recording ? 'is-recording' : ''}`}
+                  className={`trace-icon-btn trace-rec-btn ${recording ? 'is-recording' : ''}`}
                   onClick={toggleRecording}
                   aria-pressed={recording}
                   aria-label={recording ? 'Stop recording' : 'Start recording'}
+                  title={recording ? 'Stop' : 'Record'}
                 >
                   {recording ? (
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                       <rect x="5" y="5" width="10" height="10" rx="1.5" />
                     </svg>
                   ) : (
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-                         strokeWidth="1.8" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                         strokeWidth="1.7" aria-hidden="true">
                       <circle cx="10" cy="10" r="7" />
                       <circle cx="10" cy="10" r="3.4" fill="currentColor" stroke="none" />
                     </svg>
                   )}
-                  <span>{recording ? 'Stop' : 'Record'}</span>
-                </button>
-              )}
-
-              {torchSupported && (
-                <button
-                  type="button"
-                  className={`trace-action-btn ${torchOn ? 'is-active' : ''}`}
-                  onClick={toggleTorch}
-                  aria-pressed={torchOn}
-                  aria-label={torchOn ? 'Turn flash off' : 'Turn flash on'}
-                >
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-                       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M12 2 L4.5 11 H9.5 L8 18 L15.5 9 H10.5 L12 2 Z" />
-                  </svg>
-                  <span>Flash</span>
                 </button>
               )}
             </div>
+
+            {recordSupported && !recording && (
+              <label className="trace-checkbox trace-checkbox-mini">
+                <input
+                  type="checkbox"
+                  checked={recordIncludeOverlay}
+                  onChange={(e) => setRecordIncludeOverlay(e.target.checked)}
+                />
+                <span className="trace-checkbox-box" aria-hidden="true">
+                  <svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor"
+                       strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2.5 7.5 L6 11 L11.5 3.5" />
+                  </svg>
+                </span>
+                <span className="trace-checkbox-label">Record overlay</span>
+              </label>
+            )}
           </div>
         )}
       </footer>

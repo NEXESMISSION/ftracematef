@@ -34,6 +34,27 @@ export function AuthProvider({ children }) {
   // from "we've loaded the signed-out state".
   const fetchedForUidRef = useRef(undefined);
 
+  // One-session-per-user enforcement. The local sid is the per-device,
+  // per-user random uuid this tab claimed via claim_session() at sign-in.
+  // When loadUserData (or the realtime profile-update subscription below)
+  // observes profiles.current_session_id != localSessionIdRef.current, a
+  // NEWER device claimed the account — kick this device.
+  // Hydrated from localStorage on app reload so the comparison still works
+  // after a refresh. localStorage layout: { uid, sid }.
+  const localSessionIdRef = useRef(null);
+  const supersededRef     = useRef(false); // guards re-entry when we sign out
+
+  const forceSignOutSuperseded = useCallback(async () => {
+    if (supersededRef.current) return;
+    supersededRef.current = true;
+    console.warn('[AuthProvider] session superseded by another device — signing out.');
+    try { window.localStorage.removeItem('tm:session-id'); } catch { /* ignore */ }
+    try { await supabase.auth.signOut(); } catch { /* ignore */ }
+    try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
+    // Hard reload to /login so any rendered protected page is wiped.
+    window.location.replace('/login');
+  }, []);
+
   // Returns true on success, false on error (so callers can decide).
   const loadUserData = useCallback(async (userId) => {
     if (!userId) {
@@ -60,6 +81,20 @@ export function AuthProvider({ children }) {
         console.error('[AuthProvider] subscriptions query error:', subRes.error);
       }
 
+      // Single-session check. Only fires when:
+      //   - The DB knows about a session (column non-null — pre-migration
+      //     rows are skipped).
+      //   - We have a local sid for THIS user (otherwise we have no claim
+      //     to lose; mismatch on a freshly-rehydrated tab without sid is
+      //     not enough evidence to kick).
+      //   - The two values disagree.
+      const remoteSid = profileRes.data?.current_session_id ?? null;
+      const localSid  = localSessionIdRef.current;
+      if (remoteSid && localSid && remoteSid !== localSid) {
+        forceSignOutSuperseded();
+        return false;
+      }
+
       setProfile(profileRes.data ?? null);
       setSubscription(subRes.data ?? null);
       return !profileRes.error && !subRes.error;
@@ -69,7 +104,7 @@ export function AuthProvider({ children }) {
       setSubscription(null);
       return false;
     }
-  }, []);
+  }, [forceSignOutSuperseded]);
 
   // Initial session + onAuthStateChange handler.
   // Both wrap loadUserData in their own try/finally so we *always* clear `loading`.
@@ -142,8 +177,8 @@ export function AuthProvider({ children }) {
       const needsLoad = fetchedForUidRef.current !== newUid;
       setSession(next);
       // Hand the realtime client the latest user JWT so authenticated
-      // channels (broadcast+presence on tw:* / live:* in livePreview.js)
-      // can subscribe successfully. Without this, on supabase-js >=2.45
+      // channels (broadcast+presence on live:* in livePreview.js) can
+      // subscribe successfully. Without this, on supabase-js >=2.45
       // the WebSocket connects with the anon key only, and any project
       // that has realtime authorization configured at all will silently
       // drop SUBSCRIBED → CHANNEL_ERROR. Symptom: AuthProvider's
@@ -154,6 +189,51 @@ export function AuthProvider({ children }) {
         supabase.realtime.setAuth(next?.access_token ?? '');
       } catch (err) {
         console.warn('[AuthProvider] realtime.setAuth failed:', err);
+      }
+      // Single-session enforcement.
+      //   - Signed-out (newUid null): drop the local sid; nothing to
+      //     enforce.
+      //   - Signed in for a user we'd already loaded (token refresh,
+      //     same-tab navigation): keep whatever sid is in the ref;
+      //     re-hydrate from localStorage on first run if needed.
+      //   - Fresh sign-in / sign-up (newUid changed and is non-null):
+      //     mint a brand new sid, persist locally, and call
+      //     claim_session() so the DB stamps it as the canonical session.
+      //     Any older device's sid stops matching — its realtime sub
+      //     fires and signs it out.
+      if (!newUid) {
+        localSessionIdRef.current = null;
+        try { window.localStorage.removeItem('tm:session-id'); } catch { /* ignore */ }
+      } else if (!needsLoad) {
+        // Same user, already loaded — hydrate sid from localStorage if
+        // we lost it (e.g. component remount).
+        if (!localSessionIdRef.current) {
+          try {
+            const cached = JSON.parse(window.localStorage.getItem('tm:session-id') ?? 'null');
+            if (cached?.uid === newUid && typeof cached?.sid === 'string') {
+              localSessionIdRef.current = cached.sid;
+            }
+          } catch { /* ignore */ }
+        }
+      } else {
+        // Fresh sign-in for this device. Mint a sid + claim before we
+        // load profile, so the loadUserData session-mismatch check
+        // doesn't false-trigger against a previous device's stamp.
+        const sid = (typeof crypto !== 'undefined' && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : (Math.random().toString(36).slice(2) + Date.now().toString(36));
+        localSessionIdRef.current = sid;
+        try {
+          window.localStorage.setItem('tm:session-id', JSON.stringify({ uid: newUid, sid }));
+        } catch { /* ignore */ }
+        try {
+          await supabase.rpc('claim_session', { p_session_id: sid });
+        } catch (err) {
+          // Best-effort. If the column doesn't exist yet (pre-migration),
+          // RPC errors out; the DB-side check just silently no-ops the
+          // single-session feature. Don't block sign-in on it.
+          console.warn('[AuthProvider] claim_session failed:', err);
+        }
       }
       // User changed — show the spinner while we refetch. Without this,
       // a fresh sign-in renders /account with session set but profile
@@ -322,6 +402,15 @@ export function AuthProvider({ children }) {
           { event: '*', schema: 'public', table: 'subscriptions', filter: `user_id=eq.${userId}` },
           () => loadUserData(userId),
         )
+        // Watch our own profile row so a sign-in on another device flips
+        // current_session_id and we can react within a second instead of
+        // waiting for the next poll. loadUserData runs the comparison and
+        // calls forceSignOutSuperseded when the value no longer matches.
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+          () => loadUserData(userId),
+        )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             connected = true;
@@ -466,6 +555,9 @@ export function AuthProvider({ children }) {
       // Also wipe the legacy anon bucket from older builds (see traceStats.js)
       // so it can't leak into the next user on a shared device.
       window.localStorage.removeItem('tm:traceStats:anon');
+      // One-session-per-user marker — drop it so a re-sign-in mints a
+      // fresh sid instead of trying to reuse the stale one.
+      window.localStorage.removeItem('tm:session-id');
       // Also clear pending-image / pending-intent so a checkout-in-progress
       // doesn't get attributed to whoever signs in next.
       window.sessionStorage.removeItem('tm:pending-image');

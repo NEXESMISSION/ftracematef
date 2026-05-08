@@ -1,27 +1,20 @@
 /**
  * Live Preview — peer-to-peer camera streaming between two devices on the
- * same account.
+ * same account (the user's own /live phone ↔ desktop pairing).
  *
  * Architecture:
  *  - WebRTC carries the video stream directly between the two devices. No
  *    media ever touches our servers, so there's no bandwidth cost.
  *  - Supabase Realtime broadcast channel is the *signaling* layer: SDP
  *    offer/answer + ICE candidates are tiny JSON messages, pennies at most.
- *  - Channel name is `${kind}:${userId}`. The user UUID is unguessable, so
- *    only the user's own devices (or an admin who already pulled the user
- *    list from the secure admin endpoint) can find it.
- *  - Two `kind`s are in use:
- *      'live'       — user's own /live page (phone ↔ desktop pairing).
- *      'tracewatch' — admin spectating a /trace session. Same protocol,
- *                     separate channel so it never fights the user's own
- *                     device pairing.
+ *  - Channel name is `live:${pairingToken}`. The token is server-issued
+ *    (get_live_pairing_token RPC), readable only by its owner.
  *  - Presence is used to discover the other side: each peer tracks itself
  *    with a `role` field, and the broadcaster automatically initiates the
  *    offer when it sees a viewer appear (and vice versa for cleanup).
  *
  * Limitations:
- *  - 1:1 only per channel. With separate `kind`s, /live and /trace can
- *    coexist; within one kind, a second viewer is ignored.
+ *  - 1:1 only per channel.
  *  - STUN-only. ~80% of consumer NATs work; symmetric NATs (some corporate
  *    networks) need TURN. Add a TURN server later if reports come in.
  */
@@ -32,17 +25,13 @@ const ICE_SERVERS = [
   { urls: 'stun:stun1.l.google.com:19302' },
 ];
 
-// Default `kind` keeps the existing /live page working without changes.
-// Pass kind: 'tracewatch' to use the admin-spectator channel.
-const channelName = (userId, kind = 'live') => `${kind}:${userId}`;
+const channelName = (key) => `live:${key}`;
 
 /**
  * Resolve the caller's pairing token for /live (lazy-create on first call).
  * Returns a uuid the caller passes in as the channel-key for both
  * startBroadcaster and startViewer, so the realtime channel becomes
- * `live:{token}` instead of `live:{userId}`. The user's UUID can leak
- * through error logs / analytics / shared screenshots; the token can't —
- * it's only ever in the realtime channel name itself.
+ * `live:{token}` instead of `live:{userId}`.
  *
  * Both devices belonging to the same user fetch the same token (the RPC
  * looks it up by auth.uid()), so they meet on the same channel without
@@ -56,6 +45,7 @@ export async function getLivePairingKey() {
   }
   return data;
 }
+
 const newId = () =>
   (typeof crypto !== 'undefined' && crypto.randomUUID)
     ? crypto.randomUUID()
@@ -65,16 +55,10 @@ const newId = () =>
 // Broadcaster: owns the camera stream, sends offers when a viewer appears.
 // onQualityRequest: optional callback fired when the viewer requests a
 // quality preset — the broadcaster's UI uses it to resize the canvas etc.
-// referenceImageDataUrl: optional thumbnail data URL. When provided, an
-// "extras" data channel is opened and the image is sent as soon as the
-// channel is ready — admin spectator uses this to show what the user is
-// tracing alongside the live camera feed.
 // ────────────────────────────────────────────────────────────────────────────
 export function startBroadcaster({
   userId,
-  kind = 'live',
   stream,
-  referenceImageDataUrl = null,
   onStatus,
   onError,
   onQualityRequest,
@@ -82,20 +66,14 @@ export function startBroadcaster({
   const myId = newId();
   let pc = null;
   let videoSender = null;
-  let metaChannel = null;
   let viewerId = null;
   let pendingIce = [];
   let stopped = false;
 
-  // Diagnostic prefix so devtools `[livePreview]` filter cleanly separates
-  // broadcaster vs viewer in a tab that has both. Channel name is the
-  // single most useful piece of info for matching the two sides up — if
-  // bcast logs `tw:abc123` and view logs `tw:def456`, the dashboard's
-  // user list is stale.
-  const logTag = `[livePreview bcast ${channelName(userId, kind)} ${myId.slice(0, 6)}]`;
+  const logTag = `[livePreview bcast ${channelName(userId)} ${myId.slice(0, 6)}]`;
   console.log(`${logTag} starting`);
 
-  const channel = supabase.channel(channelName(userId, kind), {
+  const channel = supabase.channel(channelName(userId), {
     config: {
       broadcast: { self: false },
       presence: { key: myId },
@@ -112,7 +90,6 @@ export function startBroadcaster({
   };
 
   const teardownPC = () => {
-    if (metaChannel) { try { metaChannel.close(); } catch { /* ignore */ } metaChannel = null; }
     if (pc) { try { pc.close(); } catch { /* ignore */ } pc = null; }
     pendingIce = [];
   };
@@ -121,35 +98,6 @@ export function startBroadcaster({
     teardownPC();
     pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     videoSender = null;
-
-    // Open the data channel BEFORE addTrack/createOffer so it's negotiated
-    // in the SDP. The channel carries the reference-image thumbnail (and
-    // any future side-band metadata) — message type 'r' keeps the wire
-    // format short. We send the thumbnail once on open; if the viewer
-    // reconnects, a fresh PC + channel is created here and the thumbnail
-    // is re-sent automatically.
-    try {
-      metaChannel = pc.createDataChannel('meta', { ordered: true });
-      metaChannel.onopen = () => {
-        if (stopped || !metaChannel) return;
-        if (referenceImageDataUrl) {
-          try {
-            metaChannel.send(JSON.stringify({
-              type: 'r',
-              dataUrl: referenceImageDataUrl,
-            }));
-          } catch (err) {
-            console.warn('[livePreview] failed to send reference image:', err);
-          }
-        }
-      };
-      metaChannel.onerror = (err) => {
-        // Non-fatal — the video stream is the load-bearing payload.
-        console.warn('[livePreview] data channel error:', err);
-      };
-    } catch (err) {
-      console.warn('[livePreview] could not create data channel:', err);
-    }
 
     stream.getTracks().forEach((track) => {
       const sender = pc.addTrack(track, stream);
@@ -209,8 +157,6 @@ export function startBroadcaster({
     if (payload.role !== 'viewer') return;
     if (payload.to && payload.to !== myId) return;
 
-    // Quality requests don't need an active peer connection — the viewer
-    // can send their preference before the offer is even out.
     if (payload.type === 'quality' && payload.preset) {
       try { onQualityRequest?.(payload.preset); } catch { /* ignore */ }
       return;
@@ -221,7 +167,6 @@ export function startBroadcaster({
     try {
       if (payload.type === 'answer') {
         await pc.setRemoteDescription(payload.sdp);
-        // ICE that arrived before remoteDescription was set must be replayed now.
         while (pendingIce.length) {
           try { await pc.addIceCandidate(pendingIce.shift()); } catch { /* ignore */ }
         }
@@ -263,10 +208,6 @@ export function startBroadcaster({
       teardownPC();
       try { supabase.removeChannel(channel); } catch { /* ignore */ }
     },
-    // Apply WebRTC sender encoding parameters. maxBitrate is the most
-    // useful knob — it directly controls perceived quality on a fast
-    // connection. maxFramerate is honored by some browsers (Chrome) but
-    // not others (Safari may ignore).
     setEncoding: async ({ maxBitrate, maxFramerate } = {}) => {
       if (!videoSender) return;
       try {
@@ -286,45 +227,21 @@ export function startBroadcaster({
 
 // ────────────────────────────────────────────────────────────────────────────
 // Viewer: receive-only side. Waits for an offer, answers it.
-// onReferenceImage: optional callback fired when the broadcaster ships the
-// reference-image thumbnail over the "extras" data channel. Receives a
-// data URL string suitable for an <img src=...>.
 // ────────────────────────────────────────────────────────────────────────────
-export function startViewer({ userId, kind = 'live', onStream, onStatus, onError, onReferenceImage }) {
+export function startViewer({ userId, onStream, onStatus, onError }) {
   const myId = newId();
   let broadcasterId = null;
   let pendingIce = [];
   let stopped = false;
 
-  // Same diagnostic prefix shape as the broadcaster — channel-name match
-  // between the two sides is the most useful signal for debugging stale-
-  // token / channel-mismatch issues.
-  const logTag = `[livePreview view ${channelName(userId, kind)} ${myId.slice(0, 6)}]`;
+  const logTag = `[livePreview view ${channelName(userId)} ${myId.slice(0, 6)}]`;
   console.log(`${logTag} starting`);
 
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-  // Tell the PC we expect to receive media. Without these transceivers some
-  // browsers won't emit ontrack on remote-only sessions.
   pc.addTransceiver('video', { direction: 'recvonly' });
   pc.addTransceiver('audio', { direction: 'recvonly' });
   pc.ontrack = (e) => {
     if (e.streams?.[0]) onStream?.(e.streams[0]);
-  };
-  // Receive the broadcaster's metadata data channel. We don't open one
-  // ourselves — the broadcaster creates it before the offer, and this
-  // handler fires once on the viewer side when it negotiates in.
-  pc.ondatachannel = (e) => {
-    if (e.channel?.label !== 'meta') return;
-    e.channel.onmessage = (msg) => {
-      try {
-        const data = JSON.parse(msg.data);
-        if (data?.type === 'r' && typeof data.dataUrl === 'string') {
-          onReferenceImage?.(data.dataUrl);
-        }
-      } catch (err) {
-        console.warn('[livePreview] bad data channel message:', err);
-      }
-    };
   };
   pc.onconnectionstatechange = () => {
     const s = pc.connectionState;
@@ -333,7 +250,7 @@ export function startViewer({ userId, kind = 'live', onStream, onStatus, onError
     else if (s === 'failed') onStatus?.('disconnected');
   };
 
-  const channel = supabase.channel(channelName(userId, kind), {
+  const channel = supabase.channel(channelName(userId), {
     config: {
       broadcast: { self: false },
       presence: { key: myId },
@@ -432,9 +349,6 @@ export function startViewer({ userId, kind = 'live', onStream, onStatus, onError
       try { pc.close(); } catch { /* ignore */ }
       try { supabase.removeChannel(channel); } catch { /* ignore */ }
     },
-    // Tell the broadcaster which quality preset we want. They apply it
-    // (canvas resolution + sender bitrate). Safe to call before the
-    // connection is up — broadcaster handles it whenever it arrives.
     requestQuality: (preset) => {
       send({
         type: 'quality',

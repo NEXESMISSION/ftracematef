@@ -207,7 +207,365 @@ body:has(.trace-stage) {
   margin-bottom: 16px;
 }
 
-/* ----- Bottom controls (compact dock) ----- */
+/* ----- Bottom dock — redesigned, segmented, compact ----- */
+.trace-dock {
+  position: absolute;
+  left: 50%;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  transform: translate3d(-50%, 0, 0);
+  padding: 4px 12px 10px;
+  background: rgba(14, 14, 18, 0.62);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  z-index: 5;
+  width: min(440px, calc(100vw - 20px));
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 200ms ease,
+    width 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 240ms ease,
+    background 200ms ease,
+    opacity 0.6s ease;
+  will-change: transform, width;
+}
+.trace-dock.is-hidden {
+  padding: 0;
+  width: 92px;
+  border-radius: 999px;
+  background: rgba(14, 14, 18, 0.55);
+}
+
+/* Slim grab pill — replaces the 44px chevron with a Material-style
+   handle. Same tap target (40px tall via padding) but visually quiet. */
+.trace-dock-handle {
+  align-self: center;
+  width: 100%;
+  height: 22px;
+  padding: 8px 0 6px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.trace-dock.is-hidden .trace-dock-handle {
+  height: 36px;
+  padding: 12px 0;
+}
+.trace-dock-handle-pill {
+  display: block;
+  width: 44px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  transition: background 160ms ease, transform 160ms ease, width 200ms ease;
+}
+.trace-dock.is-hidden .trace-dock-handle-pill {
+  width: 28px;
+  background: rgba(255, 255, 255, 0.7);
+}
+.trace-dock-handle:hover .trace-dock-handle-pill { background: #fff; }
+.trace-dock-handle:active .trace-dock-handle-pill { transform: scaleY(0.7); }
+
+.trace-dock-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: traceDockFade 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes traceDockFade {
+  from { opacity: 0; transform: translate3d(0, 6px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0,   0); }
+}
+
+/* ----- Segmented tab control ----- */
+.trace-dock-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.trace-dock-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 7px 6px;
+  border-radius: 9px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 200ms ease, color 200ms ease, box-shadow 200ms ease;
+}
+.trace-dock-tab:hover { color: #fff; }
+.trace-dock-tab.is-active {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* ----- Slider region ----- */
+.trace-dock-panel {
+  display: block;
+  animation: tracePanelFade 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes tracePanelFade {
+  from { opacity: 0; transform: translate3d(0, 4px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0,   0); }
+}
+
+.trace-slider-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 12px;
+  row-gap: 2px;
+}
+
+.trace-flicker-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ----- Sliders ----- */
+.trace-slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px;
+  min-width: 0;
+}
+.trace-slider-compact {
+  padding: 2px 0;
+  gap: 8px;
+}
+.trace-slider input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 26px; /* tap area; visible track centered */
+  background: transparent;
+  outline: none;
+  min-width: 0;
+  cursor: pointer;
+  --tm-slider-fill: 50%;
+  touch-action: none;
+}
+.trace-slider input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background:
+    linear-gradient(to right,
+      var(--coral) 0%,
+      var(--coral) var(--tm-slider-fill),
+      rgba(255, 255, 255, 0.18) var(--tm-slider-fill),
+      rgba(255, 255, 255, 0.18) 100%);
+  border: 0;
+}
+.trace-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: #fff;
+  border: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55), 0 0 0 4px rgba(255, 255, 255, 0);
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 140ms ease;
+}
+.trace-slider input[type="range"]:hover::-webkit-slider-thumb {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55), 0 0 0 6px rgba(255, 255, 255, 0.08);
+}
+.trace-slider input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.18);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.6), 0 0 0 8px rgba(255, 110, 90, 0.2);
+}
+.trace-slider input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 0;
+}
+.trace-slider input[type="range"]::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--coral);
+}
+.trace-slider input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.trace-slider input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
+.trace-slider-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  min-width: 42px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+.trace-slider-compact .trace-slider-value { min-width: 36px; font-size: 11px; }
+.trace-slider-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.72);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  min-width: 36px;
+}
+.trace-slider-compact .trace-slider-label { min-width: 28px; }
+.trace-slider input[type="range"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ----- Compact icon-only action row ----- */
+.trace-dock-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: nowrap;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+.trace-icon-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 38px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease,
+              transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+.trace-icon-btn svg { display: block; }
+.trace-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.trace-icon-btn:active { transform: scale(0.94); }
+.trace-icon-btn.is-active {
+  background: var(--coral);
+  border-color: var(--coral);
+  box-shadow: 0 2px 10px rgba(255, 110, 90, 0.35);
+}
+.trace-rec-btn.is-recording {
+  background: rgba(220, 38, 38, 0.92);
+  border-color: rgba(255, 255, 255, 0.25);
+  animation: traceRecBtnPulse 1.6s ease-in-out infinite;
+}
+@keyframes traceRecBtnPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55); }
+  50%      { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0);   }
+}
+
+/* ----- Pill switch (Flicker on/off) ----- */
+.trace-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 6px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.trace-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.trace-switch-track {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  transition: background 200ms ease, border-color 200ms ease;
+}
+.trace-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.trace-switch input:checked + .trace-switch-track {
+  background: var(--coral);
+  border-color: var(--coral);
+}
+.trace-switch input:checked + .trace-switch-track .trace-switch-thumb {
+  transform: translate3d(16px, 0, 0);
+}
+.trace-switch-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ----- Idle dim: chrome fades after 10s of no interaction ----- */
+.trace-topbar,
+.trace-dock,
+.trace-controls,
+.warp-reset {
+  transition: opacity 0.6s ease;
+}
+.trace-stage.is-idle .trace-topbar,
+.trace-stage.is-idle .trace-dock,
+.trace-stage.is-idle .trace-controls,
+.trace-stage.is-idle .warp-reset {
+  opacity: 0.22;
+}
+.trace-dock {
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 200ms ease,
+    width 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 240ms ease,
+    background 200ms ease,
+    opacity 0.6s ease;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Legacy dock — still used by /live (LivePreview.jsx). Trace.jsx uses the
+ * new .trace-dock above; /live wasn't migrated, so keep these intact.
+ * ───────────────────────────────────────────────────────────────────── */
 .trace-controls {
   position: absolute;
   left: 50%;
@@ -224,7 +582,7 @@ body:has(.trace-stage) {
   align-items: stretch;
   z-index: 5;
   width: min(460px, calc(100vw - 20px));
-  transition: padding 0.2s ease, background 0.2s ease, width 0.2s ease;
+  transition: padding 0.2s ease, background 0.2s ease, width 0.2s ease, opacity 0.6s ease;
 }
 .trace-controls.is-hidden {
   padding: 0;
@@ -232,8 +590,6 @@ body:has(.trace-stage) {
   background: rgba(0, 0, 0, 0.55);
   border-radius: 999px;
 }
-
-/* Big chevron handle — hide/show toggle */
 .trace-handle {
   align-self: center;
   width: 100%;
@@ -257,104 +613,17 @@ body:has(.trace-stage) {
   display: block;
   transition: transform 0.18s ease;
 }
-
 .trace-controls-inner {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
-/* ----- Opacity slider — thicker, cleaner ----- */
-.trace-slider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 4px 4px 6px;
-}
-.trace-slider input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  flex: 1;
-  height: 28px; /* big tap area, visible track is centered inside */
-  background: transparent;
-  outline: none;
-  min-width: 0;
-  cursor: pointer;
-  --tm-slider-fill: 50%;
-}
-/* WebKit track */
-.trace-slider input[type="range"]::-webkit-slider-runnable-track {
-  height: 10px;
-  border-radius: 999px;
-  background:
-    linear-gradient(to right, var(--coral) 0%, var(--coral) var(--tm-slider-fill), rgba(255, 255, 255, 0.22) var(--tm-slider-fill), rgba(255, 255, 255, 0.22) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-.trace-slider input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 26px;
-  height: 26px;
-  margin-top: -9px; /* (track 10 + border 2) / 2 - thumb 26 / 2 */
-  border-radius: 50%;
-  background: #fff;
-  border: 2px solid var(--coral);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-  cursor: pointer;
-  transition: transform 0.12s ease;
-}
-.trace-slider input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
-/* Firefox track */
-.trace-slider input[type="range"]::-moz-range-track {
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-.trace-slider input[type="range"]::-moz-range-progress {
-  height: 10px;
-  border-radius: 999px;
-  background: var(--coral);
-}
-.trace-slider input[type="range"]::-moz-range-thumb {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: #fff;
-  border: 2px solid var(--coral);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-  cursor: pointer;
-}
-.trace-slider-value {
-  font-size: 13px;
-  font-weight: 700;
-  color: #fff;
-  min-width: 42px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-}
-.trace-slider-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.85);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  min-width: 44px;
-}
-.trace-slider input[type="range"]:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-/* ----- Action buttons ----- */
 .trace-toggles {
   display: flex;
   gap: 8px;
   justify-content: center;
   flex-wrap: nowrap;
 }
-
 .trace-action-btn {
   flex: 1 1 0;
   min-width: 0;
@@ -383,23 +652,12 @@ body:has(.trace-stage) {
   background: var(--coral);
   border-color: var(--coral);
 }
-
-/* ----- Idle dim: chrome fades after 10s of no interaction ----- */
-.trace-topbar,
-.trace-controls,
-.warp-reset {
-  transition: opacity 0.6s ease;
+.trace-record-btn.is-recording {
+  background: rgba(220, 38, 38, 0.95);
+  border-color: rgba(220, 38, 38, 1);
 }
-.trace-stage.is-idle .trace-topbar,
-.trace-stage.is-idle .trace-controls,
-.trace-stage.is-idle .warp-reset {
-  opacity: 0.22;
-}
-/* The opacity transition on .trace-controls would otherwise stomp the
-   existing padding/background/width transition declared up above. Keep
-   both by extending the multi-property transition for the controls dock. */
-.trace-controls {
-  transition: padding 0.2s ease, background 0.2s ease, width 0.2s ease, opacity 0.6s ease;
+.trace-record-btn.is-recording:hover {
+  background: rgba(239, 68, 68, 1);
 }
 
 /* ----- Record: REC chip in topbar, checkbox, button states, errors ----- */
@@ -434,32 +692,33 @@ body:has(.trace-stage) {
 .trace-checkbox {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 4px 2px;
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 13px;
+  gap: 8px;
+  padding: 2px 2px 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11.5px;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+.trace-checkbox-mini { font-size: 11px; }
 .trace-checkbox input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
 .trace-checkbox-box {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1.5px solid rgba(255, 255, 255, 0.45);
-  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
   color: transparent;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 .trace-checkbox input:checked + .trace-checkbox-box {
   background: var(--coral);
@@ -472,21 +731,13 @@ body:has(.trace-stage) {
 }
 .trace-checkbox-label { line-height: 1.2; }
 
-.trace-record-btn.is-recording {
-  background: rgba(220, 38, 38, 0.95);
-  border-color: rgba(220, 38, 38, 1);
-}
-.trace-record-btn.is-recording:hover {
-  background: rgba(239, 68, 68, 1);
-}
-
 .trace-rec-error {
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: rgba(220, 38, 38, 0.18);
   border: 1px solid rgba(220, 38, 38, 0.55);
-  border-radius: 10px;
+  border-radius: 8px;
   color: #fff;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 
@@ -546,10 +797,13 @@ body:has(.trace-stage) {
 @media (max-width: 480px) {
   .trace-overlay-img { max-width: 85vw; max-height: 75vh; }
   .trace-hint { font-size: 11px; top: 70px; }
-  .trace-action-btn { font-size: 11px; min-height: 60px; }
-  .trace-slider-value { font-size: 12px; min-width: 38px; }
+  .trace-icon-btn { height: 36px; }
+  .trace-slider-value { font-size: 11px; min-width: 36px; }
+  .trace-slider-grid { column-gap: 8px; }
 }
 @media (max-width: 360px) {
-  .trace-action-btn { padding: 6px 2px; }
-  .trace-toggles { gap: 6px; }
+  .trace-dock { padding: 4px 10px 8px; }
+  .trace-dock-actions { gap: 4px; }
+  .trace-icon-btn { height: 34px; border-radius: 9px; }
+  .trace-slider-grid { grid-template-columns: 1fr; }
 }
