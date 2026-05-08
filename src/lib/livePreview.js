@@ -87,6 +87,14 @@ export function startBroadcaster({
   let pendingIce = [];
   let stopped = false;
 
+  // Diagnostic prefix so devtools `[livePreview]` filter cleanly separates
+  // broadcaster vs viewer in a tab that has both. Channel name is the
+  // single most useful piece of info for matching the two sides up — if
+  // bcast logs `tw:abc123` and view logs `tw:def456`, the dashboard's
+  // user list is stale.
+  const logTag = `[livePreview bcast ${channelName(userId, kind)} ${myId.slice(0, 6)}]`;
+  console.log(`${logTag} starting`);
+
   const channel = supabase.channel(channelName(userId, kind), {
     config: {
       broadcast: { self: false },
@@ -176,16 +184,21 @@ export function startBroadcaster({
   channel.on('presence', { event: 'sync' }, () => {
     if (stopped) return;
     const state = channel.presenceState();
+    const keys = Object.keys(state);
+    const roles = keys.map((k) => `${k.slice(0, 6)}=${state[k]?.[0]?.role ?? '?'}`);
+    console.log(`${logTag} presence sync — ${roles.length} peer(s):`, roles.join(', ') || '(none)');
     let foundViewer = null;
-    for (const key of Object.keys(state)) {
+    for (const key of keys) {
       const meta = state[key]?.[0];
       if (meta?.role === 'viewer') { foundViewer = key; break; }
     }
     if (foundViewer && foundViewer !== viewerId) {
       viewerId = foundViewer;
+      console.log(`${logTag} viewer appeared, sending offer`);
       initiateOffer();
     } else if (!foundViewer && viewerId) {
       viewerId = null;
+      console.log(`${logTag} viewer left, tearing down PC`);
       teardownPC();
       onStatus?.('waiting');
     }
@@ -226,11 +239,14 @@ export function startBroadcaster({
 
   channel.subscribe(async (status) => {
     if (stopped) return;
+    console.log(`${logTag} subscribe → ${status}`);
     if (status === 'SUBSCRIBED') {
       try {
         await channel.track({ role: 'broadcaster' });
+        console.log(`${logTag} presence tracked as broadcaster`);
         onStatus?.('waiting');
-      } catch {
+      } catch (err) {
+        console.warn(`${logTag} track() failed:`, err);
         onError?.('Could not announce this device.');
       }
     } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
@@ -242,6 +258,7 @@ export function startBroadcaster({
     stop: () => {
       if (stopped) return;
       stopped = true;
+      console.log(`${logTag} stop()`);
       try { channel.untrack(); } catch { /* ignore */ }
       teardownPC();
       try { supabase.removeChannel(channel); } catch { /* ignore */ }
@@ -278,6 +295,12 @@ export function startViewer({ userId, kind = 'live', onStream, onStatus, onError
   let broadcasterId = null;
   let pendingIce = [];
   let stopped = false;
+
+  // Same diagnostic prefix shape as the broadcaster — channel-name match
+  // between the two sides is the most useful signal for debugging stale-
+  // token / channel-mismatch issues.
+  const logTag = `[livePreview view ${channelName(userId, kind)} ${myId.slice(0, 6)}]`;
+  console.log(`${logTag} starting`);
 
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   // Tell the PC we expect to receive media. Without these transceivers some
@@ -330,16 +353,21 @@ export function startViewer({ userId, kind = 'live', onStream, onStatus, onError
   channel.on('presence', { event: 'sync' }, () => {
     if (stopped) return;
     const state = channel.presenceState();
+    const keys = Object.keys(state);
+    const roles = keys.map((k) => `${k.slice(0, 6)}=${state[k]?.[0]?.role ?? '?'}`);
+    console.log(`${logTag} presence sync — ${roles.length} peer(s):`, roles.join(', ') || '(none)');
     let foundBroadcaster = null;
-    for (const key of Object.keys(state)) {
+    for (const key of keys) {
       const meta = state[key]?.[0];
       if (meta?.role === 'broadcaster') { foundBroadcaster = key; break; }
     }
     if (foundBroadcaster && foundBroadcaster !== broadcasterId) {
       broadcasterId = foundBroadcaster;
+      console.log(`${logTag} broadcaster appeared`);
       onStatus?.('connecting');
     } else if (!foundBroadcaster && broadcasterId) {
       broadcasterId = null;
+      console.log(`${logTag} broadcaster left`);
       onStatus?.('waiting');
     }
   });
@@ -376,11 +404,14 @@ export function startViewer({ userId, kind = 'live', onStream, onStatus, onError
 
   channel.subscribe(async (status) => {
     if (stopped) return;
+    console.log(`${logTag} subscribe → ${status}`);
     if (status === 'SUBSCRIBED') {
       try {
         await channel.track({ role: 'viewer' });
+        console.log(`${logTag} presence tracked as viewer`);
         onStatus?.('waiting');
-      } catch {
+      } catch (err) {
+        console.warn(`${logTag} track() failed:`, err);
         onError?.('Could not announce this device.');
       }
     } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {

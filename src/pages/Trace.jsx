@@ -303,6 +303,23 @@ export default function Trace() {
   // cost) until an admin actually opens the modal. No UI surface — the
   // user is unaware of this effect entirely.
   useEffect(() => {
+    // Diagnostic — prints exactly which prerequisite is missing on
+    // every render, so when a user reports "spectate doesn't work" we
+    // can see in their console whether the broadcaster effect skipped
+    // because of (a) no auth user, (b) no spectate_token from
+    // start_trace_run, or (c) no camera stream. The most common silent
+    // failure is start_trace_run hitting the per-user rate limit and
+    // returning {run_id:null, spectate_token:null}, which leaves the
+    // dashboard's "Watch live" button gone but produces no on-screen
+    // user feedback. The tag matches the log shape in livePreview.js
+    // so they line up in devtools.
+    console.log(
+      '[trace bcast effect]',
+      'user=', user?.id ? user.id.slice(0, 6) : 'none',
+      'spectateToken=', spectateToken ? spectateToken.slice(0, 6) : 'none',
+      'stream=', streamRef.current ? 'ok' : 'none',
+      'streamRev=', streamRev,
+    );
     if (!user?.id) return;
     if (!spectateToken) return;
     const stream = streamRef.current;
