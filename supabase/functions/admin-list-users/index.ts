@@ -123,20 +123,34 @@ Deno.serve(async (req) => {
   // can authorise its WebRTC subscriber on a non-guessable channel.
   const { data: openRuns, error: openRunsErr } = await admin
     .from('trace_session_runs')
-    .select('id, spectate_token, last_heartbeat_at')
+    .select('id, spectate_token, last_heartbeat_at, broadcast_state, broadcast_state_at')
     .is('ended_at', null);
   if (openRunsErr) {
     // Non-fatal — the dashboard is still useful without spectate. Log and
     // continue; tracing rows just won't get a spectate_token attached.
     console.warn('[admin-list-users] open-runs lookup failed:', openRunsErr);
   }
-  type OpenRunMeta = { token: string | null; lastHeartbeatAt: string | null };
+  type OpenRunMeta = {
+    token: string | null;
+    lastHeartbeatAt: string | null;
+    // Latest self-reported broadcaster state from the user's /trace tab
+    // ('up' | 'starting' | 'camera_denied' | 'no_camera' | 'camera_error'
+    // | 'realtime_failed' | null). Drives the dashboard's accurate
+    // "user is on /trace but camera failed" hinting. Nullable for runs
+    // that started before migration 20260508000001 landed (rows without
+    // the column default to null) and for runs whose client hasn't yet
+    // dialed in any state.
+    broadcastState: string | null;
+    broadcastStateAt: string | null;
+  };
   const runMetaById = new Map<string, OpenRunMeta>();
   for (const r of (openRuns ?? [])) {
     if (r?.id) {
       runMetaById.set(r.id as string, {
         token: (r.spectate_token as string | null) ?? null,
         lastHeartbeatAt: (r.last_heartbeat_at as string | null) ?? null,
+        broadcastState: (r.broadcast_state as string | null) ?? null,
+        broadcastStateAt: (r.broadcast_state_at as string | null) ?? null,
       });
     }
   }
@@ -271,6 +285,14 @@ Deno.serve(async (req) => {
       // presumed gone, so the button stops showing even before the next
       // server-side reconcile sweep closes the run.
       last_trace_heartbeat_at: runMeta?.lastHeartbeatAt ?? null,
+      // Self-reported broadcaster state from the /trace tab. Null for
+      // pre-migration runs and for runs whose client hasn't reported
+      // yet. Dashboard uses this to distinguish "user closed the tab"
+      // (presence empty + state == null|stopped) from "user is here but
+      // camera/realtime failed" (presence empty + state in
+      // camera_denied / no_camera / camera_error / realtime_failed).
+      broadcast_state:    runMeta?.broadcastState ?? null,
+      broadcast_state_at: runMeta?.broadcastStateAt ?? null,
     };
   });
 

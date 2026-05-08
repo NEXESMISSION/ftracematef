@@ -963,6 +963,62 @@ const SPECTATE_STATUS_LABEL = {
   disconnected: 'Disconnected',
 };
 
+// Compact label + tone for the inline pill rendered next to "Watch live"
+// on a row whose broadcaster has self-reported a state. Skips 'up' (the
+// default healthy case — no pill noise) and null (pre-migration / no
+// signal yet — no information to surface). All other values get a one-
+// or two-word label so the operator can scan a list and pick the rows
+// where Watch live will actually work.
+const BROADCAST_STATE_PILL = {
+  starting:        { label: 'Starting',     tone: 'neutral' },
+  camera_denied:   { label: 'Cam blocked',  tone: 'warn'    },
+  no_camera:       { label: 'No camera',    tone: 'warn'    },
+  camera_error:    { label: 'Cam error',    tone: 'bad'     },
+  realtime_failed: { label: 'WS blocked',   tone: 'bad'     },
+};
+
+// Map a self-reported broadcast_state value (from the user's /trace tab,
+// stored on the open trace_session_runs row) to operator-facing copy for
+// the SpectateModal stuck-hint. Returns null when there's no specific
+// reason to surface — caller falls back to the generic "user left" copy.
+//
+// canRetry distinguishes transient states ('starting' — the channel
+// might still come up, retrying is meaningful) from terminal-for-now
+// states (camera blocked, no camera, network blocks WS — retrying does
+// nothing until the user does something on their end). Terminal states
+// only get a Close button so the operator doesn't waste clicks.
+function broadcastStateExplanation(state) {
+  switch (state) {
+    case 'camera_denied':
+      return {
+        body: "User denied the camera permission prompt or their OS is blocking it. They need to allow camera access in browser settings and refresh /trace.",
+        canRetry: false,
+      };
+    case 'no_camera':
+      return {
+        body: "User's browser doesn't expose a camera — usually an in-app browser (Instagram, X, LINE, Discord, Pinterest) or no camera hardware. Suggest opening the link in Safari or Chrome.",
+        canRetry: false,
+      };
+    case 'camera_error':
+      return {
+        body: "Camera failed to start — another app may be holding it, or the device rejected the requested constraints. A page refresh on their end usually fixes it.",
+        canRetry: false,
+      };
+    case 'realtime_failed':
+      return {
+        body: "User's network is blocking the realtime WebSocket (common on corporate / captive WiFi). Heartbeat works over plain HTTPS, but live spectate needs WS — they'd have to switch networks.",
+        canRetry: false,
+      };
+    case 'starting':
+      return {
+        body: "User is on /trace and the camera came up, but the realtime channel hasn't finished subscribing yet. Give it another moment.",
+        canRetry: true,
+      };
+    default:
+      return null;
+  }
+}
+
 function SpectateModal({ user, onClose, onUserNotTracing }) {
   const videoRef = useRef(null);
   const viewerRef = useRef(null);
@@ -1037,11 +1093,14 @@ function SpectateModal({ user, onClose, onUserNotTracing }) {
 
   // Stuck-hint timer. Two thresholds depending on what the channel told us:
   //   - 'waiting' means realtime presence sees no broadcaster on the
-  //     channel — the user almost certainly already left /trace. Surface
-  //     the hint after 3.5s; no point in the operator staring at a
-  //     spinner that will never resolve. Also bubble that signal up to
-  //     the parent so the dashboard row can drop the Watch live button
-  //     even if the heartbeat stamp on profiles is still "fresh".
+  //     channel — usually the user already left /trace. Surface the
+  //     hint after 3.5s; no point in the operator staring at a spinner
+  //     that will never resolve. Also bubble that signal up to the
+  //     parent so the dashboard row can drop the Watch live button
+  //     even if the heartbeat stamp on profiles is still "fresh" —
+  //     UNLESS the user's /trace tab has self-reported a known
+  //     "I'm here, my camera/network failed" state, in which case the
+  //     row IS accurate and we must not clear it.
   //   - any other non-connected status (connecting, reconnecting,
   //     disconnected) means we did see a broadcaster and the WebRTC
   //     handshake is what's struggling. NAT / cached-bundle hint, 8s.
@@ -1056,14 +1115,21 @@ function SpectateModal({ user, onClose, onUserNotTracing }) {
     const t = setTimeout(() => {
       setStuckHint(true);
       if (status === 'waiting' && user?.id) {
-        // Realtime says nobody's broadcasting on this channel after the
-        // grace window — definitive "user has left" signal that beats
-        // anything the heartbeat-stamped profile row can tell us.
-        try { onUserNotTracing?.(user.id); } catch { /* ignore */ }
+        // The user's /trace tab self-reports a broadcast_state on the
+        // open run. Any non-null value means "I'm still here" — even
+        // failure modes are proof of life (the tab is alive enough to
+        // run an RPC). Skip the not-tracing fallback in that case so
+        // the operator's row keeps the live badge instead of dropping
+        // it on a perfectly-tracing user whose camera was denied.
+        const reportedState = user.broadcast_state ?? null;
+        const userClearlyHere = reportedState !== null;
+        if (!userClearlyHere) {
+          try { onUserNotTracing?.(user.id); } catch { /* ignore */ }
+        }
       }
     }, ms);
     return () => clearTimeout(t);
-  }, [status, retryNonce, user?.id, onUserNotTracing]);
+  }, [status, retryNonce, user?.id, user?.broadcast_state, onUserNotTracing]);
 
   // Keep the <video>'s muted attribute in sync with our toggle. Setting it
   // imperatively avoids a React re-render churn each toggle.
@@ -1151,14 +1217,47 @@ function SpectateModal({ user, onClose, onUserNotTracing }) {
             {/* If we've been waiting / connecting longer than the
                 threshold, surface a hint so the operator isn't staring at
                 a blank box wondering if the tool is broken. The message
-                differs by signal: 'waiting' = realtime presence sees no
-                broadcaster (user has already left /trace, no point in
-                retrying); anything else = handshake is struggling, retry
-                might help (NAT / stale cached bundle). */}
-            {stuckHint && status !== 'connected' && (
-              <div className="admin-spectate-hint" role="status">
-                {status === 'waiting' ? (
-                  <>
+                depends on three things in priority order:
+                  1. user.broadcast_state — the user's /trace tab told the
+                     server *exactly* why broadcasting isn't happening
+                     (camera denied, no camera / in-app browser, WS
+                     blocked, still starting). Most accurate signal,
+                     prefer it whenever present.
+                  2. status === 'waiting' — realtime presence sees nobody
+                     on the channel AND we have no broadcast_state. Falls
+                     back to the original "user closed the tab" copy.
+                  3. otherwise — we DID see a broadcaster but the WebRTC
+                     handshake is struggling (NAT / stale bundle).
+                     Retrying often resolves it. */}
+            {stuckHint && status !== 'connected' && (() => {
+              const explanation = broadcastStateExplanation(user?.broadcast_state);
+              if (explanation) {
+                return (
+                  <div className="admin-spectate-hint" role="status">
+                    <p>{explanation.body}</p>
+                    {explanation.canRetry ? (
+                      <button
+                        type="button"
+                        className="admin-spectate-retry"
+                        onClick={() => setRetryNonce((n) => n + 1)}
+                      >
+                        Retry
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="admin-spectate-retry"
+                        onClick={onClose}
+                      >
+                        Close
+                      </button>
+                    )}
+                  </div>
+                );
+              }
+              if (status === 'waiting') {
+                return (
+                  <div className="admin-spectate-hint" role="status">
                     <p>
                       User is no longer broadcasting from /trace — they
                       likely closed the tab or navigated away.
@@ -1170,24 +1269,25 @@ function SpectateModal({ user, onClose, onUserNotTracing }) {
                     >
                       Close
                     </button>
-                  </>
-                ) : (
-                  <>
-                    <p>
-                      Not connecting. The user may need to refresh their
-                      tab, or they're behind a strict NAT.
-                    </p>
-                    <button
-                      type="button"
-                      className="admin-spectate-retry"
-                      onClick={() => setRetryNonce((n) => n + 1)}
-                    >
-                      Retry
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
+                  </div>
+                );
+              }
+              return (
+                <div className="admin-spectate-hint" role="status">
+                  <p>
+                    Not connecting. The user may need to refresh their
+                    tab, or they're behind a strict NAT.
+                  </p>
+                  <button
+                    type="button"
+                    className="admin-spectate-retry"
+                    onClick={() => setRetryNonce((n) => n + 1)}
+                  >
+                    Retry
+                  </button>
+                </div>
+              );
+            })()}
           </div>
           <aside className="admin-spectate-ref" aria-label="Reference image">
             {referenceImage ? (
@@ -1745,23 +1845,42 @@ export default function AdminDashboard() {
                     </dl>
 
                     <div className="admin-row-actions">
-                      {tracing && u.spectate_token && (
-                        <button
-                          type="button"
-                          className="admin-row-watch"
-                          onClick={() => openSpectate(u)}
-                          aria-label={`Watch ${u.email ?? 'user'} live`}
-                          title="Live camera view"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"
-                               stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
-                               strokeLinejoin="round" aria-hidden="true">
-                            <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" />
-                            <circle cx="8" cy="8" r="2" fill="currentColor" stroke="none" />
-                          </svg>
-                          Watch live
-                        </button>
-                      )}
+                      {tracing && u.spectate_token && (() => {
+                        // Inline state pill — only shown when the user's
+                        // /trace tab has reported something worth
+                        // surfacing (broken camera, blocked WS, etc.).
+                        // Healthy ('up') and unknown (null) cases skip
+                        // the pill so the row stays quiet.
+                        const pill = BROADCAST_STATE_PILL[u.broadcast_state];
+                        const watchExplanation = broadcastStateExplanation(u.broadcast_state);
+                        return (
+                          <>
+                            {pill && (
+                              <span
+                                className={`admin-pill admin-pill-${pill.tone}`}
+                                title={watchExplanation?.body ?? pill.label}
+                              >
+                                {pill.label}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              className="admin-row-watch"
+                              onClick={() => openSpectate(u)}
+                              aria-label={`Watch ${u.email ?? 'user'} live`}
+                              title={watchExplanation?.body ?? 'Live camera view'}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"
+                                   stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
+                                   strokeLinejoin="round" aria-hidden="true">
+                                <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" />
+                                <circle cx="8" cy="8" r="2" fill="currentColor" stroke="none" />
+                              </svg>
+                              Watch live
+                            </button>
+                          </>
+                        );
+                      })()}
                       <button
                         type="button"
                         className="admin-row-toggle"

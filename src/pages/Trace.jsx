@@ -165,6 +165,24 @@ export default function Trace() {
   // (temporal dead zone). Putting both states together also makes the
   // broadcaster effect's deps list read top-to-bottom in the file.
   const [spectateToken, setSpectateToken] = useState(null);
+  // Mirror of runIdRef.current in React state. The runId itself only ever
+  // needs to live in a ref (the heartbeat / end-of-session callbacks read
+  // it imperatively), but the broadcast-state reporter effect below has
+  // to *react* to runId arriving so it can flush whatever state was
+  // queued before start_trace_run resolved (e.g. camera permission
+  // denied within 200ms of mount, before the RPC came back).
+  const [runId, setRunId] = useState(null);
+  // Latest broadcaster-state to report on the open run row. Drives the
+  // accuracy of the admin "Watch live" UI:
+  //   'starting'        — broadcaster effect ran, channel not yet up
+  //   'up'              — broadcaster subscribed to realtime
+  //   'camera_denied'   — getUserMedia rejected with NotAllowedError
+  //   'no_camera'       — mediaDevices unavailable / no device
+  //   'camera_error'    — getUserMedia threw something else
+  //   'realtime_failed' — channel.subscribe reported error / timeout
+  // Setting the same string twice is a no-op (React bails out on Object.is
+  // equality), so the reporter effect fires exactly once per transition.
+  const [broadcastReport, setBroadcastReport] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -193,6 +211,19 @@ export default function Trace() {
         autoGainControl:  true,
       };
 
+      // mediaDevices missing entirely = in-app browser WebView (Instagram /
+      // Facebook / LINE / Discord / X embedded browsers all strip the API)
+      // or an ancient browser. The user may not even know they're inside
+      // an in-app browser — the page loads fine, the heartbeat fires fine,
+      // but the camera path is unreachable. Surface to the dashboard so
+      // we don't show "they closed the tab" copy when they very much
+      // didn't.
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        setCameraError('Your browser blocks camera access. Open this page in Safari or Chrome instead of an in-app browser.');
+        setBroadcastReport('no_camera');
+        return;
+      }
+
       let stream = null;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -214,6 +245,20 @@ export default function Trace() {
                 ? 'Camera access was blocked. Allow it in your browser settings to start tracing.'
                 : 'Could not start the camera. Try a different browser or device.'
             );
+            // Map browser error names to broadcast-state values the admin
+            // dashboard understands. NotAllowedError = user / OS denial,
+            // NotFoundError = no camera hardware enumerable, anything
+            // else (OverconstrainedError, NotReadableError from another
+            // app holding the camera, generic AbortError) bucketed as
+            // camera_error so the operator can at least tell it's not a
+            // permission problem.
+            if (err2?.name === 'NotAllowedError') {
+              setBroadcastReport('camera_denied');
+            } else if (err2?.name === 'NotFoundError') {
+              setBroadcastReport('no_camera');
+            } else {
+              setBroadcastReport('camera_error');
+            }
             return;
           }
         }
@@ -266,6 +311,13 @@ export default function Trace() {
     let cancelled = false;
     let broadcaster = null;
 
+    // Tell the dashboard we're trying. The reporter effect below RPCs
+    // this onto the open run row as soon as runId is known. If the
+    // channel comes up cleanly we'll overwrite with 'up' a beat later;
+    // if it never connects, the operator sees 'starting' and knows it's
+    // not a "user denied camera" case.
+    setBroadcastReport('starting');
+
     (async () => {
       const referenceThumb = await getReferenceThumb();
       if (cancelled) return;
@@ -280,8 +332,32 @@ export default function Trace() {
           kind: 'tw',
           stream,
           referenceImageDataUrl: referenceThumb,
+          // First non-error status from livePreview means realtime
+          // SUBSCRIBED + presence tracked — i.e. an admin viewer would
+          // be discoverable. Any of {waiting, connecting, connected,
+          // reconnecting} all imply the broadcaster side is healthy.
+          // We collapse them all to 'up' for the dashboard signal.
+          onStatus: (s) => {
+            if (cancelled) return;
+            if (s === 'waiting' || s === 'connecting' || s === 'connected' || s === 'reconnecting') {
+              setBroadcastReport('up');
+            }
+          },
+          // Realtime channel CHANNEL_ERROR / TIMED_OUT / CLOSED. Common
+          // cause: corporate / captive WiFi blocking WebSocket while
+          // letting plain HTTPS through, so heartbeat keeps firing but
+          // signaling can't run.
+          onError: () => {
+            if (cancelled) return;
+            setBroadcastReport('realtime_failed');
+          },
         });
-      } catch { /* silent — degraded mode is acceptable */ }
+      } catch {
+        // startBroadcaster itself threw — the channel object couldn't
+        // even be constructed. Treat as a realtime failure for the
+        // dashboard's purposes.
+        if (!cancelled) setBroadcastReport('realtime_failed');
+      }
     })();
 
     return () => {
@@ -289,6 +365,33 @@ export default function Trace() {
       if (broadcaster) { try { broadcaster.stop(); } catch { /* ignore */ } broadcaster = null; }
     };
   }, [streamRev, spectateToken, user?.id, getReferenceThumb]);
+
+  // Report the broadcaster's state to the open run row so the admin
+  // dashboard can render accurate "Watch live" affordances (and accurate
+  // copy when the channel doesn't come up). Fires on every distinct
+  // (runId, broadcastReport) transition. Best-effort: a failed RPC just
+  // means the badge stays stale, which is strictly less bad than the
+  // pre-fix behavior of always showing "user closed the tab" for any
+  // empty-presence case. Server enforces ownership + ended_at IS NULL,
+  // so a late RPC after end_trace_run is a safe no-op.
+  useEffect(() => {
+    if (!runId || !broadcastReport) return;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey     = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const accessToken = accessTokenRef.current;
+    if (!supabaseUrl || !anonKey || !accessToken) return;
+    try {
+      fetch(`${supabaseUrl}/rest/v1/rpc/set_trace_broadcast_state`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': anonKey,
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ p_run_id: runId, p_state: broadcastReport }),
+      }).catch(() => { /* best-effort; admin UX-only */ });
+    } catch { /* ignore */ }
+  }, [runId, broadcastReport]);
 
   // Auto-hide the gesture hint after a moment
   useEffect(() => {
@@ -496,9 +599,11 @@ export default function Trace() {
               //     Both fields adopted; spectator wires up.
               if (typeof data === 'string' && data.length === 36) {
                 runIdRef.current = data;
+                setRunId(data);
               } else if (data && typeof data === 'object') {
                 if (typeof data.run_id === 'string' && data.run_id.length === 36) {
                   runIdRef.current = data.run_id;
+                  setRunId(data.run_id);
                 }
                 if (typeof data.spectate_token === 'string' && data.spectate_token.length === 36) {
                   setSpectateToken(data.spectate_token);
@@ -557,6 +662,11 @@ export default function Trace() {
       stopHeartbeat();
       clearPresence();
       setTracing(false);
+      // Drop the React-state runId so any in-flight broadcast-state
+      // reporter effects don't fire RPCs against the row we just closed.
+      // (The server-side filter `where ended_at is null` would no-op them
+      // anyway, but skipping the request is cheaper.)
+      setRunId(null);
 
       const runId = runIdRef.current;
 
