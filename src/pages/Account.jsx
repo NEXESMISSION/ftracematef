@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { startCheckout, markPreCheckout, clearPreCheckoutSnapshot } from '../lib/checkout.js';
@@ -14,11 +14,6 @@ import { isAdminUser } from '../lib/admin.js';
 import { canUseFreeTrial, freeSessionsLeft } from '../lib/freeTrial.js';
 import Alert from '../components/Alert.jsx';
 import { usePresence } from '../hooks/usePresence.js';
-
-// DevPanel is admin-only and ships about ~3 KB of presets + dev UI. Lazy-load
-// it so the panel and its preset payload aren't in every visitor's bundle —
-// only admins (and only on the Account page) ever fetch the chunk.
-const DevPanel = lazy(() => import('../components/DevPanel.jsx'));
 
 const STATUS_TONE = {
   active:    { label: 'Active',     tone: 'good'    },
@@ -622,15 +617,15 @@ export default function Account() {
           <p className="profile-hero-sub">{subLine}</p>
 
           <div className="profile-cta-row">
-            {canEnterStudio ? (
-              <Link to="/upload" className="profile-cta profile-cta-primary">
-                + Upload new image
-              </Link>
-            ) : (
-              <Link to="/pricing" className="profile-cta profile-cta-primary">
-                Start tracing →
-              </Link>
-            )}
+            {/* Always route through /upload, even when the trial is used.
+                /trace's <RequirePaid> mounts the universal <ExitSurvey /> gate
+                AND renders <Paywall trialUsed /> with the empathic copy tuned
+                for that moment ("Your free trace is done — was it worth it?").
+                Routing trial-used users straight to /pricing here used to skip
+                both — see the matching note in Upload.jsx. */}
+            <Link to="/upload" className="profile-cta profile-cta-primary">
+              {canEnterStudio ? '+ Upload new image' : 'Start tracing →'}
+            </Link>
             {isAdminUser(profile) && (
               <Link to="/admin-me" className="profile-cta profile-cta-ghost" aria-label="Open admin dashboard">
                 Admin
@@ -686,15 +681,9 @@ export default function Account() {
           setAlert={setAlert}
         />
 
-        {/* ── Receipts (collapsible) ── */}
-        <ReceiptsCard />
-
-        {/* ── Dev self-test panel (admins only — gated by profile.is_admin) ── */}
-        {isAdminUser(profile) && (
-          <Suspense fallback={null}>
-            <DevPanel />
-          </Suspense>
-        )}
+        {/* ── Receipts (collapsible) — hidden for admins, who get full
+            access without going through Dodo. */}
+        {!isAdminUser(profile) && <ReceiptsCard />}
 
         {/* ── Sign out ── */}
         <div className="profile-foot">

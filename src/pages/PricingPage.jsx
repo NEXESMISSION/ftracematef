@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import SvgDefs from '../components/SvgDefs.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { supabase } from '../lib/supabase.js';
-import { startCheckout, markPreCheckout, clearPreCheckoutSnapshot } from '../lib/checkout.js';
 import { hasPendingImage } from '../lib/pendingImage.js';
-import { friendlyError } from '../lib/errors.js';
 import { PLANS } from '../lib/plans.js';
 import { usePresence } from '../hooks/usePresence.js';
+import { usePlanCheckout } from '../hooks/usePlanCheckout.js';
 
 /**
  * Dedicated pricing page (/pricing) — what users see after signing in.
@@ -15,13 +14,25 @@ import { usePresence } from '../hooks/usePresence.js';
  * Open to paid users too so they can compare plans / upgrade.
  */
 export default function PricingPage() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, profile, subscription } = useAuth();
+  const { user, profile } = useAuth();
   usePresence('pricing');
-  const [busy, setBusy]                 = useState(null);
-  const [error, setError]               = useState(null);
-  const [lifetimeLeft, setLifetimeLeft] = useState(null);
+  const { busy, error, lifetimeLeft, choose, dismissError } = usePlanCheckout();
+
+  // Make hasPendingImage() reactive — re-read on mount and whenever the
+  // window regains focus or storage events fire. Without this, the
+  // "Your image is saved and waiting" line goes stale if the image is
+  // cleared by another tab during the page's lifetime.
+  const [pendingImage, setPendingImage] = useState(() => hasPendingImage());
+  useEffect(() => {
+    const recheck = () => setPendingImage(hasPendingImage());
+    window.addEventListener('focus', recheck);
+    window.addEventListener('storage', recheck);
+    return () => {
+      window.removeEventListener('focus', recheck);
+      window.removeEventListener('storage', recheck);
+    };
+  }, []);
 
   // Stamp first /pricing view for journey funnel. Server-side idempotent
   // (only writes if first_pricing_at is null). Fire-and-forget; the gate
@@ -29,6 +40,21 @@ export default function PricingPage() {
   useEffect(() => {
     if (!user?.id) return;
     supabase.rpc('mark_journey_event', { p_event: 'pricing' }).then(() => {}, () => {});
+  }, [user?.id]);
+
+  // Auto-consume any pre-login checkout intent stamped by a plan-CTA click on
+  // the landing page. Login.jsx routes signed-in users with intent here, so
+  // /pricing must close the loop — otherwise the user has to click their
+  // chosen plan a second time and the intent sits in sessionStorage until a
+  // future Paywall render fires it. Read once on first signed-in render.
+  useEffect(() => {
+    if (!user?.id) return;
+    let intent;
+    try { intent = sessionStorage.getItem('tm:intent-plan'); } catch {}
+    if (!intent) return;
+    try { sessionStorage.removeItem('tm:intent-plan'); } catch {}
+    choose(intent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   // Dodo bounces the user back here with ?checkout=cancelled on cancel/failure.
@@ -42,31 +68,6 @@ export default function PricingPage() {
     setSearchParams(next, { replace: true });
   };
 
-  // Live spots counter
-  useEffect(() => {
-    let cancelled = false;
-    supabase.rpc('lifetime_seats_left').then(({ data, error }) => {
-      if (!cancelled && !error && typeof data === 'number') setLifetimeLeft(data);
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  const onChoose = async (planId) => {
-    setError(null);
-    if (!user) { navigate('/login', { state: { intent: { plan: planId } } }); return; }
-    try {
-      setBusy(planId);
-      // Snapshot BEFORE the await — see Paywall.jsx for the why.
-      markPreCheckout(subscription, user?.id);
-      const url = await startCheckout(planId);
-      window.location.href = url;
-    } catch (e) {
-      clearPreCheckoutSnapshot();
-      setBusy(null);
-      setError(friendlyError(e, 'Could not start checkout.'));
-    }
-  };
-
   const greeting = profile?.display_name?.split(' ')[0] || user?.email?.split('@')[0] || 'friend';
 
   return (
@@ -78,11 +79,9 @@ export default function PricingPage() {
         <Link to="/" className="pp-brand">
           <img src="/images/brand/logo.webp" alt="Trace Mate" />
         </Link>
-        {user && (
-          <Link to="/account" className="pp-back-link">
-            ← Back to account
-          </Link>
-        )}
+        <Link to={user ? '/account' : '/'} className="pp-back-link">
+          ← {user ? 'Back to account' : 'Back to home'}
+        </Link>
       </header>
 
       <main className="pp-shell">
@@ -97,14 +96,14 @@ export default function PricingPage() {
           </h1>
           <p className="pp-lead">
             Trace anything you can see — onto real paper. Pick the plan that fits.
-            {hasPendingImage() && <> <strong>Your image is saved</strong> and waiting.</>}
+            {pendingImage && <> <strong>Your image is saved</strong> and waiting.</>}
           </p>
         </div>
 
         {error && (
           <div className="paywall-error pp-error" role="alert">
             <strong>Heads up — </strong>{error}
-            <button type="button" className="paywall-link" onClick={() => setError(null)} style={{ marginLeft: 8 }}>Dismiss</button>
+            <button type="button" className="paywall-link" onClick={dismissError} style={{ marginLeft: 8 }}>Dismiss</button>
           </div>
         )}
 
@@ -161,7 +160,7 @@ export default function PricingPage() {
                 <button
                   type="button"
                   className="pp-card-cta"
-                  onClick={() => onChoose(p.id)}
+                  onClick={() => choose(p.id)}
                   disabled={busy === p.id || soldOut}
                 >
                   {soldOut ? 'Sold out' : busy === p.id ? 'Opening checkout…' : `${p.cta} →`}

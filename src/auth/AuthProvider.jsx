@@ -710,8 +710,13 @@ export function AuthProvider({ children }) {
   //  - Recurring plans with no `current_period_end` fail CLOSED. Previously
   //    this fail-open path could grant infinite access if a webhook ever
   //    stored bad data; that's strictly worse than a paywall.
+  //  - Admins (profiles.is_admin = true) get full access regardless of
+  //    subscription state. The flag is RLS-restricted to the user's own
+  //    row and is the same source of truth used by the operator dashboard
+  //    gate, so we trust it here too.
   const RENEWAL_GRACE_MS = 6 * 60 * 60 * 1000;
   const isPaid = (() => {
+    if (profile?.is_admin === true) return true;
     if (!subscription) return false;
     if (subscription.plan === 'free' || subscription.status !== 'active') return false;
     if (subscription.plan === 'lifetime') return true;

@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { startCheckout, markPreCheckout, clearPreCheckoutSnapshot } from '../lib/checkout.js';
 import { supabase } from '../lib/supabase.js';
-import { PLANS as ALL_PLANS } from '../lib/plans.js';
-import { friendlyError } from '../lib/errors.js';
+import { PLANS } from '../lib/plans.js';
+import { usePlanCheckout } from '../hooks/usePlanCheckout.js';
 
 // Paywall-specific copy decorations on top of the central plan catalog.
 // `equiv` is the small grey line under the price — anchors the value
@@ -16,7 +15,7 @@ const PAYWALL_COPY = {
   lifetime:  { equiv: 'pay once · use forever',      cta: 'Claim Lifetime' },
 };
 
-const PLANS = ALL_PLANS.map((p) => ({
+const PAYWALL_PLANS = PLANS.map((p) => ({
   ...p,
   badge:   p.id === 'lifetime' ? 'Limited 10' : p.badge,
   equiv:   PAYWALL_COPY[p.id]?.equiv ?? null,
@@ -43,44 +42,19 @@ function FeatureCheck() {
 
 /** Shown by <RequirePaid> when a logged-in user hasn't subscribed yet. */
 export default function Paywall({ trialUsed = false }) {
-  const { profile, user, subscription } = useAuth();
-  const [busy, setBusy]                 = useState(null);
-  const [error, setError]               = useState(null);
-  const [lifetimeLeft, setLifetimeLeft] = useState(null);
+  const { profile, user } = useAuth();
+  // RequirePaid guarantees a signed-in user before we render — no need for
+  // the unauth → /login redirect path.
+  const { busy, error, lifetimeLeft, choose, dismissError } = usePlanCheckout({
+    redirectUnauthedToLogin: false,
+  });
 
   useEffect(() => {
-    let cancelled = false;
-    supabase.rpc('lifetime_seats_left').then(({ data, error }) => {
-      if (!cancelled && !error && typeof data === 'number') setLifetimeLeft(data);
-    });
     // Stamp the user's first paywall view. Idempotent on the server side
     // (writes only when first_paywall_at is still null) so re-renders are
     // free. Fire-and-forget — failures don't change UX.
     supabase.rpc('mark_journey_event', { p_event: 'paywall' }).then(() => {}, () => {});
-    return () => { cancelled = true; };
   }, []);
-
-  const onChoose = async (plan) => {
-    setError(null);
-    setBusy(plan);
-    try {
-      // Stamp the snapshot BEFORE the network call — the await can take
-      // seconds, during which a renewal webhook could mutate the row out
-      // from under us. We want "what we knew when the user clicked", not
-      // "what we knew when Dodo replied".
-      markPreCheckout(subscription, user?.id);
-      const url = await startCheckout(plan);
-      window.location.href = url;
-    } catch (e) {
-      // startCheckout threw — drop the snapshot so it can't poison a
-      // future /checkout/success visit. Without this clear, an aborted
-      // attempt's snapshot survives until the next successful checkout
-      // (or 6h expiry) and skews the row-changed comparison.
-      clearPreCheckoutSnapshot();
-      setBusy(null);
-      setError(friendlyError(e, 'Could not start checkout.'));
-    }
-  };
 
   // If the user came from the landing's pricing CTA, auto-start checkout
   // for that plan (so they don't have to click twice).
@@ -88,8 +62,8 @@ export default function Paywall({ trialUsed = false }) {
     let intent;
     try { intent = sessionStorage.getItem('tm:intent-plan'); } catch {}
     if (!intent) return;
-    sessionStorage.removeItem('tm:intent-plan');
-    onChoose(intent);
+    try { sessionStorage.removeItem('tm:intent-plan'); } catch {}
+    choose(intent);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -124,12 +98,12 @@ export default function Paywall({ trialUsed = false }) {
         {error && (
           <div className="paywall-error" role="alert">
             <strong>Heads up — </strong>{error}
-            <button type="button" className="paywall-link" onClick={() => setError(null)} style={{ marginLeft: 8 }}>Dismiss</button>
+            <button type="button" className="paywall-link" onClick={dismissError} style={{ marginLeft: 8 }}>Dismiss</button>
           </div>
         )}
 
         <div className="paywall-plans">
-          {PLANS.map((p, i) => {
+          {PAYWALL_PLANS.map((p, i) => {
             const soldOut = p.gold && lifetimeLeft === 0;
             const lifetimeBadge = p.gold && lifetimeLeft != null && lifetimeLeft > 0
               ? `Only ${lifetimeLeft} of 10 left`
@@ -141,7 +115,7 @@ export default function Paywall({ trialUsed = false }) {
                 type="button"
                 className={`paywall-plan${p.gold ? ' paywall-plan-gold' : ''}${p.popular ? ' paywall-plan-popular' : ''}`}
                 disabled={busy === p.id || soldOut}
-                onClick={() => onChoose(p.id)}
+                onClick={() => choose(p.id)}
                 style={{ animationDelay: `${i * 70}ms` }}
               >
                 {p.popular && (

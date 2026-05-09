@@ -1,10 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase.js';
-import { useAuth } from '../auth/AuthProvider.jsx';
-import { startCheckout, markPreCheckout, clearPreCheckoutSnapshot } from '../lib/checkout.js';
 import { PLANS } from '../lib/plans.js';
-import { friendlyError } from '../lib/errors.js';
+import { usePlanCheckout } from '../hooks/usePlanCheckout.js';
 
 function Check({ gold }) {
   return (
@@ -67,41 +62,7 @@ function PlanCard({ plan, onChoose, busy, lifetimeLeft }) {
 }
 
 export default function Pricing() {
-  const { user, subscription } = useAuth();
-  const navigate = useNavigate();
-  const [busy, setBusy] = useState(null);
-  const [error, setError] = useState(null);
-  const [lifetimeLeft, setLifetimeLeft] = useState(null); // null until loaded
-
-  // Live lifetime spots counter — calls the public RPC `lifetime_seats_left()`.
-  useEffect(() => {
-    let cancelled = false;
-    supabase.rpc('lifetime_seats_left').then(({ data, error }) => {
-      if (cancelled || error) return;
-      if (typeof data === 'number') setLifetimeLeft(data);
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  const onChoose = async (plan) => {
-    setError(null);
-    // Not logged in → send to /login first; we'll come back to checkout after.
-    if (!user) {
-      navigate('/login', { state: { intent: { plan } } });
-      return;
-    }
-    try {
-      setBusy(plan);
-      // Snapshot BEFORE the await — see Paywall.jsx for the why.
-      markPreCheckout(subscription, user?.id);
-      const url = await startCheckout(plan);
-      window.location.href = url;
-    } catch (e) {
-      clearPreCheckoutSnapshot();
-      setBusy(null);
-      setError(friendlyError(e, 'Could not start checkout.'));
-    }
-  };
+  const { busy, error, lifetimeLeft, choose, dismissError } = usePlanCheckout();
 
   return (
     <section id="pricing" className="pricing tm-section-pad">
@@ -114,7 +75,7 @@ export default function Pricing() {
       {error && (
         <div className="paywall-error" role="alert" style={{ maxWidth: 640, margin: '0 auto 24px' }}>
           <strong>Heads up — </strong>{error}
-          <button type="button" className="paywall-link" onClick={() => setError(null)} style={{ marginLeft: 8 }}>Dismiss</button>
+          <button type="button" className="paywall-link" onClick={dismissError} style={{ marginLeft: 8 }}>Dismiss</button>
         </div>
       )}
 
@@ -123,7 +84,7 @@ export default function Pricing() {
           <PlanCard
             key={plan.id}
             plan={plan}
-            onChoose={onChoose}
+            onChoose={choose}
             busy={busy}
             lifetimeLeft={plan.gold ? lifetimeLeft : null}
           />

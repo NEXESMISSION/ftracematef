@@ -27,7 +27,7 @@ import { supabase } from './supabase.js';
  *
  * `profiles.free_trial_started_at` is now a "first-use" timestamp — the RPC
  * stamps it on the very first consume — and isn't load-bearing for the gate
- * logic. It's kept for analytics + the existing dev-panel reset flow.
+ * logic. It's kept for analytics + the dev-mutate-subscription reset flow.
  */
 
 export const FREE_SESSION_LIMIT = 1;
