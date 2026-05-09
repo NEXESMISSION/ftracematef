@@ -1,16 +1,27 @@
 import { useEffect, useState } from 'react';
 
 // First-visit welcome sequence: t1 → t2 → flies to popup spot.
-// Skipped on subsequent reloads in the same session via sessionStorage.
+//
+// Cooldown lives in localStorage (NOT sessionStorage) so a return visitor
+// in a fresh browser tab on the same device doesn't get the animation
+// re-played. Re-shows after the cooldown so a long-stale visitor gets a
+// fresh impression — long enough to feel "I haven't seen this in a while",
+// short enough to not break for someone who used to come weekly.
+const STORAGE_KEY  = 'tm:popup:welcome:last-shown';
+const COOLDOWN_MS  = 30 * 24 * 60 * 60 * 1000; // 30 days
+
 export default function WelcomeOverlay() {
   const [shouldRender, setShouldRender] = useState(false);
 
   useEffect(() => {
     try {
-      if (sessionStorage.getItem('tm-popups-shown')) return;
-      sessionStorage.setItem('tm-popups-shown', '1');
+      const last = Number(localStorage.getItem(STORAGE_KEY) || 0);
+      if (Number.isFinite(last) && Date.now() - last < COOLDOWN_MS) return;
+      localStorage.setItem(STORAGE_KEY, String(Date.now()));
       setShouldRender(true);
     } catch {
+      // Private mode / disabled storage — fall back to showing the
+      // welcome rather than suppressing it.
       setShouldRender(true);
     }
   }, []);

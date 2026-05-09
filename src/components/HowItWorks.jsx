@@ -1,4 +1,7 @@
-import DemoReel from './DemoReel.jsx';
+// "See it in action" demo-reel is temporarily hidden — placeholder videos
+// were under-quality. To bring it back: re-import DemoReel and re-render
+// the .how-shorts-head + .shorts-row blocks below.
+// import DemoReel from './DemoReel.jsx';
 
 const STEPS = [
   { src: '/images/steps/01-upload.webp',  alt: 'Step 1 — Upload or select any image.' },
@@ -42,15 +45,6 @@ export default function HowItWorks() {
         ))}
       </div>
 
-      <div className="how-shorts-head">
-        <p className="kicker hand">in motion</p>
-        <h3>See it in action.</h3>
-      </div>
-
-      <div className="shorts-row">
-        <DemoReel />
-        <DemoReel videoId="ooT9NYDX6oc" />
-      </div>
     </section>
   );
 }
