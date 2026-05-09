@@ -103,16 +103,16 @@ export default function Paywall({ trialUsed = false }) {
 
       <main className="studio-paywall">
         <p className="kicker hand">
-          {trialUsed ? `that's a wrap, ${greeting} ✦` : `welcome, ${greeting} ✦`}
+          {trialUsed ? `if it felt good, ${greeting} ✦` : `welcome, ${greeting} ✦`}
         </p>
         <h1>
           {trialUsed
-            ? 'Free tracing is used up — pick a plan to keep going.'
+            ? 'Your free trace is done — was it worth it?'
             : 'One unlock. Every tool. Every device.'}
         </h1>
         <p className="lead">
           {trialUsed
-            ? 'You used your free studio sessions. Any plan unlocks unlimited tracing — full quality, every tool, every device.'
+            ? "You got your one free session. If it felt magical, here's how to keep going — pick a plan and trace forever, less than a coffee."
             : 'Trace anything you can photograph — sketches, tattoos, murals, signs. Pick the plan that fits.'}
         </p>
 

@@ -1,20 +1,29 @@
+import { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider.jsx';
 import { useAuthGate } from './AuthGate.jsx';
 import Paywall from '../components/Paywall.jsx';
+import ExitSurvey from '../components/ExitSurvey.jsx';
 import { beginTrialSession, canUseFreeTrial, freeTrialState } from '../lib/freeTrial.js';
 
 /**
  * Wrap routes that require an active *paid* plan.
- * - Not signed in       → redirect to /login
+ * - Not signed in              → redirect to /login
  * - Signed in, free, with an unused/active free trial → render children
+ * - Signed in but free (trial used), no exit-survey yet → render <ExitSurvey />
  * - Signed in but free (trial used) → render <Paywall trialUsed /> in place
- * - Signed in and paid  → render children
+ * - Signed in and paid         → render children
  */
 export default function RequirePaid({ children }) {
   const { user, profile, isPaid } = useAuth();
   const location = useLocation();
   const gate = useAuthGate();
+  // Optimistic local override: the moment ExitSurvey successfully POSTs we
+  // flip this to true so the paywall renders immediately, without waiting
+  // for the realtime profile-update channel to deliver the new
+  // exit_survey_at stamp. The refresh() inside ExitSurvey also runs, so the
+  // server-side value catches up within a frame or two.
+  const [surveyDoneLocal, setSurveyDoneLocal] = useState(false);
 
   if (gate.element) return gate.element;
 
@@ -35,7 +44,19 @@ export default function RequirePaid({ children }) {
       beginTrialSession();
       return children;
     }
-    return <Paywall trialUsed={freeTrialState(profile) === 'used'} />;
+    const trialIsUsed = freeTrialState(profile) === 'used';
+    // One-shot exit survey before the paywall: only when the trial is
+    // actually used (so users mid-session aren't surveyed) AND we haven't
+    // already recorded an answer for this account.
+    const surveyPending =
+      trialIsUsed
+      && profile
+      && !profile.exit_survey_at
+      && !surveyDoneLocal;
+    if (surveyPending) {
+      return <ExitSurvey onDone={() => setSurveyDoneLocal(true)} />;
+    }
+    return <Paywall trialUsed={trialIsUsed} />;
   }
 
   return children;

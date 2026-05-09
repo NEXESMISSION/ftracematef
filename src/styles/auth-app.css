@@ -2508,3 +2508,232 @@
   color: var(--ink-soft);
   text-align: center;
 }
+
+/* ============ Exit survey (between trial-end and paywall) ============
+   Two structured questions + one optional note. Lives inside .studio-shell
+   so the warm cream background + brand bar match the paywall the user
+   sees immediately after submitting. */
+.exit-survey {
+  flex: 1;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: clamp(32px, 5vw, 64px) clamp(20px, 4vw, 36px) 80px;
+  text-align: center;
+}
+.exit-survey h1 {
+  font-family: 'Nunito', sans-serif;
+  font-size: clamp(28px, 3.8vw, 44px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0 0 12px;
+}
+.exit-survey .lead {
+  max-width: 520px;
+  margin: 0 auto 28px;
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.exit-survey-block {
+  margin: 22px 0;
+  text-align: left;
+  animation: pwPlanIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.exit-survey-block:nth-child(2) { animation-delay: 60ms; }
+.exit-survey-block:nth-child(3) { animation-delay: 120ms; }
+.exit-survey-block:nth-child(4) { animation-delay: 180ms; }
+.exit-survey-q {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0 0 12px;
+  letter-spacing: -0.005em;
+}
+.exit-survey-q-num {
+  display: inline-grid;
+  place-items: center;
+  width: 26px; height: 26px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--coral);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+/* Source chips — wrap-flow row of pill buttons. One-tap selection. */
+.exit-survey-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.exit-survey-chip {
+  border: 1.5px solid rgba(43, 33, 24, 0.14);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease,
+              background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.exit-survey-chip:hover:not(:disabled) {
+  border-color: rgba(232, 122, 122, 0.5);
+  transform: translateY(-1px);
+}
+.exit-survey-chip.is-active {
+  background: var(--coral);
+  border-color: var(--coral);
+  color: #fff;
+  box-shadow: 0 6px 14px -6px rgba(232, 122, 122, 0.6);
+}
+.exit-survey-chip:disabled { opacity: 0.55; cursor: default; }
+
+/* Feelings — bigger emoji-led cards in a 4-up grid that collapses to 2-up
+   on narrow phones. Hint line under the label gives each option a little
+   character so the user isn't ranking faceless adjectives. */
+.exit-survey-feelings {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+@media (max-width: 540px) {
+  .exit-survey-feelings { grid-template-columns: repeat(2, 1fr); }
+}
+.exit-survey-feeling {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 10px 12px;
+  border: 1.5px solid rgba(43, 33, 24, 0.14);
+  background: var(--paper);
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  font-family: 'Nunito', sans-serif;
+}
+.exit-survey-feeling:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(232, 122, 122, 0.45);
+  box-shadow: 0 12px 22px -16px rgba(43, 33, 24, 0.3);
+}
+.exit-survey-feeling.is-active {
+  border-color: var(--coral);
+  background: rgba(232, 122, 122, 0.08);
+  box-shadow:
+    0 0 0 3px rgba(232, 122, 122, 0.14),
+    0 14px 26px -16px rgba(232, 122, 122, 0.4);
+}
+.exit-survey-feeling:disabled { opacity: 0.55; cursor: default; }
+.exit-survey-feeling-emoji { font-size: 32px; line-height: 1; }
+.exit-survey-feeling-label { font-size: 14px; font-weight: 800; color: var(--ink); }
+.exit-survey-feeling-hint  { font-size: 11.5px; color: var(--ink-muted); font-weight: 600; }
+
+.exit-survey-note-block { position: relative; }
+.exit-survey-note-label {
+  display: block;
+  font-family: 'Nunito', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.exit-survey-optional {
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.exit-survey-note {
+  width: 100%;
+  resize: vertical;
+  min-height: 64px;
+  padding: 12px 14px 22px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1.5px solid rgba(43, 33, 24, 0.14);
+  border-radius: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.exit-survey-note:focus {
+  outline: none;
+  border-color: var(--coral);
+  box-shadow: 0 0 0 3px rgba(232, 122, 122, 0.14);
+}
+.exit-survey-note:disabled { opacity: 0.55; }
+.exit-survey-note-count {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.exit-survey-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+.exit-survey-skip {
+  background: transparent;
+  border: 1.5px solid rgba(43, 33, 24, 0.18);
+  color: var(--ink-soft);
+  font-family: 'Nunito', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 11px 22px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.exit-survey-skip:hover:not(:disabled) {
+  background: rgba(43, 33, 24, 0.05);
+  color: var(--ink);
+  border-color: rgba(43, 33, 24, 0.3);
+}
+.exit-survey-submit {
+  background: var(--coral);
+  border: 0;
+  color: #fff;
+  font-family: 'Nunito', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  padding: 12px 26px;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 8px 18px -8px rgba(232, 122, 122, 0.7);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+.exit-survey-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px -8px rgba(232, 122, 122, 0.8);
+}
+.exit-survey-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.exit-survey-foot {
+  margin-top: 22px;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  font-style: italic;
+  line-height: 1.5;
+}

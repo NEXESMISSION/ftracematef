@@ -741,6 +741,175 @@ function AcquisitionPanel({ users }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
+/* Exit-survey rollup. Counts answers from users who reached the post-trial
+   survey before the paywall — the "where did they come from" + "did they
+   like it" pair lets the operator read sentiment per acquisition channel.
+   Pure client-side aggregation off the same users array, no extra fetch. */
+
+const SURVEY_FEELING_LABEL = {
+  loved:    { label: 'Loved it',    emoji: '🤩', tone: 'good' },
+  liked:    { label: 'Liked it',    emoji: '🙂', tone: 'good' },
+  mixed:    { label: 'Mixed',       emoji: '😐', tone: 'neutral' },
+  disliked: { label: "Didn't love", emoji: '😕', tone: 'warn' },
+};
+const SURVEY_FEELING_ORDER = ['loved', 'liked', 'mixed', 'disliked'];
+
+function SurveyPanel({ users }) {
+  const { rows, totals, notes } = useMemo(() => {
+    if (!Array.isArray(users)) {
+      return { rows: [], totals: { responses: 0, eligible: 0 }, notes: [] };
+    }
+    // Eligible = users who actually got asked (trial used or any paywall hit).
+    // Without this denominator the response rate looks artificially low,
+    // because most accounts never reach the survey trigger at all.
+    let eligible = 0;
+    let responses = 0;
+    const bySource = new Map();
+    const byFeeling = Object.fromEntries(SURVEY_FEELING_ORDER.map((f) => [f, 0]));
+    const noteList = [];
+
+    for (const u of users) {
+      const reachedSurvey = !!(u?.first_paywall_at);
+      if (reachedSurvey) eligible += 1;
+      if (!u?.exit_survey_at) continue;
+      responses += 1;
+
+      const src = (u.exit_survey_source || 'other').trim();
+      const cur = bySource.get(src) ?? { source: src, total: 0, loved: 0, liked: 0, mixed: 0, disliked: 0 };
+      cur.total += 1;
+      const feeling = (u.exit_survey_feeling || '').trim();
+      if (feeling in cur) cur[feeling] += 1;
+      bySource.set(src, cur);
+
+      if (feeling in byFeeling) byFeeling[feeling] += 1;
+
+      if (u.exit_survey_note) {
+        noteList.push({
+          id: u.id,
+          email: u.email,
+          display_name: u.display_name,
+          source: src,
+          feeling,
+          note: u.exit_survey_note,
+          at: u.exit_survey_at,
+        });
+      }
+    }
+
+    const list = Array.from(bySource.values()).sort((a, b) => b.total - a.total);
+    // Newest notes first — fresh feedback is the most actionable.
+    noteList.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+    return {
+      rows: list,
+      totals: { responses, eligible, byFeeling },
+      notes: noteList,
+    };
+  }, [users]);
+
+  const responseRate = totals.eligible > 0
+    ? Math.round((totals.responses / totals.eligible) * 100)
+    : 0;
+
+  return (
+    <section className="admin-stats" aria-labelledby="admin-survey-title">
+      <header className="admin-stats-head">
+        <h2 id="admin-survey-title">Exit survey</h2>
+        <span className="admin-stats-when">
+          shown once to users who used their free trace; pairs source
+          attribution with sentiment so you can read each channel's vibe at a
+          glance.
+        </span>
+      </header>
+
+      {totals.responses === 0 ? (
+        <div className="admin-stats-empty" style={{ padding: 16 }}>
+          No survey responses yet — the popup fires the next time a user
+          tries to start a second trace.
+        </div>
+      ) : (
+        <>
+          <div className="admin-survey-summary">
+            <div className="admin-survey-summary-cell">
+              <span className="admin-survey-summary-num">{totals.responses}</span>
+              <span className="admin-survey-summary-lbl">responses</span>
+            </div>
+            <div className="admin-survey-summary-cell">
+              <span className="admin-survey-summary-num">{responseRate}%</span>
+              <span className="admin-survey-summary-lbl">
+                of {totals.eligible} eligible
+              </span>
+            </div>
+            {SURVEY_FEELING_ORDER.map((f) => {
+              const meta = SURVEY_FEELING_LABEL[f];
+              const count = totals.byFeeling?.[f] ?? 0;
+              const pct = totals.responses > 0
+                ? Math.round((count / totals.responses) * 100)
+                : 0;
+              return (
+                <div key={f} className={`admin-survey-summary-cell admin-survey-summary-${meta.tone}`}>
+                  <span className="admin-survey-summary-num">
+                    <span aria-hidden="true">{meta.emoji}</span> {count}
+                  </span>
+                  <span className="admin-survey-summary-lbl">{meta.label} · {pct}%</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="admin-acq-table" role="table" style={{ marginTop: 18 }}>
+            <div className="admin-acq-row admin-acq-head" role="row">
+              <span role="columnheader">Source</span>
+              <span role="columnheader">Total</span>
+              <span role="columnheader">Loved</span>
+              <span role="columnheader">Liked</span>
+              <span role="columnheader">Mixed</span>
+              <span role="columnheader">Didn't love</span>
+            </div>
+            {rows.map((r) => (
+              <div key={r.source} className="admin-acq-row" role="row">
+                <span className="admin-acq-source" role="cell">{r.source}</span>
+                <span role="cell">{r.total}</span>
+                <span role="cell">{r.loved}</span>
+                <span role="cell">{r.liked}</span>
+                <span role="cell">{r.mixed}</span>
+                <span role="cell">{r.disliked}</span>
+              </div>
+            ))}
+          </div>
+
+          {notes.length > 0 && (
+            <div className="admin-survey-notes">
+              <h3 className="admin-survey-notes-title">Recent free-form notes</h3>
+              <ul className="admin-survey-notes-list">
+                {notes.slice(0, 8).map((n) => {
+                  const meta = SURVEY_FEELING_LABEL[n.feeling] ?? null;
+                  return (
+                    <li key={n.id} className="admin-survey-note">
+                      <div className="admin-survey-note-head">
+                        <span className="admin-survey-note-emoji" aria-hidden="true">
+                          {meta?.emoji ?? '💬'}
+                        </span>
+                        <span className="admin-survey-note-who">
+                          {n.display_name || n.email || 'unknown'}
+                        </span>
+                        <span className="admin-survey-note-meta">
+                          {n.source} · {meta?.label ?? n.feeling} · {formatRelative(n.at)}
+                        </span>
+                      </div>
+                      <p className="admin-survey-note-body">{n.note}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
 /* Webhook health — stuck-event count + recent list. Mounted above the
    tab nav so anything stuck for >24h is impossible to miss regardless of
    which tab the operator is currently on.                                */
@@ -1250,6 +1419,7 @@ export default function AdminDashboard() {
           <>
             <StatsPanel stats={meta.stats} error={meta.error} loading={meta.loading} />
             <AcquisitionPanel users={users} />
+            <SurveyPanel users={users} />
           </>
         )}
         {view === 'traffic' && <TrafficPanel />}
