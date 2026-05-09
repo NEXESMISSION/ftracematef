@@ -759,9 +759,13 @@ function SurveyPanel({ users }) {
     if (!Array.isArray(users)) {
       return { rows: [], totals: { responses: 0, eligible: 0 }, notes: [] };
     }
-    // Eligible = users who actually got asked (trial used or any paywall hit).
-    // Without this denominator the response rate looks artificially low,
-    // because most accounts never reach the survey trigger at all.
+    // Eligible = users who have ever reached /trace and therefore had the
+    // chance to see the survey. Proxy: free_sessions_used > 0 (any free
+    // user who entered the studio at least once) OR is_paid (paid users
+    // can hit /trace anytime). Total users isn't right as a denominator
+    // because ghosts who signed up and never opened /trace genuinely
+    // never saw the gate, so counting them would make the rate look
+    // artificially low.
     let eligible = 0;
     let responses = 0;
     const bySource = new Map();
@@ -769,8 +773,8 @@ function SurveyPanel({ users }) {
     const noteList = [];
 
     for (const u of users) {
-      const reachedSurvey = !!(u?.first_paywall_at);
-      if (reachedSurvey) eligible += 1;
+      const reachedTrace = !!u?.is_paid || (Number(u?.free_sessions_used ?? 0) > 0);
+      if (reachedTrace) eligible += 1;
       if (!u?.exit_survey_at) continue;
       responses += 1;
 
@@ -813,18 +817,18 @@ function SurveyPanel({ users }) {
   return (
     <section className="admin-stats" aria-labelledby="admin-survey-title">
       <header className="admin-stats-head">
-        <h2 id="admin-survey-title">Exit survey</h2>
+        <h2 id="admin-survey-title">Pre-trace survey</h2>
         <span className="admin-stats-when">
-          shown once to users who used their free trace; pairs source
-          attribution with sentiment so you can read each channel's vibe at a
-          glance.
+          required gate on /trace for every user — paid, first-time free,
+          and trial-used free alike. Pairs source attribution with sentiment
+          so you can read each channel's vibe at a glance.
         </span>
       </header>
 
       {totals.responses === 0 ? (
         <div className="admin-stats-empty" style={{ padding: 16 }}>
-          No survey responses yet — the popup fires the next time a user
-          tries to start a second trace.
+          No survey responses yet — the gate fires the next time any user
+          opens /trace.
         </div>
       ) : (
         <>

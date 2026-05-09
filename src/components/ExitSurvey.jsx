@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { supabase } from '../lib/supabase.js';
@@ -21,26 +21,30 @@ const SOURCES = [
   { id: 'other',     label: 'Somewhere else'},
 ];
 
+// Generic feeling labels — work for both first-timers (rating their first
+// impression of the site) AND returning users (rating their actual trace
+// experience). The DB still stores loved/liked/mixed/disliked.
 const FEELINGS = [
-  { id: 'loved',    emoji: '🤩', label: 'Loved it',     hint: 'felt magical'        },
-  { id: 'liked',    emoji: '🙂', label: 'Liked it',     hint: 'pretty good'         },
-  { id: 'mixed',    emoji: '😐', label: 'Mixed',        hint: 'some rough edges'    },
-  { id: 'disliked', emoji: '😕', label: "Didn't love",  hint: 'something felt off'  },
+  { id: 'loved',    emoji: '🤩', label: 'Loving it',  hint: 'this is great'        },
+  { id: 'liked',    emoji: '🙂', label: 'Liking it',  hint: 'pretty good so far'   },
+  { id: 'mixed',    emoji: '😐', label: 'Mixed',      hint: 'jury is out'          },
+  { id: 'disliked', emoji: '😕', label: 'Not for me', hint: 'not what I hoped'     },
 ];
 
 /**
- * One-shot exit survey. Rendered by RequirePaid once the user's free trial
- * is consumed AND profiles.exit_survey_at is still null. After a successful
- * submit (or "skip") the parent re-renders to show <Paywall trialUsed />.
+ * Universal pre-trace survey. Rendered by RequirePaid as a hard gate on
+ * /trace whenever profiles.exit_survey_at is null — for paid users,
+ * first-time free users, and returning trial-used free users alike.
+ * After a successful submit the parent re-renders straight to whatever
+ * the user was actually heading for: the Trace studio (paid + first
+ * free trial), or the Paywall (trial used).
  *
- * Required gate: there is no Skip button. Both questions must be answered
- * to proceed to the paywall. If the user closes the tab or refreshes
- * without answering, exit_survey_at stays null on the server and the
- * survey re-renders on every subsequent /trace visit until they actually
- * submit. The data point is more valuable than the goodwill of letting
- * them dismiss it — and "skip" answers were noise in the admin rollup
- * anyway (always source=other / feeling=mixed, indistinguishable from a
- * real "Somewhere else / Mixed" pick).
+ * Required gate: there is no Skip button. Both questions must be
+ * answered. If the user closes the tab or refreshes without answering,
+ * exit_survey_at stays null on the server and the survey re-renders on
+ * every subsequent /trace visit until they actually submit. The data
+ * point is more valuable than the friction it adds, and the gate only
+ * fires once per account (idempotent server-side).
  */
 export default function ExitSurvey({ onDone }) {
   const { profile, user, refresh } = useAuth();
@@ -51,13 +55,11 @@ export default function ExitSurvey({ onDone }) {
   const [busy, setBusy]       = useState(false);
   const [error, setError]     = useState(null);
 
-  // The survey IS the paywall block — stamp first_paywall_at on mount so a
-  // user who closes the tab without submitting still counts toward the
-  // admin funnel (and the survey response-rate denominator). Idempotent
-  // server-side, fire-and-forget; failures don't change UX.
-  useEffect(() => {
-    supabase.rpc('mark_journey_event', { p_event: 'paywall' }).then(() => {}, () => {});
-  }, []);
+  // Note: we deliberately do NOT mark first_paywall_at here. The survey
+  // is now a universal gate, not a paywall — first-time free users hit
+  // it BEFORE the paywall would ever fire. The actual <Paywall /> still
+  // stamps the column on its own mount, which is the correct funnel
+  // signal (only fires when the user has truly exhausted the trial).
 
   const greeting = profile?.display_name || user?.email?.split('@')[0] || 'friend';
 
@@ -98,11 +100,11 @@ export default function ExitSurvey({ onDone }) {
       </header>
 
       <main className="exit-survey">
-        <p className="kicker hand">two quick taps, {greeting} ✦</p>
-        <h1>Before you keep going — how was it?</h1>
+        <p className="kicker hand">quick check, {greeting} ✦</p>
+        <h1>Two taps before you trace.</h1>
         <p className="lead">
-          You finished your free trace. Pick one option from each list and we'll
-          unlock the plans — that's it, two taps.
+          Tell us where you found Trace Mate and how it feels so far. Two
+          clicks and you're in the studio.
         </p>
 
         {error && (
@@ -136,7 +138,7 @@ export default function ExitSurvey({ onDone }) {
         <section className="exit-survey-block" aria-labelledby="survey-feeling-q">
           <h2 id="survey-feeling-q" className="exit-survey-q">
             <span className="exit-survey-q-num">2</span>
-            How did your first trace feel?
+            How does Trace Mate feel so far?
           </h2>
           <div className="exit-survey-feelings" role="radiogroup" aria-label="How did it feel">
             {FEELINGS.map((f) => (
@@ -187,7 +189,7 @@ export default function ExitSurvey({ onDone }) {
               ? 'Saving…'
               : (!source || !feeling)
                 ? 'Pick one from each list →'
-                : 'Send & unlock plans →'}
+                : 'Send & enter the studio →'}
           </button>
         </div>
 
