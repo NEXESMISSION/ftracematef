@@ -29,6 +29,89 @@ function isTracingNow(u) {
   return Date.now() - t < TRACE_HEARTBEAT_FRESH_MS;
 }
 
+// Canonical email local-part for de-duplication: lowercased, +tag stripped.
+// We deliberately don't strip Gmail-style dots — that's provider-specific
+// and risks merging unrelated accounts on non-Gmail domains.
+function emailLocalPart(email) {
+  if (!email) return '';
+  const at = email.indexOf('@');
+  if (at < 0) return email.toLowerCase();
+  const local = email.slice(0, at).toLowerCase();
+  const plus = local.indexOf('+');
+  return plus < 0 ? local : local.slice(0, plus);
+}
+
+// Collapse two-or-more rows that share a canonical local part (the same
+// person signed up with `name@hotmail.com` and `name@gmail.com`) into one
+// merged row. Across our user base this is a reliable "same person" signal —
+// genuine collisions across providers are vanishingly rare for the kinds
+// of email locals real users have.
+//
+// Merge rules:
+//   - lead = the row most useful to the operator (paid first, then freshest activity)
+//   - sums  : trace_sessions, total_trace_seconds
+//   - max ts: last_seen_at, last_sign_in_at, last_trace_at
+//   - min ts: created_at, first_trace_at (earliest signup / first trace)
+//   - any-true: is_paid, trial_used
+//   - aliases: emails of the rows folded into the lead, surfaced in the UI
+function mergeUserGroup(group) {
+  if (group.length === 1) return group[0];
+  const sorted = group.slice().sort((a, b) => {
+    if (!!a.is_paid !== !!b.is_paid) return a.is_paid ? -1 : 1;
+    const ta = new Date(a.last_seen_at || a.last_sign_in_at || a.created_at || 0).getTime();
+    const tb = new Date(b.last_seen_at || b.last_sign_in_at || b.created_at || 0).getTime();
+    return tb - ta;
+  });
+  const lead = sorted[0];
+  const aliases = group.filter((u) => u.id !== lead.id).map((u) => u.email).filter(Boolean);
+  const sumNum = (k) => group.reduce((s, u) => s + (Number(u[k]) || 0), 0);
+  const ms = (v) => (v ? new Date(v).getTime() : null);
+  const maxTs = (k) => {
+    let best = null;
+    for (const u of group) {
+      const t = ms(u[k]);
+      if (t != null && (best == null || t > best)) best = t;
+    }
+    return best == null ? null : new Date(best).toISOString();
+  };
+  const minTs = (k) => {
+    let best = null;
+    for (const u of group) {
+      const t = ms(u[k]);
+      if (t != null && (best == null || t < best)) best = t;
+    }
+    return best == null ? null : new Date(best).toISOString();
+  };
+  return {
+    ...lead,
+    aliases,
+    is_paid:             group.some((u) => u.is_paid),
+    trial_used:          group.some((u) => u.trial_used),
+    total_trace_seconds: sumNum('total_trace_seconds'),
+    trace_sessions:      sumNum('trace_sessions'),
+    created_at:          minTs('created_at')      ?? lead.created_at,
+    first_trace_at:      minTs('first_trace_at')  ?? lead.first_trace_at,
+    last_seen_at:        maxTs('last_seen_at')    ?? lead.last_seen_at,
+    last_sign_in_at:     maxTs('last_sign_in_at') ?? lead.last_sign_in_at,
+    last_trace_at:       maxTs('last_trace_at')   ?? lead.last_trace_at,
+  };
+}
+
+// Group raw users by canonical local-part and merge dupes. Admins stay in
+// the list with their badge; the count tiles below filter them out.
+function normalizeUsers(rawUsers) {
+  if (!Array.isArray(rawUsers)) return [];
+  const groups = new Map();
+  const noKey = [];
+  for (const u of rawUsers) {
+    const key = emailLocalPart(u.email);
+    if (!key) { noKey.push(u); continue; }
+    const arr = groups.get(key);
+    if (arr) arr.push(u); else groups.set(key, [u]);
+  }
+  return [...Array.from(groups.values()).map(mergeUserGroup), ...noKey];
+}
+
 const STATUS_TONE = {
   active:    'good',
   on_hold:   'warn',
@@ -1228,7 +1311,11 @@ export default function AdminDashboard() {
   const loadUsers = useCallback(async () => {
     try {
       const items = await listAllUsers();
-      setUsers(items);
+      // Normalize once on the way in: dedupe by canonical local-part so
+      // counts, the filter list, and the rendered cards all see the same
+      // collapsed set. Same person across providers (gmail + hotmail) is
+      // surfaced as one row with an alias chip.
+      setUsers(normalizeUsers(items));
       setError(null);
     } catch (e) {
       setError(friendlyError(e, 'Could not load users.'));
@@ -1268,9 +1355,13 @@ export default function AdminDashboard() {
 
   const counts = useMemo(() => {
     if (!users) return { all: 0, paid: 0, unpaid: 0, online: 0, tracing: 0, ghost: 0, cold: 0, warm: 0, trying: 0 };
+    // Admins (operator self-views, team test accounts) skew every funnel
+    // they appear in. Drop them from every tile so headline numbers reflect
+    // real users only. Admins still render in the list with their badge.
+    const real = users.filter((u) => !u.is_admin);
     let paid = 0, online = 0, tracing = 0;
     let ghost = 0, cold = 0, warm = 0, trying = 0;
-    for (const u of users) {
+    for (const u of real) {
       if (u.is_paid) paid++;
       if (isOnline(u.last_seen_at)) {
         online++;
@@ -1283,7 +1374,7 @@ export default function AdminDashboard() {
       else if (stage === 'trying') trying++;
     }
     void tick;
-    return { all: users.length, paid, unpaid: users.length - paid, online, tracing, ghost, cold, warm, trying };
+    return { all: real.length, paid, unpaid: real.length - paid, online, tracing, ghost, cold, warm, trying };
   }, [users, tick]);
 
   const filtered = useMemo(() => {
@@ -1301,9 +1392,13 @@ export default function AdminDashboard() {
       if (['ghost','cold','warm','trying'].includes(filter) && userStage(u) !== filter) return false;
       if (filter === 'online'  && !isOnline(u.last_seen_at)) return false;
       if (filter === 'tracing' && !isTracingNow(u)) return false;
-      if (q && !(u.email ?? '').toLowerCase().includes(q)
-            && !(u.display_name ?? '').toLowerCase().includes(q)) {
-        return false;
+      if (q) {
+        const haystack = [
+          u.email ?? '',
+          u.display_name ?? '',
+          ...(Array.isArray(u.aliases) ? u.aliases : []),
+        ].join(' ').toLowerCase();
+        if (!haystack.includes(q)) return false;
       }
       return true;
     });
@@ -1532,6 +1627,14 @@ export default function AdminDashboard() {
                         <span className="admin-row-email">
                           {u.email ?? '—'}
                           {u.is_admin && <span className="admin-row-badge">admin</span>}
+                          {Array.isArray(u.aliases) && u.aliases.length > 0 && (
+                            <span
+                              className="admin-row-badge"
+                              title={`Merged with ${u.aliases.join(', ')}`}
+                            >
+                              +{u.aliases.length} alias
+                            </span>
+                          )}
                         </span>
                         {u.display_name && (
                           <span className="admin-row-name">{u.display_name}</span>
