@@ -21,7 +21,6 @@ export const PLANS = [
       'Full quality outlines',
       'All tools unlocked',
       'Works on any device',
-      'Cancel anytime',
     ],
   },
   {

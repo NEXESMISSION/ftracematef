@@ -173,7 +173,6 @@ export default function PricingPage() {
 
         <p className="pp-foot">
           <span className="reassure-bullet">✦</span> 14-day refund
-          &nbsp;·&nbsp; cancel anytime on monthly &amp; 3-month
           &nbsp;·&nbsp; secure payments by Dodo
         </p>
       </main>

@@ -133,7 +133,6 @@ export default function Pricing() {
       <p className="pricing-foot">
         <span className="reassure-bullet">✦</span> 14-day refund
         &nbsp;·&nbsp; no hidden fees
-        &nbsp;·&nbsp; cancel anytime on monthly &amp; 3-month
       </p>
     </section>
   );

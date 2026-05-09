@@ -116,34 +116,10 @@ export default function Paywall({ trialUsed = false }) {
             : 'Trace anything you can photograph — sketches, tattoos, murals, signs. Pick the plan that fits.'}
         </p>
 
-        {/* Trust strip — small, scannable badges right under the lead so
-            objections (cancel? secure?) are answered before the user
-            even thinks about them. */}
-        <ul className="paywall-trust-strip" aria-label="What's included">
-          <li>
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M8 1.5 L2 4 V8 a6 6 0 0 0 6 6.5 a6 6 0 0 0 6 -6.5 V4 Z" />
-              <path d="M5.5 8 L7.2 9.7 L10.6 6.3" />
-            </svg>
-            Secure checkout
-          </li>
-          <li>
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M8 14 a6 6 0 1 1 6 -6" />
-              <path d="M14 4 V8 H10" />
-            </svg>
-            Cancel anytime
-          </li>
-          <li>
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M9 1 L3 9 H8 L7 15 L13 7 H8 Z" />
-            </svg>
-            Unlock instantly
-          </li>
-        </ul>
+        {/* Trust strip used to live here as small pills (Secure / Cancel /
+            Instant) but it duplicated the bottom promise strip line-for-
+            line. Removed in favor of a single reassurance block under
+            the cards — same words shouldn't appear twice on one page. */}
 
         {error && (
           <div className="paywall-error" role="alert">
@@ -241,7 +217,7 @@ export default function Paywall({ trialUsed = false }) {
                  strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M3 8 L7 12 L13 4" />
             </svg>
-            <span><strong>Cancel anytime</strong> · no lock-in</span>
+            <span><strong>14-day refund</strong> · no lock-in</span>
           </li>
           <li>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
