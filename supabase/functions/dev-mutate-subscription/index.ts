@@ -82,6 +82,7 @@ Deno.serve(async (req) => {
     period_end_offset_days?: number;        // shorthand: now + N days
     current_period_end?: string | null;     // explicit ISO timestamp (or null)
     reset_free_trial?: boolean;             // null out profiles.free_trial_started_at
+    simulate_trial_used?: boolean;          // jump straight to "trial used + no survey"
   } = {};
   try { body = await req.json(); } catch { /* ignored */ }
 
@@ -122,7 +123,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  if (Object.keys(update).length === 0 && !body.reset_free_trial) {
+  if (Object.keys(update).length === 0 && !body.reset_free_trial && !body.simulate_trial_used) {
     return json({ error: 'No fields to update' }, 400);
   }
 
@@ -134,20 +135,61 @@ Deno.serve(async (req) => {
   );
 
   // Profile-level mutation: reset the free-trial stamp AND zero the session
-  // counter. Admin-only convenience for testing the post-trial paywall flow
-  // without spinning up a fresh account. Allowed in combination with
-  // subscription mutations (e.g. "Reset to free + restore trial") or as a
-  // standalone call.
+  // counter, AND clear the post-trial journey stamps (exit-survey answer +
+  // first_paywall_at). Admin-only convenience for re-testing the entire
+  // first-trace → exit-survey → paywall flow without spinning up a fresh
+  // account. Allowed in combination with subscription mutations
+  // (e.g. "Reset to free + restore trial") or as a standalone call.
+  //
+  // Survey/journey stamps are part of the reset because once a tester
+  // answers the survey once, exit_survey_at is permanently set and the
+  // gate falls straight through to the paywall — defeating the purpose of
+  // a "reset" button for repeat QA. first_paywall_at is also cleared so
+  // ExitSurvey's mount-time stamp lands afresh.
   if (body.reset_free_trial) {
     const { error: trialErr } = await admin
       .from('profiles')
-      .update({ free_trial_started_at: null, free_sessions_used: 0 })
+      .update({
+        free_trial_started_at: null,
+        free_sessions_used:    0,
+        exit_survey_at:        null,
+        exit_survey_source:    null,
+        exit_survey_feeling:   null,
+        exit_survey_note:      null,
+        first_paywall_at:      null,
+      })
       .eq('id', user.id);
     if (trialErr) return json({ error: `reset_free_trial failed: ${trialErr.message}` }, 500);
 
     // Standalone call — nothing else to do.
     if (Object.keys(update).length === 0) {
       return json({ free_trial_reset: true });
+    }
+  }
+
+  // Skip-ahead helper: jumps the admin straight into the "trial used + no
+  // survey yet" state so a single click in the dev panel surfaces the
+  // ExitSurvey on the next /trace visit. Pairs naturally with `plan: 'free'`
+  // (the DevPanel's preset bundles both) since a paid user wouldn't see
+  // the survey at all. Bumps free_sessions_used to 1 (the current cap)
+  // and explicitly clears any prior survey answer.
+  if (body.simulate_trial_used) {
+    const { error: simErr } = await admin
+      .from('profiles')
+      .update({
+        free_sessions_used:    1,
+        free_trial_started_at: new Date().toISOString(),
+        exit_survey_at:        null,
+        exit_survey_source:    null,
+        exit_survey_feeling:   null,
+        exit_survey_note:      null,
+        first_paywall_at:      null,
+      })
+      .eq('id', user.id);
+    if (simErr) return json({ error: `simulate_trial_used failed: ${simErr.message}` }, 500);
+
+    if (Object.keys(update).length === 0) {
+      return json({ simulate_trial_used: true });
     }
   }
 

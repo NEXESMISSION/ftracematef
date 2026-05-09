@@ -35,6 +35,13 @@ const PRESETS = [
     body: { status: 'active', period_end_offset_days: 30 } },
   { id: 'reset-trial',    label: 'Reset trial usage',      tone: 'ghost',
     body: { reset_free_trial: true } },
+  // One-click QA for the post-trial flow: forces plan=free, marks the trial
+  // as used, AND wipes any prior exit-survey answer in the same call. The
+  // very next /trace visit will render <ExitSurvey> followed by the new
+  // trial-used <Paywall>. Without this, testing the survey took three steps
+  // (reset to free → reset trial → trace once → leave → return).
+  { id: 'show-survey',    label: 'Show exit survey now',   tone: 'plain',
+    body: { plan: 'free', simulate_trial_used: true } },
 ];
 
 export default function DevPanel() {
