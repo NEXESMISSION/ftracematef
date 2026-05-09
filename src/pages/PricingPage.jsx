@@ -12,14 +12,12 @@ import { usePresence } from '../hooks/usePresence.js';
 /**
  * Dedicated pricing page (/pricing) — what users see after signing in.
  * Cleaner, more confident layout vs. the landing-section pricing.
- *
- * If the user already has an active paid plan, sends them to /upload (or
- * /trace if there's a pending image they were about to trace).
+ * Open to paid users too so they can compare plans / upgrade.
  */
 export default function PricingPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, isPaid, profile, subscription } = useAuth();
+  const { user, profile, subscription } = useAuth();
   usePresence('pricing');
   const [busy, setBusy]                 = useState(null);
   const [error, setError]               = useState(null);
@@ -52,13 +50,6 @@ export default function PricingPage() {
     });
     return () => { cancelled = true; };
   }, []);
-
-  // Already paid? Skip past the page.
-  useEffect(() => {
-    if (isPaid) {
-      navigate(hasPendingImage() ? '/trace' : '/upload', { replace: true });
-    }
-  }, [isPaid, navigate]);
 
   const onChoose = async (planId) => {
     setError(null);
