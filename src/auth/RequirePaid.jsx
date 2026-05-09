@@ -45,9 +45,20 @@ export default function RequirePaid({ children }) {
       return children;
     }
     const trialIsUsed = freeTrialState(profile) === 'used';
-    // One-shot exit survey before the paywall: only when the trial is
-    // actually used (so users mid-session aren't surveyed) AND we haven't
-    // already recorded an answer for this account.
+    // Required exit survey before the paywall: only when the trial is
+    // actually used (so users mid-session aren't surveyed). The survey
+    // re-renders on every /trace visit until profiles.exit_survey_at is
+    // set — which only happens on a successful submit (no skip path).
+    // Closing the tab, refreshing, or navigating away does NOT count as
+    // an answer; the user MUST pick one source and one feeling and
+    // click "Send & unlock plans" to proceed to the paywall.
+    //
+    // surveyDoneLocal is the optimistic local flag that lets us render
+    // the paywall the same frame as a successful submit, without waiting
+    // for the realtime profile-update channel to deliver the new stamp.
+    // It resets to false on every fresh mount of RequirePaid (i.e. on
+    // every navigation to /trace) so a returning user with no recorded
+    // answer always sees the survey.
     const surveyPending =
       trialIsUsed
       && profile

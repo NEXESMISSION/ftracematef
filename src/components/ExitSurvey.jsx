@@ -33,10 +33,14 @@ const FEELINGS = [
  * is consumed AND profiles.exit_survey_at is still null. After a successful
  * submit (or "skip") the parent re-renders to show <Paywall trialUsed />.
  *
- * The skip path still stamps exit_survey_at — we'd rather hear "no opinion"
- * once than keep blocking a user who genuinely doesn't want to answer.
- * "Skip" writes source='other', feeling='mixed', note=null so the row stays
- * countable but distinguishable (no note, default values).
+ * Required gate: there is no Skip button. Both questions must be answered
+ * to proceed to the paywall. If the user closes the tab or refreshes
+ * without answering, exit_survey_at stays null on the server and the
+ * survey re-renders on every subsequent /trace visit until they actually
+ * submit. The data point is more valuable than the goodwill of letting
+ * them dismiss it — and "skip" answers were noise in the admin rollup
+ * anyway (always source=other / feeling=mixed, indistinguishable from a
+ * real "Somewhere else / Mixed" pick).
  */
 export default function ExitSurvey({ onDone }) {
   const { profile, user, refresh } = useAuth();
@@ -57,14 +61,13 @@ export default function ExitSurvey({ onDone }) {
 
   const greeting = profile?.display_name || user?.email?.split('@')[0] || 'friend';
 
-  const submit = async (mode) => {
+  const submit = async () => {
     if (busy) return;
     setError(null);
 
-    // "submit" path requires both questions answered. The Submit button is
-    // disabled until then, but a determined user could still mash Enter —
-    // guard server-side too.
-    if (mode === 'submit' && (!source || !feeling)) {
+    // Both questions are required — Send button is disabled until then,
+    // but a determined user could mash Enter, so guard explicitly.
+    if (!source || !feeling) {
       setError('Pick one option from each list — it takes a second.');
       return;
     }
@@ -72,8 +75,8 @@ export default function ExitSurvey({ onDone }) {
     setBusy(true);
     try {
       const { error: rpcError } = await supabase.rpc('record_exit_survey', {
-        p_source:  mode === 'skip' ? 'other' : source,
-        p_feeling: mode === 'skip' ? 'mixed' : feeling,
+        p_source:  source,
+        p_feeling: feeling,
         p_note:    note.trim() || null,
       });
       if (rpcError) throw rpcError;
@@ -98,8 +101,8 @@ export default function ExitSurvey({ onDone }) {
         <p className="kicker hand">two quick taps, {greeting} ✦</p>
         <h1>Before you keep going — how was it?</h1>
         <p className="lead">
-          You finished your free trace. Tell us how you found us and how it felt —
-          it's literally two clicks and it shapes what we build next.
+          You finished your free trace. Pick one option from each list and we'll
+          unlock the plans — that's it, two taps.
         </p>
 
         {error && (
@@ -176,25 +179,21 @@ export default function ExitSurvey({ onDone }) {
         <div className="exit-survey-actions">
           <button
             type="button"
-            className="exit-survey-skip"
-            onClick={() => submit('skip')}
-            disabled={busy}
-          >
-            Skip
-          </button>
-          <button
-            type="button"
             className="exit-survey-submit"
-            onClick={() => submit('submit')}
+            onClick={submit}
             disabled={busy || !source || !feeling}
           >
-            {busy ? 'Saving…' : 'Send & continue →'}
+            {busy
+              ? 'Saving…'
+              : (!source || !feeling)
+                ? 'Pick one from each list →'
+                : 'Send & unlock plans →'}
           </button>
         </div>
 
         <p className="exit-survey-foot">
-          One survey, one time. Your answer helps a solo founder pick the
-          right next feature — thank you 🌱
+          Asked once. Your answer goes straight to a solo founder and shapes
+          what we build next — thank you 🌱
         </p>
       </main>
     </div>

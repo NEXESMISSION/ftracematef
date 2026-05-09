@@ -2689,24 +2689,6 @@
   gap: 12px;
   margin-top: 24px;
 }
-.exit-survey-skip {
-  background: transparent;
-  border: 1.5px solid rgba(43, 33, 24, 0.18);
-  color: var(--ink-soft);
-  font-family: 'Nunito', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  padding: 11px 22px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-.exit-survey-skip:hover:not(:disabled) {
-  background: rgba(43, 33, 24, 0.05);
-  color: var(--ink);
-  border-color: rgba(43, 33, 24, 0.3);
-}
 .exit-survey-submit {
   background: var(--coral);
   border: 0;
