@@ -440,6 +440,78 @@ function StatsGrid({ stats, memberSince }) {
   );
 }
 
+/* ─────────────────────────── Profile recover ───────────────────────────
+   Soft fallback when AuthProvider settles without a profile row. Auto-
+   retries refresh() with exponential backoff (1s, 2s, 4s, 8s, 16s ≈ 30s
+   total) before exposing the manual escape hatch — users almost never
+   actually see the buttons. This kills the "We couldn't load your
+   profile / sign out and back in" dead-end for transient races. */
+
+function ProfileRecover({ refresh, signOut }) {
+  const [attempt, setAttempt]       = useState(0);
+  const [showManual, setShowManual] = useState(false);
+
+  // Exponential backoff: 1s, 2s, 4s, 8s, 16s. After ~30s of unsuccessful
+  // retries we surface the manual buttons. AuthProvider's own retries run
+  // inside each refresh() so a single tick here triggers SELECT + heal +
+  // re-SELECT — five rounds of that is far past any normal transient.
+  useEffect(() => {
+    if (showManual) return;
+    const delays = [1000, 2000, 4000, 8000, 16000];
+    if (attempt >= delays.length) {
+      setShowManual(true);
+      return;
+    }
+    const t = setTimeout(() => {
+      // refresh() resolves once loadUserData settles; if it found the
+      // profile, AuthProvider re-renders us out of this branch entirely.
+      // If not, attempt++ schedules the next backoff tick.
+      Promise.resolve(refresh()).finally(() => setAttempt((a) => a + 1));
+    }, delays[attempt]);
+    return () => clearTimeout(t);
+  }, [attempt, refresh, showManual]);
+
+  return (
+    <div className="studio-shell">
+      <header className="studio-bar">
+        <Link to="/welcome" className="studio-brand" aria-label="Trace Mate home">
+          <img src="/images/brand/logo.webp" alt="Trace Mate" />
+        </Link>
+      </header>
+      <main className="profile-loading">
+        <span className="profile-spinner" aria-hidden="true" />
+        <p className="profile-loading-text" style={{ marginTop: 14 }}>
+          {showManual ? 'Still working on it…' : 'Setting up your studio…'}
+        </p>
+        {showManual && (
+          <>
+            <p style={{ color: 'var(--ink-soft)', fontSize: 13.5, marginTop: 14, marginBottom: 20, textAlign: 'center', maxWidth: 380, lineHeight: 1.5 }}>
+              Hmm, this is taking longer than usual. A refresh almost
+              always sorts it.
+            </p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button
+                type="button"
+                className="profile-btn profile-btn-primary"
+                onClick={() => window.location.reload()}
+              >
+                Reload page
+              </button>
+              <button
+                type="button"
+                className="profile-btn profile-btn-ghost"
+                onClick={signOut}
+              >
+                Sign out
+              </button>
+            </div>
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
+
 /* ─────────────────────────── Page ──────────────────────────────────────── */
 
 export default function Account() {
@@ -481,47 +553,18 @@ export default function Account() {
     );
   }
 
-  // Auth has settled but we still don't have a profile row. Most often:
-  // (a) the signup trigger silently failed for this account, (b) RLS
-  // briefly rejected the SELECT (network blip), or (c) the profiles row
-  // was deleted out from under the user. Render a clear escape hatch
-  // instead of hanging the spinner forever — the user can retry the
-  // fetch or sign out and back in cleanly.
+  // Auth has settled but we still don't have a profile row. Common causes:
+  //   (a) the signup trigger silently failed for this account
+  //   (b) a transient RLS / network race during the initial fetch
+  //   (c) the profile row was deleted out from under the user
+  // AuthProvider already retries hard inside loadUserData (SELECT-with-
+  // backoff → ensure_profile RPC → re-SELECT). If we still landed here it
+  // usually clears on the next call, so the page silently re-tries
+  // refresh() with backoff up to ~30s before exposing the manual escape
+  // hatch. The visible UI is a soft "hang on" state, NOT a dead-end —
+  // users no longer need to read instructions about signing out.
   if (!profile) {
-    return (
-      <div className="studio-shell">
-        <header className="studio-bar">
-          <Link to="/welcome" className="studio-brand" aria-label="Trace Mate home">
-            <img src="/images/brand/logo.webp" alt="Trace Mate" />
-          </Link>
-        </header>
-        <main className="profile-loading">
-          <p className="profile-loading-text" style={{ marginBottom: 18 }}>
-            We couldn't load your profile.
-          </p>
-          <p style={{ color: 'var(--ink-soft)', fontSize: 14, marginBottom: 24, textAlign: 'center', maxWidth: 360, lineHeight: 1.5 }}>
-            This usually fixes itself on a refresh. If it doesn't, sign out
-            and sign back in — that re-creates the profile cleanly.
-          </p>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button
-              type="button"
-              className="profile-btn profile-btn-primary"
-              onClick={() => refresh()}
-            >
-              Try again
-            </button>
-            <button
-              type="button"
-              className="profile-btn profile-btn-ghost"
-              onClick={signOut}
-            >
-              Sign out
-            </button>
-          </div>
-        </main>
-      </div>
-    );
+    return <ProfileRecover refresh={refresh} signOut={signOut} />;
   }
 
   // Free users get a budget of free studio sessions before the paywall.

@@ -87,41 +87,78 @@ export function AuthProvider({ children }) {
       // row deleted) or the SELECT itself errored (transient RLS blip,
       // network glitch, stale cache).
       //
-      // Recovery (transparent to the user):
-      //   1. Brief 300ms retry on a clean empty result — absorbs read-
-      //      after-write replication lag without a server round-trip.
-      //   2. ensure_profile() RPC — security-definer; bypasses RLS, so
-      //      it works even when the direct SELECT was failing. Returns
-      //      the existing row or creates one from auth.users metadata.
+      // Recovery (transparent to the user) — three cooperating loops:
+      //   1. SELECT retry  (300/700/1500ms)         — absorbs read-after-
+      //      write replication lag and the slow path of the signup
+      //      trigger committing on an under-resourced project.
+      //   2. ensure_profile() RPC, retried 2x       — security-definer;
+      //      bypasses RLS, creates the row from auth.users metadata.
       //      Idempotent. Fires for BOTH the empty-result and error
       //      branches, since either case means we lack data to render
       //      the studio and the RPC's worst case is a no-op SELECT.
-      const profileMissing = !profileRes.data;
-      if (profileMissing && !profileRes.error) {
-        // Clean empty result — give the trigger a beat to commit.
-        await new Promise((r) => setTimeout(r, 300));
+      //   3. Final SELECT after a successful heal   — proves the row is
+      //      now visible to the caller's session, in case PostgREST's
+      //      schema cache lagged the RPC return value.
+      //
+      // Empirically the dead-end "couldn't load your profile" screen
+      // always cleared on a manual refresh — i.e. the second AuthProvider
+      // mount succeeded where the first failed. That's a transient race,
+      // not a structural problem; the retries below close that window.
+      const SELECT_DELAYS = [300, 700, 1500];
+      for (const delay of SELECT_DELAYS) {
+        if (profileRes.data) break;
+        await new Promise((r) => setTimeout(r, delay));
         profileRes = await supabase
           .from('profiles').select('*').eq('id', userId).maybeSingle();
+        if (profileRes.error) {
+          console.warn(`[AuthProvider] profile retry (after ${delay}ms) errored:`, profileRes.error);
+        }
       }
+
       if (!profileRes.data) {
-        console.warn('[AuthProvider] profile fetch did not return a row, calling ensure_profile RPC', {
-          had_error: !!profileRes.error,
-        });
-        const heal = await supabase.rpc('ensure_profile');
-        if (heal.error) {
-          console.error('[AuthProvider] ensure_profile RPC failed:', heal.error);
-        } else if (heal.data) {
-          // PostgREST may wrap a single-composite return as an array — handle both.
-          const row = Array.isArray(heal.data) ? heal.data[0] : heal.data;
-          if (row) {
-            profileRes = { data: row, error: null };
-            // The RPC also makes sure a free subscription exists. Refetch
-            // it so the UI sees the freshly-created row instead of null.
-            if (!subRes.data) {
-              subRes = await supabase
-                .from('subscriptions').select('*')
-                .eq('user_id', userId).eq('status', 'active').maybeSingle();
+        // Two attempts at the heal RPC with a small gap. Most failures
+        // here are PostgREST schema cache lag (404 on a freshly-deployed
+        // function) or a transient 503 on the auth.users read inside
+        // the SECURITY DEFINER body — both retry-able.
+        for (let attempt = 1; attempt <= 2; attempt += 1) {
+          if (profileRes.data) break;
+          console.warn(`[AuthProvider] profile fetch did not return a row, calling ensure_profile RPC (attempt ${attempt})`, {
+            had_error: !!profileRes.error,
+          });
+          const heal = await supabase.rpc('ensure_profile');
+          if (heal.error) {
+            console.error(`[AuthProvider] ensure_profile RPC failed (attempt ${attempt}):`, heal.error);
+            if (attempt < 2) await new Promise((r) => setTimeout(r, 800));
+            continue;
+          }
+          if (heal.data) {
+            // PostgREST may wrap a single-composite return as an array — handle both.
+            const row = Array.isArray(heal.data) ? heal.data[0] : heal.data;
+            if (row) {
+              profileRes = { data: row, error: null };
+              // The RPC also makes sure a free subscription exists. Refetch
+              // it so the UI sees the freshly-created row instead of null.
+              if (!subRes.data) {
+                subRes = await supabase
+                  .from('subscriptions').select('*')
+                  .eq('user_id', userId).eq('status', 'active').maybeSingle();
+              }
+              break;
             }
+          }
+        }
+
+        // Last-ditch: even if the RPC didn't hand us a row directly, the
+        // INSERT it ran is committed — re-SELECT one more time. Some
+        // PostgREST builds drop the composite-row return value silently
+        // when search_path resolution misses a recently-added column,
+        // but the row IS in the table.
+        if (!profileRes.data) {
+          await new Promise((r) => setTimeout(r, 400));
+          profileRes = await supabase
+            .from('profiles').select('*').eq('id', userId).maybeSingle();
+          if (profileRes.data) {
+            console.info('[AuthProvider] post-heal SELECT recovered the profile row');
           }
         }
       }
