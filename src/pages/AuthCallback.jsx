@@ -112,6 +112,13 @@ export default function AuthCallback() {
       }
     });
 
+    // Tracks whether exchangeCodeForSession has settled (either with a
+    // session, or with an error we've already handled). Read by the
+    // 8-second safety-net check below to decide whether to extend or
+    // finalize. Declared up here because the .then/.catch closures
+    // capture it before the getSession callback runs.
+    let exchangeSettled = false;
+
     // Eager check for already-cached sessions (e.g. user lands here after
     // already being signed in — refreshing the tab should not loop them
     // through the exchange again).
@@ -134,6 +141,7 @@ export default function AuthCallback() {
       if (!promise) return;
       promise
         .then(async ({ error }) => {
+          exchangeSettled = true;
           // Strip ?code=… from the URL whether or not the exchange succeeded
           // — it's burned either way, and leaving it in place would let a
           // refresh replay a dead code and produce the same error again.
@@ -146,6 +154,7 @@ export default function AuthCallback() {
           // On success the SIGNED_IN listener above handles navigation.
         })
         .catch(async (err) => {
+          exchangeSettled = true;
           cleanOAuthParamsFromUrl();
           console.error('[AuthCallback] exchangeCodeForSession threw:', err);
           await purgeStalePkceState();
@@ -153,16 +162,47 @@ export default function AuthCallback() {
         });
     });
 
-    // Safety net: if no session arrives in 8s, route to /login. If we had a
-    // ?code= in the URL, the PKCE exchange silently failed — tell the user.
-    const timeout = setTimeout(() => {
+    // Safety net: if no session arrives in time, route to /login.
+    //
+    // Two-tier timeout because a single 8s deadline used to bounce real
+    // sign-ins on slow networks. The Supabase SDK's PKCE exchange does a
+    // POST → /auth/v1/token, which on flaky mobile data legitimately takes
+    // 6-12s; firing the safety-net at 8s would race a successful exchange
+    // and dump a "we couldn't complete sign-in" error onto a session that
+    // was actually minted moments later.
+    //
+    // First check at 8s: if the exchange promise is STILL in flight, give
+    // it more time (extend to 20s total). Only declare failure when the
+    // exchange has either already settled-with-no-session, or both checks
+    // expire. The user sees "Signing you in…" the whole time, which is
+    // the correct copy.
+    const FIRST_CHECK_MS = 8000;
+    const HARD_DEADLINE_MS = 20000;
+    const startedAt = Date.now();
+    const tryFinalize = () => {
       go('/login', code
         ? { error: "We couldn't complete sign-in. Please try again." }
         : undefined);
-    }, 8000);
+    };
+    const timeoutFirst = setTimeout(() => {
+      // If the exchange already settled (and nav already happened), this
+      // is a no-op via the `settled` guard inside go(). If the exchange
+      // is still pending, extend — don't give up on a slow but live
+      // request. If we never had a code (user landed here directly), no
+      // exchange is in flight, so go straight to /login.
+      if (!code || exchangeSettled) {
+        tryFinalize();
+        return;
+      }
+      // Exchange still in flight — log once so a stuck exchange is
+      // visible in DevTools, then arm a hard deadline.
+      console.warn(`[AuthCallback] PKCE exchange still pending after ${Math.round((Date.now() - startedAt) / 1000)}s; extending`);
+    }, FIRST_CHECK_MS);
+    const timeout = setTimeout(tryFinalize, HARD_DEADLINE_MS);
 
     return () => {
       subscription.unsubscribe();
+      clearTimeout(timeoutFirst);
       clearTimeout(timeout);
     };
   }, [navigate]);

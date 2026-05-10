@@ -32,10 +32,19 @@ export function friendlyError(err, fallback = 'Something went wrong.') {
   const message = err.message ?? String(err);
   const status  = err.context?.status;
 
-  // FunctionsFetchError fires when the edge function URL is unreachable
-  // (most often: not deployed, or local dev not running).
+  // FunctionsFetchError fires when the edge function URL is unreachable.
+  // 99% of real-user hits are network blips — phone walked into a tunnel,
+  // wifi dropped, captive portal expired. The "backend may not be deployed
+  // yet" copy was a dev-mode footgun: it scared end users by implying the
+  // app itself was broken. The "not deployed" branch only matters in local
+  // dev, where navigator.onLine === true AND the request still failed to
+  // reach localhost:54321 — distinguish that from a real offline state and
+  // show appropriate copy for each.
   if (name === 'FunctionsFetchError' || /Failed to send a request/.test(message)) {
-    return 'Payment service unavailable. The backend may not be deployed yet — try again in a moment.';
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      return "Looks like you're offline. Check your connection and try again.";
+    }
+    return "We couldn't reach the server. Check your connection and try again in a moment.";
   }
 
   // Rate-limited (429). The server returns a friendlier per-endpoint message

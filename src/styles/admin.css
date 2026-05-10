@@ -1432,3 +1432,182 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* ── Section sub-headers & filter tabs (within SurveyPanel) ──────────── */
+.admin-shell .admin-survey-section-title {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  margin: 18px 18px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-shell .admin-survey-section-count {
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--ink-soft);
+  background: rgba(43, 33, 24, 0.08);
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.admin-shell .admin-survey-respondents-head {
+  padding: 0 18px;
+}
+.admin-shell .admin-survey-filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 10px;
+}
+.admin-shell .admin-survey-filter-tab {
+  border: 1px solid rgba(43, 33, 24, 0.14);
+  background: var(--paper, #fff);
+  color: var(--ink);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.admin-shell .admin-survey-filter-tab:hover:not(:disabled) {
+  border-color: rgba(232, 122, 122, 0.5);
+}
+.admin-shell .admin-survey-filter-tab.is-active {
+  background: var(--coral, #e87a7a);
+  border-color: var(--coral, #e87a7a);
+  color: #fff;
+}
+.admin-shell .admin-survey-filter-tab:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.admin-shell .admin-survey-filter-count {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.7;
+}
+.admin-shell .admin-survey-filter-tab.is-active .admin-survey-filter-count {
+  opacity: 0.9;
+}
+
+/* ── Per-respondent rows ─────────────────────────────────────────────── */
+.admin-shell .admin-survey-respondents {
+  list-style: none;
+  margin: 0;
+  padding: 0 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.admin-shell .admin-survey-respondent {
+  padding: 12px 14px;
+  background: var(--cream-deep);
+  border: 1px solid rgba(43, 33, 24, 0.06);
+  border-radius: 12px;
+}
+.admin-shell .admin-survey-respondent-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.admin-shell .admin-survey-respondent-feeling {
+  font-size: 18px;
+  line-height: 1;
+}
+.admin-shell .admin-survey-respondent-who {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 800;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 1.5px dotted transparent;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.admin-shell .admin-survey-respondent-who:hover {
+  color: var(--coral, #e87a7a);
+  border-bottom-color: rgba(232, 122, 122, 0.5);
+}
+.admin-shell .admin-survey-respondent-plan {
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.admin-shell .admin-survey-respondent-plan-paid {
+  background: rgba(96, 156, 96, 0.15);
+  color: rgb(70, 110, 70);
+  border: 1px solid rgba(96, 156, 96, 0.35);
+}
+.admin-shell .admin-survey-respondent-plan-free {
+  background: rgba(43, 33, 24, 0.05);
+  color: var(--ink-soft);
+  border: 1px solid rgba(43, 33, 24, 0.12);
+}
+.admin-shell .admin-survey-respondent-meta {
+  color: var(--ink-soft);
+  font-size: 12px;
+  margin-left: auto;
+}
+.admin-shell .admin-survey-respondent-meta strong {
+  color: var(--ink);
+  font-weight: 800;
+}
+.admin-shell .admin-survey-respondent-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+.admin-shell .admin-survey-respondent-email {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+.admin-shell .admin-survey-respondent-stats {
+  font-weight: 600;
+}
+.admin-shell .admin-survey-respondent-note {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  background: var(--paper, #fff);
+  border-left: 3px solid var(--coral, #e87a7a);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.45;
+  font-style: italic;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+@media (max-width: 540px) {
+  .admin-shell .admin-survey-respondent-meta {
+    margin-left: 0;
+    width: 100%;
+  }
+  .admin-shell .admin-survey-respondent-email {
+    max-width: 100%;
+  }
+}

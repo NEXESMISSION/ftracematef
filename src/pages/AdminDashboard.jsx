@@ -861,10 +861,15 @@ const SURVEY_SOURCE_LABEL = {
 };
 const labelForSource = (id) => SURVEY_SOURCE_LABEL[id] ?? id;
 
-function SurveyPanel({ users }) {
-  const { rows, totals, notes } = useMemo(() => {
+function SurveyPanel({ users, onPickUser }) {
+  // Filter state for the respondents table. 'all' = every respondent;
+  // a specific feeling key narrows down. Re-renders cheaply since we
+  // recompute the filtered slice in the same useMemo as the rollup.
+  const [filter, setFilter] = useState('all');
+
+  const { rows, totals, respondents } = useMemo(() => {
     if (!Array.isArray(users)) {
-      return { rows: [], totals: { responses: 0, eligible: 0 }, notes: [] };
+      return { rows: [], totals: { responses: 0, eligible: 0 }, respondents: [] };
     }
     // Eligible = users who have ever reached /trace and therefore had the
     // chance to see the survey. Proxy: free_sessions_used > 0 (any free
@@ -877,7 +882,7 @@ function SurveyPanel({ users }) {
     let responses = 0;
     const bySource = new Map();
     const byFeeling = Object.fromEntries(SURVEY_FEELING_ORDER.map((f) => [f, 0]));
-    const noteList = [];
+    const respondentList = [];
 
     for (const u of users) {
       const reachedTrace = !!u?.is_paid || (Number(u?.free_sessions_used ?? 0) > 0);
@@ -894,32 +899,44 @@ function SurveyPanel({ users }) {
 
       if (feeling in byFeeling) byFeeling[feeling] += 1;
 
-      if (u.exit_survey_note) {
-        noteList.push({
-          id: u.id,
-          email: u.email,
-          display_name: u.display_name,
-          source: src,
-          feeling,
-          note: u.exit_survey_note,
-          at: u.exit_survey_at,
-        });
-      }
+      // EVERY respondent goes here, not just those with notes. The
+      // operator wants to see who answered + what they said even if
+      // they didn't leave a free-form comment.
+      respondentList.push({
+        id: u.id,
+        email: u.email,
+        display_name: u.display_name,
+        plan: u.plan ?? null,
+        is_paid: !!u.is_paid,
+        trace_sessions: u.trace_sessions ?? 0,
+        total_trace_seconds: u.total_trace_seconds ?? 0,
+        signup_source: u.signup_source ?? null,
+        source: src,
+        feeling,
+        note: u.exit_survey_note ?? null,
+        at: u.exit_survey_at,
+      });
     }
 
     const list = Array.from(bySource.values()).sort((a, b) => b.total - a.total);
-    // Newest notes first — fresh feedback is the most actionable.
-    noteList.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+    // Newest first — fresh feedback is the most actionable.
+    respondentList.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
     return {
       rows: list,
       totals: { responses, eligible, byFeeling },
-      notes: noteList,
+      respondents: respondentList,
     };
   }, [users]);
 
   const responseRate = totals.eligible > 0
     ? Math.round((totals.responses / totals.eligible) * 100)
     : 0;
+
+  const filteredRespondents = useMemo(() => {
+    if (filter === 'all') return respondents;
+    if (filter === 'with-note') return respondents.filter((r) => !!r.note);
+    return respondents.filter((r) => r.feeling === filter);
+  }, [respondents, filter]);
 
   return (
     <section className="admin-stats" aria-labelledby="admin-survey-title">
@@ -967,7 +984,8 @@ function SurveyPanel({ users }) {
             })}
           </div>
 
-          <div className="admin-acq-table" role="table" style={{ marginTop: 18 }}>
+          <h3 className="admin-survey-section-title">Source breakdown</h3>
+          <div className="admin-acq-table" role="table">
             <div className="admin-acq-row admin-acq-head" role="row">
               <span role="columnheader">Source</span>
               <span role="columnheader">Total</span>
@@ -988,32 +1006,83 @@ function SurveyPanel({ users }) {
             ))}
           </div>
 
-          {notes.length > 0 && (
-            <div className="admin-survey-notes">
-              <h3 className="admin-survey-notes-title">Recent free-form notes</h3>
-              <ul className="admin-survey-notes-list">
-                {notes.slice(0, 8).map((n) => {
-                  const meta = SURVEY_FEELING_LABEL[n.feeling] ?? null;
-                  return (
-                    <li key={n.id} className="admin-survey-note">
-                      <div className="admin-survey-note-head">
-                        <span className="admin-survey-note-emoji" aria-hidden="true">
-                          {meta?.emoji ?? '💬'}
-                        </span>
-                        <span className="admin-survey-note-who">
-                          {n.display_name || n.email || 'unknown'}
-                        </span>
-                        <span className="admin-survey-note-meta">
-                          {labelForSource(n.source)} · {meta?.label ?? n.feeling} · {formatRelative(n.at)}
-                        </span>
-                      </div>
-                      <p className="admin-survey-note-body">{n.note}</p>
-                    </li>
-                  );
-                })}
-              </ul>
+          <div className="admin-survey-respondents-head">
+            <h3 className="admin-survey-section-title">
+              Respondents <span className="admin-survey-section-count">{filteredRespondents.length}</span>
+            </h3>
+            <div className="admin-survey-filter-tabs" role="tablist" aria-label="Filter respondents">
+              {[
+                { id: 'all',       label: 'All',         count: respondents.length },
+                { id: 'loved',     label: '🤩 Loved',    count: totals.byFeeling.loved },
+                { id: 'liked',     label: '🙂 Liked',    count: totals.byFeeling.liked },
+                { id: 'mixed',     label: '😐 Mixed',    count: totals.byFeeling.mixed },
+                { id: 'disliked',  label: '😕 Off',      count: totals.byFeeling.disliked },
+                { id: 'with-note', label: '💬 With note',count: respondents.filter((r) => !!r.note).length },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={filter === t.id}
+                  className={`admin-survey-filter-tab ${filter === t.id ? 'is-active' : ''}`}
+                  onClick={() => setFilter(t.id)}
+                  disabled={t.count === 0}
+                >
+                  {t.label} <span className="admin-survey-filter-count">{t.count}</span>
+                </button>
+              ))}
             </div>
-          )}
+          </div>
+
+          <ul className="admin-survey-respondents">
+            {filteredRespondents.map((r) => {
+              const meta = SURVEY_FEELING_LABEL[r.feeling] ?? null;
+              const planLabel = r.is_paid && r.plan
+                ? PLAN_LABEL[r.plan] ?? r.plan
+                : (r.plan === 'free' || !r.plan ? 'Free' : (PLAN_LABEL[r.plan] ?? r.plan));
+              const planTone = r.is_paid ? 'paid' : 'free';
+              return (
+                <li key={r.id} className="admin-survey-respondent">
+                  <div className="admin-survey-respondent-head">
+                    <span className="admin-survey-respondent-feeling" aria-hidden="true">
+                      {meta?.emoji ?? '💬'}
+                    </span>
+                    <button
+                      type="button"
+                      className="admin-survey-respondent-who"
+                      onClick={() => onPickUser?.(r.id)}
+                      title={r.email || ''}
+                    >
+                      {r.display_name || (r.email ? r.email.split('@')[0] : 'unknown')}
+                    </button>
+                    <span className={`admin-survey-respondent-plan admin-survey-respondent-plan-${planTone}`}>
+                      {planLabel}
+                    </span>
+                    <span className="admin-survey-respondent-meta">
+                      <strong>{labelForSource(r.source)}</strong>
+                      {' · '}
+                      {meta?.label ?? r.feeling}
+                      {' · '}
+                      {formatRelative(r.at)}
+                    </span>
+                  </div>
+                  <div className="admin-survey-respondent-sub">
+                    <span className="admin-survey-respondent-email" title={r.email || ''}>
+                      {r.email || '—'}
+                    </span>
+                    <span className="admin-survey-respondent-stats">
+                      {r.trace_sessions} {r.trace_sessions === 1 ? 'session' : 'sessions'}
+                      {r.total_trace_seconds > 0 && ` · ${formatDuration(r.total_trace_seconds)} traced`}
+                      {r.signup_source && ` · first-touch: ${labelForSource(r.signup_source)}`}
+                    </span>
+                  </div>
+                  {r.note && (
+                    <p className="admin-survey-respondent-note">"{r.note}"</p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </>
       )}
     </section>
@@ -1523,6 +1592,7 @@ export default function AdminDashboard() {
           {[
             { id: 'users',   label: 'Users' },
             { id: 'stats',   label: 'Stats' },
+            { id: 'survey',  label: 'Survey' },
             { id: 'traffic', label: 'Traffic' },
           ].map((v) => (
             <button
@@ -1542,8 +1612,26 @@ export default function AdminDashboard() {
           <>
             <StatsPanel stats={meta.stats} error={meta.error} loading={meta.loading} />
             <AcquisitionPanel users={users} />
-            <SurveyPanel users={users} />
           </>
+        )}
+        {view === 'survey' && (
+          <SurveyPanel
+            users={users}
+            onPickUser={(uid) => {
+              // Pivot the dashboard to the matching user row in the
+              // Users tab so the operator can read their full activity
+              // log without clicking back and forth between sections.
+              setView('users');
+              setExpanded(uid);
+              // Scroll the user-list anchor into view on the next frame —
+              // setView swaps the rendered tree synchronously but the new
+              // section's DOM node isn't laid out until React commits.
+              requestAnimationFrame(() => {
+                const card = document.querySelector(`[data-user-id="${uid}"]`);
+                if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              });
+            }}
+          />
         )}
         {view === 'traffic' && <TrafficPanel />}
 
@@ -1638,6 +1726,7 @@ export default function AdminDashboard() {
               return (
                 <li
                   key={u.id}
+                  data-user-id={u.id}
                   className={`admin-row ${isOpen ? 'is-open' : ''} ${tracing ? 'is-tracing' : ''}`}
                 >
                   <div className="admin-row-main">

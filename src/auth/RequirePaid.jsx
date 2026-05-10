@@ -46,13 +46,23 @@ export default function RequirePaid({ children }) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
+  // Auth has settled but the profile row hasn't loaded. Bouncing to
+  // /account routes the user into <ProfileRecover />, which has the
+  // backoff retries + manual escape hatch. Without this, the !isPaid
+  // branch below would fall through to <Paywall trialUsed={false} />,
+  // which is misleading: the user isn't actually trial-used, the app
+  // just couldn't fetch their plan yet. Re-rendering the universal
+  // recover surface keeps the diagnostic story in one place.
+  if (!profile) {
+    return <Navigate to="/account" state={{ from: location.pathname }} replace />;
+  }
+
   // Universal survey gate — runs before the paid/free branch so every
   // user (paid + first-time free + trial-used free) hits it once. Required
   // (no skip path); the survey only stamps exit_survey_at on a real submit
   // and re-renders on every /trace visit until the user actually answers.
   const surveyPending =
-    profile
-    && !profile.exit_survey_at
+    !profile.exit_survey_at
     && !surveyDoneLocal;
   if (surveyPending) {
     return <ExitSurvey onDone={() => setSurveyDoneLocal(true)} />;
