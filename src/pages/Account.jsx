@@ -466,6 +466,35 @@ function ProfileRecover({ refresh, signOut }) {
     return () => clearTimeout(t);
   }, [attempt, refresh, showManual]);
 
+  // Reset this device: nuke every per-user key the app has stored
+  // locally, then sign out. The single-session enforcement (tm:session-id)
+  // can deadlock a device against itself if a claim_session RPC raced
+  // and the local sid no longer matches the DB stamp — clearing
+  // localStorage gives us a guaranteed clean slate so the next sign-in
+  // mints a fresh sid. Also clears trace stats / pending image / intent
+  // plan / pre-checkout snapshot so a stuck device doesn't carry stale
+  // state into the next signed-in user.
+  const handleReset = async () => {
+    try {
+      // Walk localStorage rather than removing fixed keys — covers the
+      // tm:session-id, tm:traceStats:*, tm:ref / tm:ref-campaign keys,
+      // PLUS Supabase's own sb-…-auth-token + sb-…-auth-token-code-verifier.
+      // Anything tracemate-related goes; anything supabase-related goes.
+      const drop = [];
+      for (let i = 0; i < window.localStorage.length; i += 1) {
+        const k = window.localStorage.key(i);
+        if (!k) continue;
+        if (k.startsWith('tm:') || k.startsWith('sb-')) drop.push(k);
+      }
+      drop.forEach((k) => window.localStorage.removeItem(k));
+      // sessionStorage too, on the off-chance a checkout snapshot is in flight.
+      window.sessionStorage.clear();
+    } catch { /* ignore quota / private mode */ }
+    try { await signOut(); } catch { /* signOut already redirects */ }
+    // signOut hard-replaces to /login; only fall through if it threw.
+    window.location.replace('/login');
+  };
+
   return (
     <div className="studio-shell">
       <header className="studio-bar">
@@ -481,8 +510,9 @@ function ProfileRecover({ refresh, signOut }) {
         {showManual && (
           <>
             <p style={{ color: 'var(--ink-soft)', fontSize: 13.5, marginTop: 14, marginBottom: 20, textAlign: 'center', maxWidth: 380, lineHeight: 1.5 }}>
-              Hmm, this is taking longer than usual. A refresh almost
-              always sorts it.
+              Hmm, this is taking longer than usual. A reload almost
+              always sorts it. If it doesn't, reset this device and
+              sign back in.
             </p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
               <button
@@ -491,6 +521,13 @@ function ProfileRecover({ refresh, signOut }) {
                 onClick={() => window.location.reload()}
               >
                 Reload page
+              </button>
+              <button
+                type="button"
+                className="profile-btn"
+                onClick={handleReset}
+              >
+                Reset this device
               </button>
               <button
                 type="button"

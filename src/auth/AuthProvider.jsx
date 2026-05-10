@@ -120,6 +120,15 @@ export function AuthProvider({ children }) {
         // here are PostgREST schema cache lag (404 on a freshly-deployed
         // function) or a transient 503 on the auth.users read inside
         // the SECURITY DEFINER body — both retry-able.
+        //
+        // Permanent failures we DON'T retry:
+        //   - errcode P0002 from ensure_profile = "auth user not found"
+        //     (ghost session — JWT outlived its auth.users row). Force
+        //     a local sign-out so the next page load starts clean
+        //     instead of looping the 30 s recover screen.
+        //   - PostgREST PGRST202 = function not found. Migration drift;
+        //     no point retrying, log loudly and bail.
+        let permanentFailure = null;
         for (let attempt = 1; attempt <= 2; attempt += 1) {
           if (profileRes.data) break;
           console.warn(`[AuthProvider] profile fetch did not return a row, calling ensure_profile RPC (attempt ${attempt})`, {
@@ -128,13 +137,34 @@ export function AuthProvider({ children }) {
           const heal = await supabase.rpc('ensure_profile');
           if (heal.error) {
             console.error(`[AuthProvider] ensure_profile RPC failed (attempt ${attempt}):`, heal.error);
+            const code = heal.error.code;
+            // Postgres P0002 = no_data_found, raised by ensure_profile()
+            // when auth.users has no row for this uid. PostgREST surfaces
+            // this with code "P0002" or sometimes "23503" if the FK trip
+            // happens at the INSERT layer.
+            if (code === 'P0002' || code === '23503' || /auth user .* not found/i.test(heal.error.message ?? '')) {
+              permanentFailure = 'ghost-session';
+              break;
+            }
+            // PGRST202 = "Could not find the function in the schema cache".
+            // Means the migration adding ensure_profile() hasn't been
+            // pushed to this project. Retrying won't help.
+            if (code === 'PGRST202') {
+              permanentFailure = 'rpc-missing';
+              break;
+            }
             if (attempt < 2) await new Promise((r) => setTimeout(r, 800));
             continue;
           }
           if (heal.data) {
             // PostgREST may wrap a single-composite return as an array — handle both.
             const row = Array.isArray(heal.data) ? heal.data[0] : heal.data;
-            if (row) {
+            // Reject null-record returns. The hardened ensure_profile()
+            // RAISES instead of returning a null record, but older
+            // deploys without the migration applied could still send
+            // back { id: null, email: null, ... } — treat it as a
+            // failure so we don't store fake profile state.
+            if (row && row.id) {
               profileRes = { data: row, error: null };
               // The RPC also makes sure a free subscription exists. Refetch
               // it so the UI sees the freshly-created row instead of null.
@@ -144,8 +174,29 @@ export function AuthProvider({ children }) {
                   .eq('user_id', userId).eq('status', 'active').maybeSingle();
               }
               break;
+            } else if (row) {
+              console.warn('[AuthProvider] ensure_profile returned a null-record (likely pre-harden migration) — ignoring');
             }
           }
+        }
+
+        if (permanentFailure === 'ghost-session') {
+          // The JWT references a deleted user. Wipe local auth and
+          // bounce — the user will land on /login and can sign in
+          // fresh. Without this they'd sit on the recover screen
+          // burning a network round-trip every couple of seconds
+          // until they eventually reload manually.
+          console.warn('[AuthProvider] ghost session detected — forcing local sign-out');
+          try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
+          setProfile(null);
+          setSubscription(null);
+          return false;
+        }
+        if (permanentFailure === 'rpc-missing') {
+          console.error('[AuthProvider] ensure_profile RPC is missing — the harden migration has not been applied to this project');
+          // Fall through to set state to null; the user will see the
+          // recover screen with manual buttons. Nothing more we can do
+          // from the client.
         }
 
         // Last-ditch: even if the RPC didn't hand us a row directly, the
@@ -153,7 +204,7 @@ export function AuthProvider({ children }) {
         // PostgREST builds drop the composite-row return value silently
         // when search_path resolution misses a recently-added column,
         // but the row IS in the table.
-        if (!profileRes.data) {
+        if (!profileRes.data && !permanentFailure) {
           await new Promise((r) => setTimeout(r, 400));
           profileRes = await supabase
             .from('profiles').select('*').eq('id', userId).maybeSingle();
@@ -450,6 +501,9 @@ export function AuthProvider({ children }) {
     let pollDelay = POLL_MIN_MS;
     let pollStartedAt = 0;
     let connected = false;
+    // Debounce for the profile-row UPDATE handler. Prevents the per-60s
+    // heartbeat from triggering a full loadUserData() each tick.
+    let lastProfileReloadAt = 0;
 
     const stopPolling = () => {
       if (pollTimer != null) {
@@ -500,10 +554,25 @@ export function AuthProvider({ children }) {
         // current_session_id and we can react within a second instead of
         // waiting for the next poll. loadUserData runs the comparison and
         // calls forceSignOutSuperseded when the value no longer matches.
+        //
+        // Coalesce repeated UPDATEs so the per-60s heartbeat
+        // (touch_last_seen → last_seen_at) doesn't fan out into a fresh
+        // SELECT-retry-RPC chain every minute. Same goes for trace heart-
+        // beats, exit-survey writes, free-session consume, and journey
+        // stamps — none of those touch the columns we actually re-read
+        // for here. We ignore an UPDATE event entirely if it lands within
+        // 1 s of the last reload, on the bet that an actual single-session
+        // takeover from another device almost always settles in a single
+        // event and we'll catch the value on the next user-driven nav.
         .on(
           'postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
-          () => loadUserData(userId),
+          () => {
+            const now = Date.now();
+            if (now - lastProfileReloadAt < 1000) return;
+            lastProfileReloadAt = now;
+            loadUserData(userId);
+          },
         )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
