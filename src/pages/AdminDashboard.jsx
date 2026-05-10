@@ -837,6 +837,30 @@ const SURVEY_FEELING_LABEL = {
 };
 const SURVEY_FEELING_ORDER = ['loved', 'liked', 'mixed', 'disliked'];
 
+// Friendly labels for the source IDs the client sends (mirrored in the
+// record_exit_survey whitelist). Anything not listed here falls back to
+// the raw id — happens for legacy values or migrations that lag the UI.
+const SURVEY_SOURCE_LABEL = {
+  ai:        'AI assistant',
+  tiktok:    'TikTok',
+  instagram: 'Instagram',
+  youtube:   'YouTube',
+  reddit:    'Reddit',
+  twitter:   'X / Twitter',
+  facebook:  'Facebook',
+  pinterest: 'Pinterest',
+  threads:   'Threads',
+  linkedin:  'LinkedIn',
+  discord:   'Discord',
+  google:    'Search engine',
+  blog:      'Blog / article',
+  podcast:   'Podcast',
+  app_store: 'App store',
+  friend:    'A friend',
+  other:     'Somewhere else',
+};
+const labelForSource = (id) => SURVEY_SOURCE_LABEL[id] ?? id;
+
 function SurveyPanel({ users }) {
   const { rows, totals, notes } = useMemo(() => {
     if (!Array.isArray(users)) {
@@ -954,7 +978,7 @@ function SurveyPanel({ users }) {
             </div>
             {rows.map((r) => (
               <div key={r.source} className="admin-acq-row" role="row">
-                <span className="admin-acq-source" role="cell">{r.source}</span>
+                <span className="admin-acq-source" role="cell">{labelForSource(r.source)}</span>
                 <span role="cell">{r.total}</span>
                 <span role="cell">{r.loved}</span>
                 <span role="cell">{r.liked}</span>
@@ -980,7 +1004,7 @@ function SurveyPanel({ users }) {
                           {n.display_name || n.email || 'unknown'}
                         </span>
                         <span className="admin-survey-note-meta">
-                          {n.source} · {meta?.label ?? n.feeling} · {formatRelative(n.at)}
+                          {labelForSource(n.source)} · {meta?.label ?? n.feeling} · {formatRelative(n.at)}
                         </span>
                       </div>
                       <p className="admin-survey-note-body">{n.note}</p>

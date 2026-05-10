@@ -2485,10 +2485,13 @@
   gap: 8px;
 }
 .exit-survey-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   border: 1.5px solid rgba(43, 33, 24, 0.14);
   background: var(--paper);
   color: var(--ink);
-  padding: 9px 16px;
+  padding: 9px 14px 9px 12px;
   border-radius: 999px;
   font-family: 'Nunito', sans-serif;
   font-size: 13.5px;
@@ -2508,6 +2511,28 @@
   box-shadow: 0 6px 14px -6px rgba(232, 122, 122, 0.6);
 }
 .exit-survey-chip:disabled { opacity: 0.55; cursor: default; }
+/* Icon slot — fixed 16px box keeps the visual rhythm steady across a
+   row of mixed-width labels. SVGs inherit currentColor so they recolor
+   correctly against both default and active states. */
+.exit-survey-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+.exit-survey-chip-icon > svg { display: block; }
+/* Highlight the first option (AI assistant) with a soft coral wash so
+   users notice the new acquisition channel without us shouting. The
+   override stays muted enough that hover/active still read correctly. */
+.exit-survey-chip:first-child:not(.is-active) {
+  border-color: rgba(232, 122, 122, 0.35);
+  background: linear-gradient(135deg, rgba(232, 122, 122, 0.08), rgba(232, 122, 122, 0.02));
+}
+.exit-survey-chip:first-child:not(.is-active) .exit-survey-chip-icon {
+  color: var(--coral);
+}
 
 /* Feelings — bigger emoji-led cards in a 4-up grid that collapses to 2-up
    on narrow phones. Hint line under the label gives each option a little
