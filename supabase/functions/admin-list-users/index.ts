@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
   // about than the foreign-key embed magic.
   const { data: profiles, error: profErr } = await admin
     .from('profiles')
-    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at, dodo_customer_id, total_trace_seconds, trace_sessions, first_trace_at, last_trace_at, current_page, current_image_label, current_run_id, signup_landing, signup_referrer, signup_source, signup_campaign, first_pricing_at, first_paywall_at, first_checkout_at, exit_survey_at, exit_survey_source, exit_survey_feeling, exit_survey_note')
+    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at, dodo_customer_id, total_trace_seconds, trace_sessions, first_trace_at, last_trace_at, current_page, current_image_label, current_run_id, signup_landing, signup_referrer, signup_source, signup_campaign, first_pricing_at, first_paywall_at, first_checkout_at, last_checkout_at, last_checkout_plan, exit_survey_at, exit_survey_source, exit_survey_feeling, exit_survey_note')
     .order('created_at', { ascending: false })
     .limit(2000);
   if (profErr) return json({ error: profErr.message }, 500);
@@ -221,6 +221,13 @@ Deno.serve(async (req) => {
       first_pricing_at:    p.first_pricing_at ?? null,
       first_paywall_at:    p.first_paywall_at ?? null,
       first_checkout_at:   p.first_checkout_at ?? null,
+      // Latest checkout attempt + which plan they opened on Dodo. Sticky
+      // null for users who signed up before 20260513000000_last_checkout_plan
+      // landed AND for any pre-existing first_checkout_at row that never
+      // saw a re-attempt — the admin UI falls back to a generic "Bailed
+      // checkout" pill in that case.
+      last_checkout_at:    p.last_checkout_at ?? null,
+      last_checkout_plan:  p.last_checkout_plan ?? null,
       // Exit-survey answers — sparse stamps written once when the user
       // answers the post-trial survey just before the paywall. Drives the
       // SurveyPanel rollup on the admin dashboard.

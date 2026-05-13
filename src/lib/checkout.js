@@ -16,9 +16,12 @@ export async function startCheckout(plan) {
   if (!data?.checkout_url) throw new Error('No checkout_url returned from Edge Function');
   // Stamp first checkout open BEFORE returning the URL so the journey
   // funnel records "user clicked through to Dodo" even if the user never
-  // makes it to the payment page (Dodo outage, browser back, etc.). Fire-
-  // and-forget; idempotent on the server side.
-  supabase.rpc('mark_journey_event', { p_event: 'checkout' }).then(() => {}, () => {});
+  // makes it to the payment page (Dodo outage, browser back, etc.). Pass
+  // the chosen plan so a "Bailed checkout" row in /admin-me shows which
+  // plan they tried — without it the operator only sees "they bailed",
+  // not whether it was a $7/mo or $25 lifetime conversation. Fire-and-
+  // forget; the RPC whitelists known plan ids server-side.
+  supabase.rpc('mark_journey_event', { p_event: 'checkout', p_plan: plan }).then(() => {}, () => {});
   return data.checkout_url;
 }
 

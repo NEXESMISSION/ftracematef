@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { listAllUsers, getUserActivity, getAdminStats } from '../lib/admin.js';
 import { friendlyError } from '../lib/errors.js';
 import { usePresence } from '../hooks/usePresence.js';
-import { PLAN_LABEL } from '../lib/plans.js';
+import { PLAN_LABEL, PLAN_BY_ID } from '../lib/plans.js';
 import { ANALYTICS_PROVIDER, ANALYTICS_EMBED_URL } from '../lib/analytics.js';
 import { formatDuration, formatRelative as formatTraceRelative } from '../lib/traceStats.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
@@ -1350,11 +1350,19 @@ function ActivityPanel({ user }) {
       });
     }
     if (user.first_checkout_at) {
+      // Show the latest plan they opened on Dodo when we have it — for
+      // "Bailed checkout" rows this is the most actionable signal on the
+      // timeline (e.g. follow-up email pitches the same plan they tried).
+      const planName = user.last_checkout_plan
+        ? (PLAN_BY_ID[user.last_checkout_plan]?.name ?? user.last_checkout_plan)
+        : null;
       out.push({
         kind: 'journey-warm',
         at: user.first_checkout_at,
-        title: 'Opened Dodo checkout',
-        detail: null,
+        title: planName ? `Opened Dodo checkout — ${planName}` : 'Opened Dodo checkout',
+        detail: user.last_checkout_at && user.last_checkout_at !== user.first_checkout_at
+          ? `Latest attempt ${formatDate(user.last_checkout_at)}`
+          : null,
       });
     }
     return out;
@@ -1768,12 +1776,22 @@ export default function AdminDashboard() {
                         const stage = userStage(u);
                         if (stage === 'paid') return null;  // 'Paid' pill above already says it
                         const def = STAGE_DEFS[stage];
+                        // For 'warm' (Bailed checkout) rows, append the plan
+                        // they tried — pre-migration rows have no plan and
+                        // fall back to the generic label.
+                        let label = def.label;
+                        let title = def.blurb;
+                        if (stage === 'warm' && u.last_checkout_plan) {
+                          const planName = PLAN_BY_ID[u.last_checkout_plan]?.name ?? u.last_checkout_plan;
+                          label = `Bailed ${planName}`;
+                          title = `${def.blurb} — opened ${PLAN_LABEL[u.last_checkout_plan] ?? planName} on Dodo`;
+                        }
                         return (
                           <span
                             className={`admin-pill admin-pill-stage admin-pill-${def.tone}`}
-                            title={def.blurb}
+                            title={title}
                           >
-                            {def.label}
+                            {label}
                           </span>
                         );
                       })()}
