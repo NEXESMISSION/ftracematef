@@ -7,6 +7,7 @@ import { consumeFreeSession, trialAlreadyConsumedThisVisit } from '../lib/freeTr
 import { setPresence, clearPresence } from '../lib/presence.js';
 import { setTracing } from '../lib/tracing-state.js';
 import { startRecording, isRecordingSupported } from '../lib/recorder.js';
+import ExitSurvey from '../components/ExitSurvey.jsx';
 import {
   cssMatrix3d,
   identityCorners,
@@ -382,6 +383,23 @@ export default function Trace() {
   // close so end_trace_run can mark the run (and the user's recorded-session
   // count) as having produced a saved clip.
   const recordedRef   = useRef(false);
+
+  // Survey gate: show the one-question survey modal on the SECOND /trace
+  // visit onward. We capture trace_sessions ONCE — the first time profile
+  // is non-null — so realtime updates that bump trace_sessions to 1 DURING
+  // the user's first session don't trigger the modal mid-trace. The image
+  // is preserved either way because the modal sits on top of <Trace />
+  // rather than replacing it (so pendingImage / imageUrl never unmount).
+  const initialTraceSessionsRef = useRef(null);
+  if (initialTraceSessionsRef.current === null && profile) {
+    initialTraceSessionsRef.current = Number(profile.trace_sessions ?? 0);
+  }
+  const [surveyDismissed, setSurveyDismissed] = useState(false);
+  const showSurveyModal =
+    initialTraceSessionsRef.current !== null
+    && initialTraceSessionsRef.current >= 1
+    && profile?.survey_completed_at == null
+    && !surveyDismissed;
   const accessTokenRef = useRef(null);
   useEffect(() => {
     accessTokenRef.current = session?.access_token || null;
@@ -1219,6 +1237,22 @@ export default function Trace() {
           </div>
         )}
       </footer>
+
+      {showSurveyModal && (
+        <div className="profile-modal trace-survey-modal" role="dialog" aria-modal="true" aria-labelledby="survey-q">
+          <div className="profile-modal-backdrop" />
+          <div className="profile-modal-card trace-survey-modal-card">
+            <ExitSurvey onDone={() => setSurveyDismissed(true)} />
+            <button
+              type="button"
+              className="trace-survey-skip"
+              onClick={() => setSurveyDismissed(true)}
+            >
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

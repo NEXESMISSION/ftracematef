@@ -13,7 +13,6 @@ import { formatDuration, formatRelative } from '../lib/traceStats.js';
 import { isAdminUser } from '../lib/admin.js';
 import { canUseFreeTrial, freeSessionsLeft } from '../lib/freeTrial.js';
 import Alert from '../components/Alert.jsx';
-import ExitSurvey from '../components/ExitSurvey.jsx';
 import { usePresence } from '../hooks/usePresence.js';
 
 const STATUS_TONE = {
@@ -678,11 +677,6 @@ export default function Account() {
 
         {/* ── Stats: scrapbook polaroids ── */}
         <StatsGrid stats={stats} memberSince={profile?.created_at} />
-
-        {/* ── One-time survey: shown only after first trace and only until answered. ── */}
-        {Number(profile?.trace_sessions ?? 0) >= 1 && !profile?.survey_completed_at && (
-          <ExitSurvey />
-        )}
 
         {/* ── Live Preview: stream the camera between two devices on this account ── */}
         <section className={`profile-live-card ${isPaid ? '' : 'is-locked'}`} aria-labelledby="live-card-title">
