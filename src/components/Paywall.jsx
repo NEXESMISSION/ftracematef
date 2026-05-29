@@ -2,8 +2,9 @@ import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { supabase } from '../lib/supabase.js';
-import { VISIBLE_PLANS } from '../lib/plans.js';
+import { VISIBLE_PLANS, PLAN_BY_ID } from '../lib/plans.js';
 import { usePlanCheckout } from '../hooks/usePlanCheckout.js';
+import { FREE_SESSION_LIMIT } from '../lib/freeTrial.js';
 
 // Paywall-specific copy decorations on top of the central plan catalog.
 // `equiv` is the small grey line under the price — anchors the value
@@ -68,6 +69,7 @@ export default function Paywall({ trialUsed = false }) {
   }, []);
 
   const greeting = profile?.display_name || user?.email?.split('@')[0] || 'friend';
+  const monthlyPrice = PLAN_BY_ID.monthly?.price ?? 7;
 
   return (
     <div className="studio-shell">
@@ -77,16 +79,16 @@ export default function Paywall({ trialUsed = false }) {
 
       <main className="studio-paywall">
         <p className="kicker hand">
-          {trialUsed ? `if it felt good, ${greeting} ✦` : `welcome, ${greeting} ✦`}
+          {trialUsed ? `nice work, ${greeting} ✦` : `welcome, ${greeting} ✦`}
         </p>
         <h1>
           {trialUsed
-            ? 'Your free traces are done — was it worth it?'
+            ? `You've made ${FREE_SESSION_LIMIT} awesome pieces`
             : 'One unlock. Every tool. Every device.'}
         </h1>
         <p className="lead">
           {trialUsed
-            ? "You used your free sessions. If it felt magical, here's how to keep going — pick a plan and trace forever, less than a coffee."
+            ? `Unlock unlimited high-res tracing for $${monthlyPrice}/month — try every paper, lighting setup, and character with no limits.`
             : 'Trace anything you can photograph — sketches, tattoos, murals, signs. Pick the plan that fits.'}
         </p>
 

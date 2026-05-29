@@ -378,6 +378,10 @@ export default function Trace() {
   const startedRef    = useRef(false);
   const endedRef      = useRef(false);
   const runIdRef      = useRef(null);
+  // Flips true the first time a recording is saved in this session; read on
+  // close so end_trace_run can mark the run (and the user's recorded-session
+  // count) as having produced a saved clip.
+  const recordedRef   = useRef(false);
   const accessTokenRef = useRef(null);
   useEffect(() => {
     accessTokenRef.current = session?.access_token || null;
@@ -387,6 +391,7 @@ export default function Trace() {
     if (!user?.id) return;
     endedRef.current = false;
     runIdRef.current = null;
+    recordedRef.current = false;
 
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const anonKey     = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -498,7 +503,7 @@ export default function Trace() {
             'apikey': anonKey,
             'Authorization': `Bearer ${accessToken}`,
           },
-          body: JSON.stringify({ p_run_id: runId, p_reason: reason }),
+          body: JSON.stringify({ p_run_id: runId, p_reason: reason, p_recorded: recordedRef.current }),
         }).catch((err) => console.warn('[trace] end_trace_run failed:', err));
       } catch (err) {
         console.warn('[trace] end_trace_run threw:', err);
@@ -673,6 +678,7 @@ export default function Trace() {
         videoEl: videoRef.current,
         overlayEl: overlayRef.current,
         getOverlayState: () => overlayStateRef.current,
+        onSaved: () => { recordedRef.current = true; },
       });
       recordStopperRef.current = handle;
       setRecording(true);

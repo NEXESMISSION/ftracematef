@@ -10,21 +10,22 @@ import { beginTrialSession, canUseFreeTrial, freeTrialState } from '../lib/freeT
  * Wrap routes that require an active *paid* plan.
  *
  * Order of decisions, top to bottom (first match wins):
- *   1. Not signed in                → redirect to /login
- *   2. Signed in, no survey on file → render <ExitSurvey /> (universal gate)
- *   3. Signed in, paid              → render children
- *   4. Signed in, free, trial OK    → render children (consumes one session)
- *   5. Signed in, free, trial used  → render <Paywall trialUsed />
+ *   1. Not signed in                  → redirect to /login
+ *   2. Signed in, traced ≥1, no survey → render <ExitSurvey /> (post-trace gate)
+ *   3. Signed in, paid                → render children
+ *   4. Signed in, free, trial OK      → render children (consumes one session)
+ *   5. Signed in, free, trial used    → render <Paywall trialUsed />
  *
- * The survey is universal by design — every user takes it the first time
- * they hit /trace, regardless of plan or trial state. Rationale:
- *   - First-time free user: answers BEFORE their first trace, then the
- *     trial flow continues and they enter the studio with their image.
- *   - Returning free user (trial used): answers BEFORE the paywall.
- *   - Paid user who paid before the survey existed: answers the next
- *     time they hit /trace, then continues straight into the studio.
- * The data point is more valuable than the friction it adds, and the
- * gate only ever fires once per account (idempotent server-side).
+ * The survey fires AFTER the user's first trace, not before — asking up
+ * front is intrusive and blocks the very thing they came to do, while
+ * asking once they've felt the win gets warmer, higher-quality answers.
+ * We gate on trace_sessions >= 1 (server-incremented by start_trace_run on
+ * every /trace mount, paid + free), so:
+ *   - First /trace visit: trace_sessions is still 0 → no survey, straight
+ *     into the studio; start_trace_run then bumps it to 1.
+ *   - Second /trace visit onward: trace_sessions >= 1 → survey shows once.
+ * The gate only ever records once per account (idempotent server-side) and
+ * re-renders on every /trace visit until the user actually submits.
  */
 export default function RequirePaid({ children }) {
   const { user, profile, isPaid } = useAuth();
@@ -33,7 +34,7 @@ export default function RequirePaid({ children }) {
   // Optimistic local override: the moment ExitSurvey successfully POSTs
   // we flip this to true so the next render falls through to the real
   // destination, without waiting for the realtime profile-update channel
-  // to deliver the new exit_survey_at stamp. The refresh() inside
+  // to deliver the new survey_completed_at stamp. The refresh() inside
   // ExitSurvey also runs, so the server-side value catches up within a
   // frame or two. Resets to false on every fresh mount of RequirePaid
   // (i.e. every navigation to /trace) so a returning user with no
@@ -57,12 +58,14 @@ export default function RequirePaid({ children }) {
     return <Navigate to="/account" state={{ from: location.pathname }} replace />;
   }
 
-  // Universal survey gate — runs before the paid/free branch so every
-  // user (paid + first-time free + trial-used free) hits it once. Required
-  // (no skip path); the survey only stamps exit_survey_at on a real submit
-  // and re-renders on every /trace visit until the user actually answers.
+  // Post-trace survey gate — runs before the paid/free branch but only
+  // after the user has traced at least once (trace_sessions >= 1), so a
+  // first-timer never hits it on the way into their first trace. Required
+  // (no skip path); the survey only stamps survey_completed_at on a real
+  // submit and re-renders on every /trace visit until the user answers.
   const surveyPending =
-    !profile.exit_survey_at
+    Number(profile.trace_sessions ?? 0) >= 1
+    && !profile.survey_completed_at
     && !surveyDoneLocal;
   if (surveyPending) {
     return <ExitSurvey onDone={() => setSurveyDoneLocal(true)} />;

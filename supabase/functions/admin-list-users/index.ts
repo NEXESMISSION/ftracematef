@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
   // about than the foreign-key embed magic.
   const { data: profiles, error: profErr } = await admin
     .from('profiles')
-    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at, dodo_customer_id, total_trace_seconds, trace_sessions, first_trace_at, last_trace_at, current_page, current_image_label, current_run_id, signup_landing, signup_referrer, signup_source, signup_campaign, first_pricing_at, first_paywall_at, first_checkout_at, last_checkout_at, last_checkout_plan, exit_survey_at, exit_survey_source, exit_survey_feeling, exit_survey_note')
+    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at, free_sessions_used, dodo_customer_id, total_trace_seconds, trace_sessions, traces_recorded, first_trace_at, last_trace_at, current_page, current_image_label, current_run_id, signup_landing, signup_referrer, signup_source, signup_campaign, first_pricing_at, first_paywall_at, first_checkout_at, last_checkout_at, last_checkout_plan, exit_survey_at, exit_survey_source, exit_survey_feeling, exit_survey_note, survey_completed_at, survey_age, survey_draws')
     .order('created_at', { ascending: false })
     .limit(2000);
   if (profErr) return json({ error: profErr.message }, 500);
@@ -185,6 +185,7 @@ Deno.serve(async (req) => {
       last_sign_in_at:     lastSignIn.get(p.id) ?? null,
       dodo_customer_id:    p.dodo_customer_id ?? null,
       trial_used:          !!p.free_trial_started_at,
+      free_sessions_used:  p.free_sessions_used ?? 0,
       // Subscription view (null when the user has no row yet, which can
       // only happen if the signup trigger failed for some reason).
       plan:                sub?.plan ?? null,
@@ -207,6 +208,9 @@ Deno.serve(async (req) => {
       // user hasn't traced yet (seeded via column defaults to 0/null).
       total_trace_seconds: p.total_trace_seconds ?? 0,
       trace_sessions:      p.trace_sessions ?? 0,
+      // Sessions that produced a saved/downloaded recording — best
+      // "did they keep a result?" engagement signal we have today.
+      traces_recorded:     p.traces_recorded ?? 0,
       first_trace_at:      p.first_trace_at ?? null,
       last_trace_at:       p.last_trace_at ?? null,
       // Journey funnel — sparse "first occurrence" stamps. The admin UI
@@ -228,13 +232,18 @@ Deno.serve(async (req) => {
       // checkout" pill in that case.
       last_checkout_at:    p.last_checkout_at ?? null,
       last_checkout_plan:  p.last_checkout_plan ?? null,
-      // Exit-survey answers — sparse stamps written once when the user
-      // answers the post-trial survey just before the paywall. Drives the
-      // SurveyPanel rollup on the admin dashboard.
+      // Legacy exit-survey answers — kept for historical rows, no longer
+      // written by the client (replaced by the post-trace survey below).
       exit_survey_at:      p.exit_survey_at ?? null,
       exit_survey_source:  p.exit_survey_source ?? null,
       exit_survey_feeling: p.exit_survey_feeling ?? null,
       exit_survey_note:    p.exit_survey_note ?? null,
+      // Post-trace survey — age + what they like to draw, stamped once after
+      // the user's first trace. Drives the SurveyPanel rollup + the
+      // recommendation flywheel.
+      survey_completed_at: p.survey_completed_at ?? null,
+      survey_age:          p.survey_age ?? null,
+      survey_draws:        Array.isArray(p.survey_draws) ? p.survey_draws : [],
       // Live presence — what page the user is on right now, and the image
       // they're tracing if they're in the studio. Only meaningful when the
       // user is also "online" (last_seen_at within the heartbeat window);

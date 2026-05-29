@@ -1,13 +1,14 @@
 // In-browser screen recorder for the trace studio.
 //
-// Two modes:
-//   - 'camera':    pipe the raw getUserMedia stream straight to MediaRecorder.
-//                  Lowest CPU, perfect quality, but the reference overlay is
-//                  invisible (only the camera feed is captured).
-//   - 'composite': render the video + the reference overlay onto an offscreen
-//                  canvas every frame at viewport size, then captureStream
-//                  that canvas. Audio is reused from the source stream so we
-//                  don't double-prompt the mic.
+// Every recording is composited onto an offscreen canvas at viewport size,
+// then captureStream'd — audio is reused from the source stream so we don't
+// double-prompt the mic. The `mode` flag only controls whether the reference
+// overlay is drawn on top of the camera feed:
+//   - 'camera':    camera feed only (overlay hidden).
+//   - 'composite': camera feed + the reference overlay, matching what's on
+//                  screen.
+// Both paths run through the canvas so the tracemate watermark is burned into
+// the bottom-right of every exported clip regardless of overlay choice.
 //
 // 100% client-side. No fetch, no upload, no Supabase. The output blob is
 // turned into an object URL and offered as a download — nothing leaves the
@@ -39,6 +40,35 @@ export function isRecordingSupported() {
   return pickMimeType() != null;
 }
 
+// Burn a "tracemate" wordmark into the bottom-right corner of every frame.
+// Sized off the canvas width so it scales with resolution, drawn with a soft
+// shadow so it stays legible over both light and dark camera feeds. Cheap
+// enough to run per-frame (one fillText + a dot).
+function drawWatermark(ctx, w, h, dpr) {
+  const fontPx = Math.max(14 * dpr, Math.round(w * 0.028));
+  const pad = Math.round(12 * dpr);
+  ctx.save();
+  ctx.font = `700 ${fontPx}px Nunito, system-ui, -apple-system, sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'bottom';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+  ctx.shadowBlur = Math.round(4 * dpr);
+  ctx.shadowOffsetY = Math.round(1 * dpr);
+  ctx.globalAlpha = 0.92;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('tracemate', w - pad, h - pad);
+  // Small coral accent dot before the wordmark, matching the brand mark.
+  const textW = ctx.measureText('tracemate').width;
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.fillStyle = '#e87a7a';
+  const dotR = Math.max(2 * dpr, fontPx * 0.12);
+  ctx.beginPath();
+  ctx.arc(w - pad - textW - dotR * 2.2, h - pad - fontPx * 0.32, dotR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function triggerDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -62,6 +92,9 @@ function triggerDownload(blob, filename) {
 //   overlayEl:      <img> element rendering the reference overlay (composite only).
 //   getOverlayState: () => { x, y, scale, rotation, flip, opacity } — read each
 //                   frame so live transforms during recording are captured.
+//   onSaved:        optional () => void — fired once a non-empty clip has been
+//                   downloaded, so callers can record that this session
+//                   produced a saved result.
 export function startRecording(opts) {
   const mime = pickMimeType();
   if (!mime) throw new Error('Recording is not supported in this browser.');
@@ -70,12 +103,10 @@ export function startRecording(opts) {
   const cleanups = [];
   let recordStream = null;
 
-  if (opts.mode === 'camera') {
-    if (!opts.sourceStream) throw new Error('No camera stream available.');
-    recordStream = opts.sourceStream;
-  } else {
+  {
     const { videoEl, overlayEl, getOverlayState, sourceStream } = opts;
-    if (!videoEl) throw new Error('Composite mode needs a video element.');
+    if (!videoEl) throw new Error('Recording needs a video element.');
+    const drawOverlay = opts.mode !== 'camera';
 
     // Record at viewport size so the result matches what the user sees on
     // screen. Cap at a reasonable resolution to keep encoder load sane on
@@ -109,7 +140,7 @@ export function startRecording(opts) {
       // it just won't show the corner-pull distortion in the file.
       const ow = overlayEl?.offsetWidth || 0;
       const oh = overlayEl?.offsetHeight || 0;
-      if (overlayEl && ow && oh && overlayEl.complete) {
+      if (drawOverlay && overlayEl && ow && oh && overlayEl.complete) {
         const s = getOverlayState();
         ctx.save();
         ctx.globalAlpha = Math.max(0, Math.min(1, s.opacity));
@@ -119,6 +150,8 @@ export function startRecording(opts) {
         ctx.drawImage(overlayEl, -ow * dpr / 2, -oh * dpr / 2, ow * dpr, oh * dpr);
         ctx.restore();
       }
+
+      drawWatermark(ctx, w, h, dpr);
 
       rafId = requestAnimationFrame(tick);
     };
@@ -147,6 +180,7 @@ export function startRecording(opts) {
     if (blob.size > 0) {
       const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       triggerDownload(blob, `tracemate-${ts}.${ext}`);
+      try { opts.onSaved?.(); } catch { /* caller-side bookkeeping, never fatal */ }
     }
     stopResolve();
   };

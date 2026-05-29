@@ -824,18 +824,40 @@ function AcquisitionPanel({ users }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
-/* Exit-survey rollup. Counts answers from users who reached the post-trial
-   survey before the paywall — the "where did they come from" + "did they
-   like it" pair lets the operator read sentiment per acquisition channel.
-   Pure client-side aggregation off the same users array, no extra fetch. */
+/* Post-trace survey rollup. Counts answers from users who reached the survey
+   after their first trace — the "how old" + "what they draw" pair lets the
+   operator read the audience and steer content/pack creation. Pure client-
+   side aggregation off the same users array, no extra fetch. */
 
-const SURVEY_FEELING_LABEL = {
-  loved:    { label: 'Loved it',    emoji: '🤩', tone: 'good' },
-  liked:    { label: 'Liked it',    emoji: '🙂', tone: 'good' },
-  mixed:    { label: 'Mixed',       emoji: '😐', tone: 'neutral' },
-  disliked: { label: "Didn't love", emoji: '😕', tone: 'warn' },
+const SURVEY_AGE_ORDER = ['13-17', '18-24', '25-34', '35-44', '45+'];
+const SURVEY_AGE_LABEL = {
+  '13-17': '13–17',
+  '18-24': '18–24',
+  '25-34': '25–34',
+  '35-44': '35–44',
+  '45+':   '45+',
 };
-const SURVEY_FEELING_ORDER = ['loved', 'liked', 'mixed', 'disliked'];
+
+// Draw categories — order is display order in the breakdown. Mirrors the
+// record_survey whitelist + the ExitSurvey chip list.
+const SURVEY_DRAW_ORDER = [
+  'anime', 'characters', 'animals', 'portraits',
+  'tattoos', 'nature', 'lettering', 'fanart', 'other',
+];
+const SURVEY_DRAW_LABEL = {
+  anime:      { label: 'Anime / manga', emoji: '🌸' },
+  characters: { label: 'Characters',    emoji: '🦸' },
+  animals:    { label: 'Animals',       emoji: '🐾' },
+  portraits:  { label: 'Portraits',     emoji: '🙂' },
+  tattoos:    { label: 'Tattoos',       emoji: '🖤' },
+  nature:     { label: 'Nature',        emoji: '🌿' },
+  lettering:  { label: 'Lettering',     emoji: '✍️' },
+  fanart:     { label: 'Fan art',       emoji: '⭐' },
+  other:      { label: 'A bit of all',  emoji: '✨' },
+};
+const labelForAge  = (id) => SURVEY_AGE_LABEL[id] ?? id;
+const labelForDraw = (id) => SURVEY_DRAW_LABEL[id]?.label ?? id;
+const emojiForDraw = (id) => SURVEY_DRAW_LABEL[id]?.emoji ?? '✨';
 
 // Friendly labels for the source IDs the client sends (mirrored in the
 // record_exit_survey whitelist). Anything not listed here falls back to
@@ -862,46 +884,38 @@ const SURVEY_SOURCE_LABEL = {
 const labelForSource = (id) => SURVEY_SOURCE_LABEL[id] ?? id;
 
 function SurveyPanel({ users, onPickUser }) {
-  // Filter state for the respondents table. 'all' = every respondent;
-  // a specific feeling key narrows down. Re-renders cheaply since we
-  // recompute the filtered slice in the same useMemo as the rollup.
+  // Filter state for the respondents list. 'all' = every respondent; an age
+  // bucket or a draw category narrows down. Recomputed cheaply alongside the
+  // rollup.
   const [filter, setFilter] = useState('all');
 
-  const { rows, totals, respondents } = useMemo(() => {
+  const { ageRows, drawRows, totals, respondents } = useMemo(() => {
     if (!Array.isArray(users)) {
-      return { rows: [], totals: { responses: 0, eligible: 0 }, respondents: [] };
+      return { ageRows: [], drawRows: [], totals: { responses: 0, eligible: 0 }, respondents: [] };
     }
-    // Eligible = users who have ever reached /trace and therefore had the
-    // chance to see the survey. Proxy: free_sessions_used > 0 (any free
-    // user who entered the studio at least once) OR is_paid (paid users
-    // can hit /trace anytime). Total users isn't right as a denominator
-    // because ghosts who signed up and never opened /trace genuinely
-    // never saw the gate, so counting them would make the rate look
-    // artificially low.
+    // Eligible = users who have traced at least once and therefore had the
+    // chance to see the post-trace survey (it gates on trace_sessions >= 1).
+    // Total users isn't the right denominator — ghosts who never opened
+    // /trace genuinely never saw the gate.
     let eligible = 0;
     let responses = 0;
-    const bySource = new Map();
-    const byFeeling = Object.fromEntries(SURVEY_FEELING_ORDER.map((f) => [f, 0]));
+    const byAge = Object.fromEntries(SURVEY_AGE_ORDER.map((a) => [a, 0]));
+    const byDraw = Object.fromEntries(SURVEY_DRAW_ORDER.map((d) => [d, 0]));
     const respondentList = [];
 
     for (const u of users) {
-      const reachedTrace = !!u?.is_paid || (Number(u?.free_sessions_used ?? 0) > 0);
-      if (reachedTrace) eligible += 1;
-      if (!u?.exit_survey_at) continue;
+      if (Number(u?.trace_sessions ?? 0) >= 1) eligible += 1;
+      if (!u?.survey_completed_at) continue;
       responses += 1;
 
-      const src = (u.exit_survey_source || 'other').trim();
-      const cur = bySource.get(src) ?? { source: src, total: 0, loved: 0, liked: 0, mixed: 0, disliked: 0 };
-      cur.total += 1;
-      const feeling = (u.exit_survey_feeling || '').trim();
-      if (feeling in cur) cur[feeling] += 1;
-      bySource.set(src, cur);
+      const age = (u.survey_age || '').trim();
+      if (age in byAge) byAge[age] += 1;
 
-      if (feeling in byFeeling) byFeeling[feeling] += 1;
+      const draws = Array.isArray(u.survey_draws) ? u.survey_draws : [];
+      for (const d of draws) {
+        if (d in byDraw) byDraw[d] += 1;
+      }
 
-      // EVERY respondent goes here, not just those with notes. The
-      // operator wants to see who answered + what they said even if
-      // they didn't leave a free-form comment.
       respondentList.push({
         id: u.id,
         email: u.email,
@@ -911,19 +925,27 @@ function SurveyPanel({ users, onPickUser }) {
         trace_sessions: u.trace_sessions ?? 0,
         total_trace_seconds: u.total_trace_seconds ?? 0,
         signup_source: u.signup_source ?? null,
-        source: src,
-        feeling,
-        note: u.exit_survey_note ?? null,
-        at: u.exit_survey_at,
+        age,
+        draws,
+        at: u.survey_completed_at,
       });
     }
 
-    const list = Array.from(bySource.values()).sort((a, b) => b.total - a.total);
-    // Newest first — fresh feedback is the most actionable.
+    // Newest first — fresh answers are the most actionable.
     respondentList.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+    const ages = SURVEY_AGE_ORDER
+      .map((id) => ({ id, count: byAge[id] }))
+      .filter((r) => r.count > 0);
+    const draws = SURVEY_DRAW_ORDER
+      .map((id) => ({ id, count: byDraw[id] }))
+      .filter((r) => r.count > 0)
+      .sort((a, b) => b.count - a.count);
+
     return {
-      rows: list,
-      totals: { responses, eligible, byFeeling },
+      ageRows: ages,
+      drawRows: draws,
+      totals: { responses, eligible, byAge, byDraw },
       respondents: respondentList,
     };
   }, [users]);
@@ -934,25 +956,34 @@ function SurveyPanel({ users, onPickUser }) {
 
   const filteredRespondents = useMemo(() => {
     if (filter === 'all') return respondents;
-    if (filter === 'with-note') return respondents.filter((r) => !!r.note);
-    return respondents.filter((r) => r.feeling === filter);
+    if (filter.startsWith('age:')) {
+      const a = filter.slice(4);
+      return respondents.filter((r) => r.age === a);
+    }
+    if (filter.startsWith('draw:')) {
+      const d = filter.slice(5);
+      return respondents.filter((r) => r.draws.includes(d));
+    }
+    return respondents;
   }, [respondents, filter]);
+
+  const maxDraw = drawRows.length > 0 ? drawRows[0].count : 0;
 
   return (
     <section className="admin-stats" aria-labelledby="admin-survey-title">
       <header className="admin-stats-head">
-        <h2 id="admin-survey-title">Pre-trace survey</h2>
+        <h2 id="admin-survey-title">Post-trace survey</h2>
         <span className="admin-stats-when">
-          required gate on /trace for every user — paid, first-time free,
-          and trial-used free alike. Pairs source attribution with sentiment
-          so you can read each channel's vibe at a glance.
+          one-time gate shown after a user's first trace. Age + what they like
+          to draw — read the audience and steer which packs and references to
+          build next.
         </span>
       </header>
 
       {totals.responses === 0 ? (
         <div className="admin-stats-empty" style={{ padding: 16 }}>
-          No survey responses yet — the gate fires the next time any user
-          opens /trace.
+          No survey responses yet — the gate fires the next time a user opens
+          /trace after their first trace.
         </div>
       ) : (
         <>
@@ -967,43 +998,54 @@ function SurveyPanel({ users, onPickUser }) {
                 of {totals.eligible} eligible
               </span>
             </div>
-            {SURVEY_FEELING_ORDER.map((f) => {
-              const meta = SURVEY_FEELING_LABEL[f];
-              const count = totals.byFeeling?.[f] ?? 0;
+            {ageRows.map((r) => {
               const pct = totals.responses > 0
-                ? Math.round((count / totals.responses) * 100)
+                ? Math.round((r.count / totals.responses) * 100)
                 : 0;
               return (
-                <div key={f} className={`admin-survey-summary-cell admin-survey-summary-${meta.tone}`}>
-                  <span className="admin-survey-summary-num">
-                    <span aria-hidden="true">{meta.emoji}</span> {count}
-                  </span>
-                  <span className="admin-survey-summary-lbl">{meta.label} · {pct}%</span>
+                <div key={r.id} className="admin-survey-summary-cell">
+                  <span className="admin-survey-summary-num">{r.count}</span>
+                  <span className="admin-survey-summary-lbl">{labelForAge(r.id)} · {pct}%</span>
                 </div>
               );
             })}
           </div>
 
-          <h3 className="admin-survey-section-title">Source breakdown</h3>
+          <h3 className="admin-survey-section-title">What they like to draw</h3>
           <div className="admin-acq-table" role="table">
             <div className="admin-acq-row admin-acq-head" role="row">
-              <span role="columnheader">Source</span>
-              <span role="columnheader">Total</span>
-              <span role="columnheader">Loved</span>
-              <span role="columnheader">Liked</span>
-              <span role="columnheader">Mixed</span>
-              <span role="columnheader">Didn't love</span>
+              <span role="columnheader">Category</span>
+              <span role="columnheader">Picks</span>
+              <span role="columnheader">Share of respondents</span>
             </div>
-            {rows.map((r) => (
-              <div key={r.source} className="admin-acq-row" role="row">
-                <span className="admin-acq-source" role="cell">{labelForSource(r.source)}</span>
-                <span role="cell">{r.total}</span>
-                <span role="cell">{r.loved}</span>
-                <span role="cell">{r.liked}</span>
-                <span role="cell">{r.mixed}</span>
-                <span role="cell">{r.disliked}</span>
-              </div>
-            ))}
+            {drawRows.map((r) => {
+              const pct = totals.responses > 0
+                ? Math.round((r.count / totals.responses) * 100)
+                : 0;
+              const barPct = maxDraw > 0 ? Math.round((r.count / maxDraw) * 100) : 0;
+              return (
+                <div key={r.id} className="admin-acq-row" role="row">
+                  <span className="admin-acq-source" role="cell">
+                    <span aria-hidden="true">{emojiForDraw(r.id)}</span> {labelForDraw(r.id)}
+                  </span>
+                  <span role="cell">{r.count}</span>
+                  <span role="cell" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: 'inline-block',
+                        height: 8,
+                        width: `${barPct}%`,
+                        minWidth: 2,
+                        borderRadius: 4,
+                        background: 'var(--coral, #e87a7a)',
+                      }}
+                    />
+                    {pct}%
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
           <div className="admin-survey-respondents-head">
@@ -1011,24 +1053,37 @@ function SurveyPanel({ users, onPickUser }) {
               Respondents <span className="admin-survey-section-count">{filteredRespondents.length}</span>
             </h3>
             <div className="admin-survey-filter-tabs" role="tablist" aria-label="Filter respondents">
-              {[
-                { id: 'all',       label: 'All',         count: respondents.length },
-                { id: 'loved',     label: '🤩 Loved',    count: totals.byFeeling.loved },
-                { id: 'liked',     label: '🙂 Liked',    count: totals.byFeeling.liked },
-                { id: 'mixed',     label: '😐 Mixed',    count: totals.byFeeling.mixed },
-                { id: 'disliked',  label: '😕 Off',      count: totals.byFeeling.disliked },
-                { id: 'with-note', label: '💬 With note',count: respondents.filter((r) => !!r.note).length },
-              ].map((t) => (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={filter === 'all'}
+                className={`admin-survey-filter-tab ${filter === 'all' ? 'is-active' : ''}`}
+                onClick={() => setFilter('all')}
+              >
+                All <span className="admin-survey-filter-count">{respondents.length}</span>
+              </button>
+              {ageRows.map((r) => (
                 <button
-                  key={t.id}
+                  key={`age:${r.id}`}
                   type="button"
                   role="tab"
-                  aria-selected={filter === t.id}
-                  className={`admin-survey-filter-tab ${filter === t.id ? 'is-active' : ''}`}
-                  onClick={() => setFilter(t.id)}
-                  disabled={t.count === 0}
+                  aria-selected={filter === `age:${r.id}`}
+                  className={`admin-survey-filter-tab ${filter === `age:${r.id}` ? 'is-active' : ''}`}
+                  onClick={() => setFilter(`age:${r.id}`)}
                 >
-                  {t.label} <span className="admin-survey-filter-count">{t.count}</span>
+                  {labelForAge(r.id)} <span className="admin-survey-filter-count">{r.count}</span>
+                </button>
+              ))}
+              {drawRows.map((r) => (
+                <button
+                  key={`draw:${r.id}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={filter === `draw:${r.id}`}
+                  className={`admin-survey-filter-tab ${filter === `draw:${r.id}` ? 'is-active' : ''}`}
+                  onClick={() => setFilter(`draw:${r.id}`)}
+                >
+                  {emojiForDraw(r.id)} {labelForDraw(r.id)} <span className="admin-survey-filter-count">{r.count}</span>
                 </button>
               ))}
             </div>
@@ -1036,7 +1091,6 @@ function SurveyPanel({ users, onPickUser }) {
 
           <ul className="admin-survey-respondents">
             {filteredRespondents.map((r) => {
-              const meta = SURVEY_FEELING_LABEL[r.feeling] ?? null;
               const planLabel = r.is_paid && r.plan
                 ? PLAN_LABEL[r.plan] ?? r.plan
                 : (r.plan === 'free' || !r.plan ? 'Free' : (PLAN_LABEL[r.plan] ?? r.plan));
@@ -1045,7 +1099,7 @@ function SurveyPanel({ users, onPickUser }) {
                 <li key={r.id} className="admin-survey-respondent">
                   <div className="admin-survey-respondent-head">
                     <span className="admin-survey-respondent-feeling" aria-hidden="true">
-                      {meta?.emoji ?? '💬'}
+                      {r.draws.length > 0 ? emojiForDraw(r.draws[0]) : '✨'}
                     </span>
                     <button
                       type="button"
@@ -1059,9 +1113,7 @@ function SurveyPanel({ users, onPickUser }) {
                       {planLabel}
                     </span>
                     <span className="admin-survey-respondent-meta">
-                      <strong>{labelForSource(r.source)}</strong>
-                      {' · '}
-                      {meta?.label ?? r.feeling}
+                      <strong>{r.age ? labelForAge(r.age) : 'age n/a'}</strong>
                       {' · '}
                       {formatRelative(r.at)}
                     </span>
@@ -1076,8 +1128,10 @@ function SurveyPanel({ users, onPickUser }) {
                       {r.signup_source && ` · first-touch: ${labelForSource(r.signup_source)}`}
                     </span>
                   </div>
-                  {r.note && (
-                    <p className="admin-survey-respondent-note">"{r.note}"</p>
+                  {r.draws.length > 0 && (
+                    <p className="admin-survey-respondent-note">
+                      Draws: {r.draws.map(labelForDraw).join(', ')}
+                    </p>
                   )}
                 </li>
               );
@@ -1265,6 +1319,11 @@ function TraceStatsTiles({ user }) {
       key: 'sessions',
       label: 'Sessions',
       value: user.trace_sessions || 0,
+    },
+    {
+      key: 'recorded',
+      label: 'Recordings saved',
+      value: user.traces_recorded || 0,
     },
     {
       key: 'last',
