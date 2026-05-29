@@ -148,11 +148,12 @@
 
 .paywall-plans {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: clamp(14px, 1.8vw, 22px);
-  max-width: 940px;
+  max-width: 720px;
   margin: 0 auto;
   align-items: stretch;
+  justify-content: center;
 }
 
 .paywall-plan {
@@ -312,8 +313,8 @@
 .paywall-plan-ribbon {
   position: absolute;
   top: 12px;
-  right: -6px;
-  padding: 5px 12px 5px 14px;
+  right: 12px;
+  padding: 5px 12px;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.10em;
@@ -323,22 +324,9 @@
   border-radius: 4px 0 0 4px;
   box-shadow: 0 6px 14px -6px rgba(232, 122, 122, 0.6);
 }
-.paywall-plan-ribbon::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: -6px;
-  border: 3px solid transparent;
-  border-top-color: #a04848;
-  border-left-color: #a04848;
-}
 .paywall-plan-ribbon-gold {
   background: linear-gradient(135deg, #ffd166 0%, #f59e2c 100%);
   color: #3d2807;
-}
-.paywall-plan-ribbon-gold::after {
-  border-top-color: #8a5a13;
-  border-left-color: #8a5a13;
 }
 
 /* Popular treatment — coral accent so the eye lands here first. */
@@ -2427,10 +2415,13 @@
 /* ============ Trace-page survey modal ============
    Lives on top of <Trace /> on the user's second /trace visit onward, so
    the uploaded image / overlay never unmounts. The inline survey card
-   below is reused as the modal body. */
+   below is reused as the modal body. Required — no skip; user must answer
+   age + at least one draw to dismiss. */
 .trace-survey-modal-card {
   padding: clamp(20px, 3vw, 28px) clamp(20px, 4vw, 36px) clamp(18px, 2.5vw, 22px);
-  max-width: 540px;
+  max-width: 580px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
 }
 .trace-survey-modal-card .exit-survey-card {
   background: transparent;
@@ -2439,21 +2430,6 @@
   padding: 0;
   margin: 0;
 }
-.trace-survey-skip {
-  display: block;
-  margin: 14px auto 0;
-  background: none;
-  border: 0;
-  color: var(--ink-muted);
-  font-family: 'Nunito', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-  padding: 6px 10px;
-}
-.trace-survey-skip:hover { color: var(--ink); }
 
 /* ============ Inline survey card (reusable body) ============
    Was used on /account; now reused as the modal body on /trace. One

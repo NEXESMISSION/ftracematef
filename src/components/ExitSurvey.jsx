@@ -3,9 +3,18 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { supabase } from '../lib/supabase.js';
 import { friendlyError } from '../lib/errors.js';
 
+// Age buckets — single select. Mirrored in the record_survey whitelist so a
+// client can't smuggle a custom value into the admin's bucket counts.
+const AGES = [
+  { id: '13-17', label: '13–17' },
+  { id: '18-24', label: '18–24' },
+  { id: '25-34', label: '25–34' },
+  { id: '35-44', label: '35–44' },
+  { id: '45+',   label: '45+'   },
+];
+
 // What they like to draw — multi-select. Drives the recommendation flywheel
-// (which packs / references to surface). Whitelisted server-side so a client
-// can't smuggle a custom value into the admin's bucket counts.
+// (which packs / references to surface). Whitelisted server-side.
 const DRAWS = [
   { id: 'anime',      emoji: '🌸', label: 'Anime / manga'   },
   { id: 'characters', emoji: '🦸', label: 'Characters'      },
@@ -18,17 +27,19 @@ const DRAWS = [
   { id: 'other',      emoji: '✨', label: 'A bit of all'    },
 ];
 
+const NOTE_MAX = 280;
+
 /**
- * Inline survey card. Rendered on /account (by <Account />) when the user has
- * completed at least one trace and hasn't answered yet — never blocks tracing.
- *
- * One question: what do you like to draw? Tap a few, hit Save. Idempotent
- * server-side, so it only records once.
+ * Survey body. Rendered as a modal on /trace from the user's second visit
+ * onward (see Trace.jsx). Both questions are required; the note is optional.
+ * Idempotent server-side, so it only ever records once.
  */
 export default function ExitSurvey({ onDone }) {
   const { profile, refresh } = useAuth();
 
+  const [age, setAge]     = useState('');
   const [draws, setDraws] = useState([]);
+  const [note, setNote]   = useState('');
   const [busy, setBusy]   = useState(false);
   const [error, setError] = useState(null);
   const [done, setDone]   = useState(false);
@@ -39,23 +50,37 @@ export default function ExitSurvey({ onDone }) {
     );
   };
 
-  const ready = draws.length > 0;
+  const ready = !!age && draws.length > 0;
 
   const submit = async () => {
     if (busy) return;
     setError(null);
     if (!ready) {
-      setError('Tap at least one — takes a sec.');
+      setError('Pick your age and at least one thing you draw.');
       return;
     }
     setBusy(true);
     try {
-      // p_age stays null; the SQL RPC accepts null and only filters draws.
+      const trimmed = note.trim();
       const { error: rpcError } = await supabase.rpc('record_survey', {
-        p_age:   null,
+        p_age:   age,
         p_draws: draws,
+        p_note:  trimmed ? trimmed : null,
       });
-      if (rpcError) throw rpcError;
+      if (rpcError) {
+        // Backend may not have the 3-arg signature yet (the survey_note
+        // migration hasn't been applied). Retry without the note so the
+        // user's main answers still record — the note is the only piece
+        // we lose. Migration: 20260529000003_survey_note.sql.
+        const msg = String(rpcError.message || '').toLowerCase();
+        const looksLikeSignatureMismatch =
+          msg.includes('p_note')
+          || msg.includes('function') && (msg.includes('does not exist') || msg.includes('not found') || msg.includes('no function matches'))
+          || msg.includes('argument');
+        if (!looksLikeSignatureMismatch) throw rpcError;
+        const retry = await supabase.rpc('record_survey', { p_age: age, p_draws: draws });
+        if (retry.error) throw retry.error;
+      }
       try { await refresh(); } catch { /* non-fatal */ }
       setDone(true);
       onDone?.();
@@ -69,12 +94,12 @@ export default function ExitSurvey({ onDone }) {
 
   return (
     <section className="exit-survey-card" aria-labelledby="survey-q">
-      <p className="exit-survey-card-kicker">✦ one quick tap</p>
+      <p className="exit-survey-card-kicker">✦ two quick taps</p>
       <h2 id="survey-q" className="exit-survey-card-title">
-        What do you like to draw?
+        Help shape what we build next.
       </h2>
       <p className="exit-survey-card-lead">
-        Pick any — helps line up references you'll actually want to trace.
+        Both answers help us line up references and tools you'll actually use.
       </p>
 
       {error && (
@@ -83,21 +108,71 @@ export default function ExitSurvey({ onDone }) {
         </div>
       )}
 
-      <div className="exit-survey-chips" role="group" aria-label="What do you like to draw">
-        {DRAWS.map((d) => (
-          <button
-            key={d.id}
-            type="button"
-            aria-pressed={draws.includes(d.id)}
-            className={`exit-survey-chip${draws.includes(d.id) ? ' is-active' : ''}`}
-            onClick={() => toggleDraw(d.id)}
-            disabled={busy}
-          >
-            <span className="exit-survey-chip-icon" aria-hidden="true">{d.emoji}</span>
-            <span className="exit-survey-chip-label">{d.label}</span>
-          </button>
-        ))}
-      </div>
+      <section className="exit-survey-block" aria-labelledby="survey-age-q">
+        <h3 id="survey-age-q" className="exit-survey-q">
+          <span className="exit-survey-q-num">1</span>
+          How old are you?
+        </h3>
+        <div className="exit-survey-chips" role="radiogroup" aria-label="How old are you">
+          {AGES.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              role="radio"
+              aria-checked={age === a.id}
+              className={`exit-survey-chip${age === a.id ? ' is-active' : ''}`}
+              onClick={() => setAge(a.id)}
+              disabled={busy}
+            >
+              <span className="exit-survey-chip-label">{a.label}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="exit-survey-block" aria-labelledby="survey-draws-q">
+        <h3 id="survey-draws-q" className="exit-survey-q">
+          <span className="exit-survey-q-num">2</span>
+          What do you like to draw?
+          <span className="exit-survey-optional"> (pick any)</span>
+        </h3>
+        <div className="exit-survey-chips" role="group" aria-label="What do you like to draw">
+          {DRAWS.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              aria-pressed={draws.includes(d.id)}
+              className={`exit-survey-chip${draws.includes(d.id) ? ' is-active' : ''}`}
+              onClick={() => toggleDraw(d.id)}
+              disabled={busy}
+            >
+              <span className="exit-survey-chip-icon" aria-hidden="true">{d.emoji}</span>
+              <span className="exit-survey-chip-label">{d.label}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="exit-survey-block exit-survey-note-block" aria-labelledby="survey-note-q">
+        <h3 id="survey-note-q" className="exit-survey-q">
+          <span className="exit-survey-q-num">3</span>
+          A note or a request?
+          <span className="exit-survey-optional"> (optional)</span>
+        </h3>
+        <textarea
+          className="exit-survey-note"
+          placeholder="Anything we should know — a feature you wish existed, a kind of reference you can't find, a bug, a wish…"
+          maxLength={NOTE_MAX}
+          rows={3}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          disabled={busy}
+          aria-describedby="survey-note-count"
+        />
+        <p id="survey-note-count" className="exit-survey-note-count">
+          {note.length}/{NOTE_MAX}
+        </p>
+      </section>
 
       <div className="exit-survey-actions">
         <button
@@ -106,7 +181,11 @@ export default function ExitSurvey({ onDone }) {
           onClick={submit}
           disabled={busy || !ready}
         >
-          {busy ? 'Saving…' : ready ? 'Save →' : 'Pick at least one →'}
+          {busy
+            ? 'Saving…'
+            : !ready
+              ? 'Pick your age + what you draw →'
+              : 'Save & back to tracing →'}
         </button>
       </div>
     </section>

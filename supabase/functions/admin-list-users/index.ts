@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
   // about than the foreign-key embed magic.
   const { data: profiles, error: profErr } = await admin
     .from('profiles')
-    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at, free_sessions_used, dodo_customer_id, total_trace_seconds, trace_sessions, traces_recorded, first_trace_at, last_trace_at, current_page, current_image_label, current_run_id, signup_landing, signup_referrer, signup_source, signup_campaign, first_pricing_at, first_paywall_at, first_checkout_at, last_checkout_at, last_checkout_plan, exit_survey_at, exit_survey_source, exit_survey_feeling, exit_survey_note, survey_completed_at, survey_age, survey_draws')
+    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at, free_sessions_used, dodo_customer_id, total_trace_seconds, trace_sessions, traces_recorded, first_trace_at, last_trace_at, current_page, current_image_label, current_run_id, signup_landing, signup_referrer, signup_source, signup_campaign, first_pricing_at, first_paywall_at, first_checkout_at, last_checkout_at, last_checkout_plan, exit_survey_at, exit_survey_source, exit_survey_feeling, exit_survey_note, survey_completed_at, survey_age, survey_draws, survey_note')
     .order('created_at', { ascending: false })
     .limit(2000);
   if (profErr) return json({ error: profErr.message }, 500);
@@ -244,6 +244,7 @@ Deno.serve(async (req) => {
       survey_completed_at: p.survey_completed_at ?? null,
       survey_age:          p.survey_age ?? null,
       survey_draws:        Array.isArray(p.survey_draws) ? p.survey_draws : [],
+      survey_note:         p.survey_note ?? null,
       // Live presence — what page the user is on right now, and the image
       // they're tracing if they're in the studio. Only meaningful when the
       // user is also "online" (last_seen_at within the heartbeat window);

@@ -927,6 +927,7 @@ function SurveyPanel({ users, onPickUser }) {
         signup_source: u.signup_source ?? null,
         age,
         draws,
+        note: typeof u.survey_note === 'string' ? u.survey_note.trim() : '',
         at: u.survey_completed_at,
       });
     }
@@ -1131,6 +1132,12 @@ function SurveyPanel({ users, onPickUser }) {
                   {r.draws.length > 0 && (
                     <p className="admin-survey-respondent-note">
                       Draws: {r.draws.map(labelForDraw).join(', ')}
+                    </p>
+                  )}
+                  {r.note && (
+                    <p className="admin-survey-respondent-note admin-survey-respondent-note-said">
+                      <span className="admin-survey-respondent-note-tag">Note</span>
+                      "{r.note}"
                     </p>
                   )}
                 </li>

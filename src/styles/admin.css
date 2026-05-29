@@ -1589,6 +1589,26 @@
 .admin-shell .admin-survey-respondent-stats {
   font-weight: 600;
 }
+/* Free-text request/note a respondent typed — gold accent on the "said"
+   variant so it stands out from the auto-generated "Draws:" summary above. */
+.admin-shell .admin-survey-respondent-note-said {
+  border-left-color: #d99e2a !important;
+}
+.admin-shell .admin-survey-respondent-note-tag {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(217, 158, 42, 0.18);
+  color: #5c3d10;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+  font-style: normal;
+}
+
 .admin-shell .admin-survey-respondent-note {
   margin: 8px 0 0;
   padding: 8px 12px;

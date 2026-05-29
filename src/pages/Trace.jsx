@@ -1240,16 +1240,11 @@ export default function Trace() {
 
       {showSurveyModal && (
         <div className="profile-modal trace-survey-modal" role="dialog" aria-modal="true" aria-labelledby="survey-q">
+          {/* Backdrop is intentionally not click-to-close — survey is required:
+              the only way out is to answer both questions and submit. */}
           <div className="profile-modal-backdrop" />
           <div className="profile-modal-card trace-survey-modal-card">
             <ExitSurvey onDone={() => setSurveyDismissed(true)} />
-            <button
-              type="button"
-              className="trace-survey-skip"
-              onClick={() => setSurveyDismissed(true)}
-            >
-              Maybe later
-            </button>
           </div>
         </div>
       )}

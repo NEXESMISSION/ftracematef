@@ -18,7 +18,10 @@ const PAYWALL_COPY = {
 
 const PAYWALL_PLANS = VISIBLE_PLANS.map((p) => ({
   ...p,
-  badge:   p.id === 'lifetime' ? 'Limited 10' : p.badge,
+  // Hide the static "Limited 10" badge on the gold card — the dynamic
+  // "Only N of 10 left" pill below already carries that message and is
+  // both more specific and harder to skim past.
+  badge:   p.id === 'lifetime' ? null : p.badge,
   equiv:   PAYWALL_COPY[p.id]?.equiv ?? null,
   ctaText: PAYWALL_COPY[p.id]?.cta   ?? 'Choose plan',
   popular: !!PAYWALL_COPY[p.id]?.popular,
@@ -127,7 +130,9 @@ export default function Paywall({ trialUsed = false }) {
                   <span className="paywall-plan-ribbon paywall-plan-ribbon-gold" aria-hidden="true">Best Value</span>
                 )}
 
-                <span className="paywall-plan-badge">{p.badge}</span>
+                {p.badge && (
+                  <span className="paywall-plan-badge">{p.badge}</span>
+                )}
                 <span className="paywall-plan-name">{p.name}</span>
 
                 {/* Anchor pricing — strike-through on the original so the
