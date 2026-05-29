@@ -1,4 +1,4 @@
-import { PLANS } from '../lib/plans.js';
+import { VISIBLE_PLANS } from '../lib/plans.js';
 import { usePlanCheckout } from '../hooks/usePlanCheckout.js';
 
 function Check({ gold }) {
@@ -80,7 +80,7 @@ export default function Pricing() {
       )}
 
       <div className="pricing-plans">
-        {PLANS.map((plan) => (
+        {VISIBLE_PLANS.map((plan) => (
           <PlanCard
             key={plan.id}
             plan={plan}

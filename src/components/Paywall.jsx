@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { supabase } from '../lib/supabase.js';
-import { PLANS } from '../lib/plans.js';
+import { VISIBLE_PLANS } from '../lib/plans.js';
 import { usePlanCheckout } from '../hooks/usePlanCheckout.js';
 
 // Paywall-specific copy decorations on top of the central plan catalog.
@@ -15,7 +15,7 @@ const PAYWALL_COPY = {
   lifetime:  { equiv: 'pay once · use forever',      cta: 'Claim Lifetime' },
 };
 
-const PAYWALL_PLANS = PLANS.map((p) => ({
+const PAYWALL_PLANS = VISIBLE_PLANS.map((p) => ({
   ...p,
   badge:   p.id === 'lifetime' ? 'Limited 10' : p.badge,
   equiv:   PAYWALL_COPY[p.id]?.equiv ?? null,
@@ -81,12 +81,12 @@ export default function Paywall({ trialUsed = false }) {
         </p>
         <h1>
           {trialUsed
-            ? 'Your free trace is done — was it worth it?'
+            ? 'Your free traces are done — was it worth it?'
             : 'One unlock. Every tool. Every device.'}
         </h1>
         <p className="lead">
           {trialUsed
-            ? "You got your one free session. If it felt magical, here's how to keep going — pick a plan and trace forever, less than a coffee."
+            ? "You used your free sessions. If it felt magical, here's how to keep going — pick a plan and trace forever, less than a coffee."
             : 'Trace anything you can photograph — sketches, tattoos, murals, signs. Pick the plan that fits.'}
         </p>
 

@@ -16,10 +16,17 @@ import { usePresence } from '../hooks/usePresence.js';
 
 /**
  * /upload — public entry. Anyone can upload an image without signing in.
- * Pressing "Start tracing" routes them depending on auth/billing state:
+ * Pressing "Start tracing" routes them depending on auth state:
  *   - Not signed in → opens LoginModal (image stays in sessionStorage)
- *   - Signed in but not paid → /pricing (image stays in sessionStorage)
- *   - Signed in and paid → /trace (image passed via state, also kept in sessionStorage)
+ *   - Signed in    → /trace (image passed via state, also kept in sessionStorage)
+ *
+ * The /trace route is wrapped in <RequirePaid>, which decides whether to
+ * render the survey, the studio, or the paywall. Upload deliberately does
+ * NOT branch on plan/trial state — funnelling everyone through the same
+ * /trace entry point ensures the survey gate fires regardless of whether
+ * they're paid, first-time free, or trial-used. Earlier behaviour
+ * short-circuited trial-used users straight to /pricing, which silently
+ * bypassed the survey for the segment we most want to hear from.
  */
 export default function Upload() {
   const navigate = useNavigate();
@@ -149,21 +156,21 @@ export default function Upload() {
       setLoginOpen(true);            // not signed in → modal
       return;
     }
-    // Signed in + paid → straight to trace.
-    // Signed in + free WITH unused/active free trial → also straight to trace
-    // (the trial gets stamped inside <Trace /> on first mount).
-    // Signed in + free + trial used → /pricing.
-    if (!isPaid && !canUseFreeTrial(profile)) {
-      navigate('/pricing');
-      return;
-    }
-    // Free user using their one shot — mark this tab as the active trial
-    // session BEFORE we navigate so RequirePaid's first render (and every
-    // render after the post-stamp profile update) resolves to 'active'
-    // rather than 'used'. RequirePaid does this defensively too, but doing
-    // it here as well covers the path where the navigation completes
-    // before RequirePaid's render cycle has run.
-    if (!isPaid) beginTrialSession();
+    // Everyone signed-in goes to /trace. RequirePaid (the route wrapper)
+    // owns the next decision: render the survey if not yet answered,
+    // render the studio if paid or trial-available, render the paywall
+    // if trial-used. Upload deliberately does NOT pre-decide based on
+    // isPaid/canUseFreeTrial — short-circuiting trial-used users to
+    // /pricing here would skip the survey gate entirely (the survey is
+    // mounted on /trace, not /pricing).
+    //
+    // For free users using their one shot we still call beginTrialSession()
+    // here so RequirePaid's first render resolves to 'active' rather than
+    // 'used'. Harmless for paid users (the in-tab flag is cleared on
+    // /trace exit and ignored by isPaid checks). RequirePaid also calls
+    // it defensively, but doing it here covers the case where the
+    // navigation completes before RequirePaid's render cycle runs.
+    if (!isPaid && canUseFreeTrial(profile)) beginTrialSession();
     navigate('/trace', { state: { imageUrl: preview, fileName } });
   };
 

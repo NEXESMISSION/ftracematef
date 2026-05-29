@@ -7,7 +7,7 @@ import {
   listPayments,
   openBillingPortal,
 } from '../lib/billing.js';
-import { PLANS, PLAN_LABEL } from '../lib/plans.js';
+import { PLANS, VISIBLE_PLANS, PLAN_LABEL } from '../lib/plans.js';
 import { friendlyError } from '../lib/errors.js';
 import { formatDuration, formatRelative } from '../lib/traceStats.js';
 import { isAdminUser } from '../lib/admin.js';
@@ -200,7 +200,11 @@ function SubscriptionCard({ subscription, refresh, onChangePlan, email, setAlert
 
 /* ─────────────────────────── Change-plan modal ─────────────────────────── */
 
-const SWAP_PLANS = PLANS
+// Use VISIBLE_PLANS so a current subscriber isn't offered a swap into a
+// publicly-hidden plan. PLANS (full catalog) is still kept for LIFETIME
+// lookup below so the gold upgrade button keeps working regardless of
+// what's visible on the public pricing page.
+const SWAP_PLANS = VISIBLE_PLANS
   .filter((p) => p.id !== 'lifetime')
   .map((p) => ({ id: p.id, name: p.name, price: `$${p.price}`, period: p.shortPeriod }));
 
@@ -657,7 +661,7 @@ export default function Account() {
             {/* Always route through /upload, even when the trial is used.
                 /trace's <RequirePaid> mounts the universal <ExitSurvey /> gate
                 AND renders <Paywall trialUsed /> with the empathic copy tuned
-                for that moment ("Your free trace is done — was it worth it?").
+                for that moment ("Your free traces are done — was it worth it?").
                 Routing trial-used users straight to /pricing here used to skip
                 both — see the matching note in Upload.jsx. */}
             <Link to="/upload" className="profile-cta profile-cta-primary">

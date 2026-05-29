@@ -4,7 +4,7 @@ import SvgDefs from '../components/SvgDefs.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { supabase } from '../lib/supabase.js';
 import { hasPendingImage } from '../lib/pendingImage.js';
-import { PLANS } from '../lib/plans.js';
+import { VISIBLE_PLANS } from '../lib/plans.js';
 import { usePresence } from '../hooks/usePresence.js';
 import { usePlanCheckout } from '../hooks/usePlanCheckout.js';
 
@@ -109,7 +109,7 @@ export default function PricingPage() {
 
         {/* Plan cards */}
         <div className="pp-plans">
-          {PLANS.map((p) => {
+          {VISIBLE_PLANS.map((p) => {
             const soldOut = p.gold && lifetimeLeft === 0;
             const lifetimeLabel =
               p.gold && lifetimeLeft != null && lifetimeLeft > 0

@@ -32,6 +32,10 @@ export const PLANS = [
     shortPeriod: '/ 3 mo',
     badge: '23% off',
     cta: 'Get 3 Months',
+    // Temporarily hidden from public pricing surfaces. PLAN_BY_ID /
+    // PLAN_LABEL still resolve the entry so existing quarterly subscribers
+    // see their plan name on /account; only display lists filter by this.
+    hidden: true,
     features: [
       'Full quality outlines',
       'All tools unlocked',
@@ -57,6 +61,15 @@ export const PLANS = [
     ],
   },
 ];
+
+/**
+ * Plans to actually render on pricing surfaces (landing Pricing, /pricing,
+ * Paywall). Filters out anything flagged `hidden`. Lookup tables below
+ * intentionally keep hidden plans so existing subscribers' labels still
+ * resolve and so a stale checkout intent for a hidden plan can still be
+ * processed if it somehow fires.
+ */
+export const VISIBLE_PLANS = PLANS.filter((p) => !p.hidden);
 
 /** Quick lookup helpers. */
 export const PLAN_BY_ID = Object.fromEntries(PLANS.map((p) => [p.id, p]));
