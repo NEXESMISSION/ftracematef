@@ -56,9 +56,9 @@ function drawWatermark(ctx, w, h, dpr) {
   ctx.shadowOffsetY = Math.round(1 * dpr);
   ctx.globalAlpha = 0.92;
   ctx.fillStyle = '#ffffff';
-  ctx.fillText('tracemate', w - pad, h - pad);
+  ctx.fillText('tracemate.art', w - pad, h - pad);
   // Small coral accent dot before the wordmark, matching the brand mark.
-  const textW = ctx.measureText('tracemate').width;
+  const textW = ctx.measureText('tracemate.art').width;
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
   ctx.fillStyle = '#e87a7a';

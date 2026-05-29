@@ -1,22 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { supabase } from '../lib/supabase.js';
 import { friendlyError } from '../lib/errors.js';
 
-// Age buckets — single select. Mirrored in the record_survey whitelist so a
-// client can't smuggle a custom value into the admin's bucket counts.
-const AGES = [
-  { id: '13-17', label: '13–17' },
-  { id: '18-24', label: '18–24' },
-  { id: '25-34', label: '25–34' },
-  { id: '35-44', label: '35–44' },
-  { id: '45+',   label: '45+'   },
-];
-
 // What they like to draw — multi-select. Drives the recommendation flywheel
-// (which packs / references to surface), so it's worth a few extra taps.
-// Also whitelisted server-side.
+// (which packs / references to surface). Whitelisted server-side so a client
+// can't smuggle a custom value into the admin's bucket counts.
 const DRAWS = [
   { id: 'anime',      emoji: '🌸', label: 'Anime / manga'   },
   { id: 'characters', emoji: '🦸', label: 'Characters'      },
@@ -30,29 +19,19 @@ const DRAWS = [
 ];
 
 /**
- * Post-trace survey. Rendered by RequirePaid as a one-time gate on /trace
- * AFTER the user's first trace (gated on trace_sessions >= 1), so we catch
- * them in the post-win glow rather than blocking their first attempt.
+ * Inline survey card. Rendered on /account (by <Account />) when the user has
+ * completed at least one trace and hasn't answered yet — never blocks tracing.
  *
- * Two quick questions — age + what they like to draw — feed a recommendation
- * flywheel. After a successful submit the parent re-renders straight to
- * wherever the user was heading: the Trace studio (paid + free trial left),
- * or the Paywall (trial used).
- *
- * Required gate: no skip. Both questions must be answered. If the user closes
- * the tab without answering, survey_completed_at stays null and the survey
- * re-renders on the next /trace visit until they submit (idempotent server-
- * side, so it only ever records once).
+ * One question: what do you like to draw? Tap a few, hit Save. Idempotent
+ * server-side, so it only records once.
  */
 export default function ExitSurvey({ onDone }) {
-  const { profile, user, refresh } = useAuth();
+  const { profile, refresh } = useAuth();
 
-  const [age, setAge]     = useState('');
   const [draws, setDraws] = useState([]);
   const [busy, setBusy]   = useState(false);
   const [error, setError] = useState(null);
-
-  const greeting = profile?.display_name || user?.email?.split('@')[0] || 'friend';
+  const [done, setDone]   = useState(false);
 
   const toggleDraw = (id) => {
     setDraws((cur) =>
@@ -60,28 +39,25 @@ export default function ExitSurvey({ onDone }) {
     );
   };
 
-  const ready = !!age && draws.length > 0;
+  const ready = draws.length > 0;
 
   const submit = async () => {
     if (busy) return;
     setError(null);
-
     if (!ready) {
-      setError('Pick your age and at least one thing you draw — takes a sec.');
+      setError('Tap at least one — takes a sec.');
       return;
     }
-
     setBusy(true);
     try {
+      // p_age stays null; the SQL RPC accepts null and only filters draws.
       const { error: rpcError } = await supabase.rpc('record_survey', {
-        p_age:   age,
+        p_age:   null,
         p_draws: draws,
       });
       if (rpcError) throw rpcError;
-      // Refresh profile so RequirePaid sees survey_completed_at and stops
-      // rendering this overlay. Failures are non-fatal — we still call onDone
-      // so the user isn't trapped behind a transient blip.
-      try { await refresh(); } catch { /* ignore */ }
+      try { await refresh(); } catch { /* non-fatal */ }
+      setDone(true);
       onDone?.();
     } catch (e) {
       setBusy(false);
@@ -89,91 +65,50 @@ export default function ExitSurvey({ onDone }) {
     }
   };
 
+  if (done || profile?.survey_completed_at) return null;
+
   return (
-    <div className="studio-shell">
-      <header className="studio-bar">
-        <Link to="/" className="studio-brand"><img src="/images/brand/logo.webp" alt="Trace Mate" /></Link>
-      </header>
+    <section className="exit-survey-card" aria-labelledby="survey-q">
+      <p className="exit-survey-card-kicker">✦ one quick tap</p>
+      <h2 id="survey-q" className="exit-survey-card-title">
+        What do you like to draw?
+      </h2>
+      <p className="exit-survey-card-lead">
+        Pick any — helps line up references you'll actually want to trace.
+      </p>
 
-      <main className="exit-survey">
-        <p className="kicker hand">nice trace, {greeting} ✦</p>
-        <h1>Two quick taps.</h1>
-        <p className="lead">
-          Tell us a little about you so we can line up references you'll
-          actually want to trace next.
-        </p>
-
-        {error && (
-          <div className="paywall-error" role="alert">
-            <strong>Heads up — </strong>{error}
-          </div>
-        )}
-
-        <section className="exit-survey-block" aria-labelledby="survey-age-q">
-          <h2 id="survey-age-q" className="exit-survey-q">
-            <span className="exit-survey-q-num">1</span>
-            How old are you?
-          </h2>
-          <div className="exit-survey-chips" role="radiogroup" aria-label="How old are you">
-            {AGES.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                role="radio"
-                aria-checked={age === a.id}
-                className={`exit-survey-chip${age === a.id ? ' is-active' : ''}`}
-                onClick={() => setAge(a.id)}
-                disabled={busy}
-              >
-                <span className="exit-survey-chip-label">{a.label}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="exit-survey-block" aria-labelledby="survey-draws-q">
-          <h2 id="survey-draws-q" className="exit-survey-q">
-            <span className="exit-survey-q-num">2</span>
-            What kind of stuff do you like to draw?
-            <span className="exit-survey-optional"> (pick any)</span>
-          </h2>
-          <div className="exit-survey-chips" role="group" aria-label="What do you like to draw">
-            {DRAWS.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                aria-pressed={draws.includes(d.id)}
-                className={`exit-survey-chip${draws.includes(d.id) ? ' is-active' : ''}`}
-                onClick={() => toggleDraw(d.id)}
-                disabled={busy}
-              >
-                <span className="exit-survey-chip-icon" aria-hidden="true">{d.emoji}</span>
-                <span className="exit-survey-chip-label">{d.label}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <div className="exit-survey-actions">
-          <button
-            type="button"
-            className="exit-survey-submit"
-            onClick={submit}
-            disabled={busy || !ready}
-          >
-            {busy
-              ? 'Saving…'
-              : !ready
-                ? 'Pick your age + what you draw →'
-                : 'Done — back to tracing →'}
-          </button>
+      {error && (
+        <div className="paywall-error" role="alert" style={{ margin: '0 0 14px' }}>
+          <strong>Heads up — </strong>{error}
         </div>
+      )}
 
-        <p className="exit-survey-foot">
-          Asked once. Your answer goes straight to a solo founder and shapes
-          what we build next — thank you 🌱
-        </p>
-      </main>
-    </div>
+      <div className="exit-survey-chips" role="group" aria-label="What do you like to draw">
+        {DRAWS.map((d) => (
+          <button
+            key={d.id}
+            type="button"
+            aria-pressed={draws.includes(d.id)}
+            className={`exit-survey-chip${draws.includes(d.id) ? ' is-active' : ''}`}
+            onClick={() => toggleDraw(d.id)}
+            disabled={busy}
+          >
+            <span className="exit-survey-chip-icon" aria-hidden="true">{d.emoji}</span>
+            <span className="exit-survey-chip-label">{d.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="exit-survey-actions">
+        <button
+          type="button"
+          className="exit-survey-submit"
+          onClick={submit}
+          disabled={busy || !ready}
+        >
+          {busy ? 'Saving…' : ready ? 'Save →' : 'Pick at least one →'}
+        </button>
+      </div>
+    </section>
   );
 }
