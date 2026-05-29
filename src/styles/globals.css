@@ -1035,41 +1035,10 @@ main, header, section, footer { position: relative; z-index: 1; }
     0 26px 48px -14px rgba(217, 158, 42, 0.55);
 }
 
-/* On wide screens the gold card uses its full width: info + CTA on the left,
-   features split across two columns on the right. */
-@media (min-width: 700px) {
-  .pricing-plan-gold {
-    display: grid;
-    grid-template-columns: minmax(220px, 0.9fr) 1.3fr;
-    grid-template-areas:
-      "name     features"
-      "price    features"
-      "period   features"
-      "badge    features"
-      "cta      features";
-    column-gap: clamp(28px, 4vw, 56px);
-    row-gap: 6px;
-    align-items: start;
-    padding: 32px clamp(28px, 3vw, 40px);
-  }
-  .pricing-plan-gold .pricing-plan-name     { grid-area: name; }
-  .pricing-plan-gold .pricing-plan-price    { grid-area: price; }
-  .pricing-plan-gold .pricing-plan-period   { grid-area: period; }
-  .pricing-plan-gold .pricing-plan-badge    { grid-area: badge; }
-  .pricing-plan-gold .pricing-plan-cta-gold {
-    grid-area: cta;
-    justify-self: stretch;
-    margin-top: 10px;
-  }
-  .pricing-plan-gold .pricing-plan-features {
-    grid-area: features;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px 24px;
-    margin: 0;
-    align-self: center;
-  }
-}
+/* Gold (Lifetime) now sits beside Monthly at equal width, so it uses the
+   same vertical column layout as the regular card — the previous full-width
+   2-column grid (info+CTA left, features in sub-cols right) overflowed once
+   gold was capped to ~400px alongside Monthly. */
 
 .pricing-plan-gold .pricing-plan-name { color: #5c3d10; }
 .pricing-plan-gold .pricing-plan-price .num { color: #5c3d10; }
