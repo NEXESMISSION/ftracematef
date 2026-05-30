@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import {
   listAllUsers, getUserActivity, getAdminStats,
   listReferrers, createReferrer, updateReferrer, rotateReferrerToken, markCommissionsPaid,
+  listAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement,
 } from '../lib/admin.js';
 import { friendlyError } from '../lib/errors.js';
 import { usePresence } from '../hooks/usePresence.js';
@@ -616,6 +617,194 @@ function fmtCents(cents) {
 function commissionLabel(r) {
   if (r.commission_flat_cents != null) return `${fmtCents(r.commission_flat_cents)} / sale`;
   return `${(Number(r.commission_rate_bps) || 0) / 100}%`;
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
+/* Announce — operator broadcast popups. Author a message, target a segment
+   (all / free / paid / inactive 14d+), set a frequency (once / daily /
+   always), and signed-in users see it as a dismissible modal on next load.
+   Data comes from the admin-announcements Edge Function (get_admin_
+   announcement_stats rollup, with per-message seen/tapped/dismissed counts). */
+
+const ANN_SEGMENTS = [
+  { value: 'all',      label: 'All users' },
+  { value: 'free',     label: 'Free users' },
+  { value: 'paid',     label: 'Paid users' },
+  { value: 'inactive', label: 'Inactive 14d+' },
+];
+const ANN_FREQS = [
+  { value: 'once',   label: 'Once' },
+  { value: 'daily',  label: 'Daily' },
+  { value: 'always', label: 'Always' },
+];
+
+const ANN_BLANK = {
+  title: '', body: '', segment: 'all', cta_label: '', cta_url: '',
+  frequency: 'once', expires_at: '',
+};
+
+function AnnouncementsPanel() {
+  const [rows, setRows]   = useState(null);
+  const [error, setError] = useState(null);
+  const [busy, setBusy]   = useState(false);
+  const [savingId, setSavingId] = useState(null);
+  const [form, setForm]   = useState(ANN_BLANK);
+
+  const upd = useCallback((k, v) => setForm((f) => ({ ...f, [k]: v })), []);
+
+  const load = useCallback(async () => {
+    try {
+      const data = await listAnnouncements();
+      setRows(Array.isArray(data) ? data : []);
+      setError(null);
+    } catch (e) {
+      setError(friendlyError(e, 'Could not load announcements.'));
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const onCreate = useCallback(async (e) => {
+    e.preventDefault();
+    if (!form.body.trim()) { setError('Body is required.'); return; }
+    setBusy(true);
+    try {
+      await createAnnouncement({
+        title:      form.title || undefined,
+        body:       form.body,
+        segment:    form.segment,
+        cta_label:  form.cta_label || undefined,
+        cta_url:    form.cta_url || undefined,
+        frequency:  form.frequency,
+        expires_at: form.expires_at || undefined,
+      });
+      setForm(ANN_BLANK);
+      await load();
+    } catch (err) {
+      setError(friendlyError(err, 'Could not publish announcement.'));
+    } finally {
+      setBusy(false);
+    }
+  }, [form, load]);
+
+  const onToggleActive = useCallback(async (a) => {
+    setSavingId(a.id);
+    try {
+      await updateAnnouncement(a.id, { active: !a.active });
+      await load();
+    } catch (err) {
+      setError(friendlyError(err, 'Could not update announcement.'));
+    } finally {
+      setSavingId(null);
+    }
+  }, [load]);
+
+  const onDelete = useCallback(async (a) => {
+    if (!window.confirm('Delete this announcement? This cannot be undone.')) return;
+    setSavingId(a.id);
+    try {
+      await deleteAnnouncement(a.id);
+      await load();
+    } catch (err) {
+      setError(friendlyError(err, 'Could not delete announcement.'));
+    } finally {
+      setSavingId(null);
+    }
+  }, [load]);
+
+  const segLabel  = (v) => (ANN_SEGMENTS.find((s) => s.value === v)?.label ?? v);
+  const freqLabel = (v) => (ANN_FREQS.find((s) => s.value === v)?.label ?? v);
+  const fmtExpiry = (ts) => (ts ? new Date(ts).toLocaleString() : 'never');
+
+  return (
+    <section className="admin-stats" aria-labelledby="admin-ann-title">
+      <header className="admin-stats-head">
+        <h2 id="admin-ann-title">Announcements</h2>
+        <p className="admin-stats-sub">
+          Push a popup to signed-in users. Target a segment, pick how often it
+          shows, and watch seen / tapped / dismissed counts below.
+        </p>
+      </header>
+
+      {error && <p className="admin-ref-error" role="alert">{error}</p>}
+
+      <form className="admin-ref-create admin-ann-create" onSubmit={onCreate}>
+        <div className="admin-ref-form-grid">
+          <label>Title<input value={form.title} onChange={(e) => upd('title', e.target.value)} placeholder="(optional)" /></label>
+          <label>Segment
+            <select value={form.segment} onChange={(e) => upd('segment', e.target.value)}>
+              {ANN_SEGMENTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </label>
+          <label>Frequency
+            <select value={form.frequency} onChange={(e) => upd('frequency', e.target.value)}>
+              {ANN_FREQS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </label>
+          <label>Expires<input type="datetime-local" value={form.expires_at} onChange={(e) => upd('expires_at', e.target.value)} /></label>
+          <label>CTA label<input value={form.cta_label} onChange={(e) => upd('cta_label', e.target.value)} placeholder="(optional)" /></label>
+          <label>CTA URL<input value={form.cta_url} onChange={(e) => upd('cta_url', e.target.value)} placeholder="/pricing or https://…" /></label>
+        </div>
+        <label className="admin-ann-bodyfield">
+          Body
+          <textarea
+            className="admin-ann-textarea"
+            rows={3}
+            value={form.body}
+            onChange={(e) => upd('body', e.target.value)}
+          />
+        </label>
+        <button type="submit" className="admin-ref-btn" disabled={busy}>
+          {busy ? 'Publishing…' : '+ Publish announcement'}
+        </button>
+      </form>
+
+      {rows === null && !error ? (
+        <p className="admin-ref-muted">Loading…</p>
+      ) : (rows && rows.length === 0) ? (
+        <p className="admin-ref-muted">No announcements yet. Publish one above.</p>
+      ) : (
+        <div className="admin-ann-list">
+          {rows.map((a) => (
+            <div key={a.id} className={`admin-ann-card ${a.active ? '' : 'admin-ann-card-off'}`}>
+              <div className="admin-ann-card-head">
+                <span className="admin-ann-card-title">
+                  {a.title || '(no title)'}
+                  {!a.active && <span className="admin-ref-tag">off</span>}
+                </span>
+                <span className="admin-ref-actions">
+                  <button
+                    type="button" className="admin-ref-btn admin-ref-btn-sm"
+                    disabled={savingId === a.id} onClick={() => onToggleActive(a)}
+                  >
+                    {a.active ? 'Disable' : 'Enable'}
+                  </button>
+                  <button
+                    type="button" className="admin-ref-btn admin-ref-btn-sm admin-ref-btn-ghost"
+                    disabled={savingId === a.id} onClick={() => onDelete(a)}
+                  >
+                    Delete
+                  </button>
+                </span>
+              </div>
+              <div className="admin-ann-msg">{a.body}</div>
+              <div className="admin-ann-meta">
+                <span>{segLabel(a.segment)}</span>
+                <span>{freqLabel(a.frequency)}</span>
+                <span>Expires: {fmtExpiry(a.expires_at)}</span>
+                {a.cta_label ? <span>CTA: {a.cta_label}</span> : null}
+              </div>
+              <div className="admin-ann-counts">
+                <span>{a.seen_count ?? 0} seen</span>
+                <span>{a.tapped_count ?? 0} tapped</span>
+                <span>{a.dismissed_count ?? 0} dismissed</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }
 
 function ReferralsPanel() {
@@ -1819,6 +2008,7 @@ export default function AdminDashboard() {
 
         {view === 'stats' && <AcquisitionPanel users={users} />}
         {view === 'referrals' && <ReferralsPanel />}
+        {view === 'announce' && <AnnouncementsPanel />}
         {view === 'survey' && (
           <SurveyPanel
             users={users}

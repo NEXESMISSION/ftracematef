@@ -131,3 +131,54 @@ export async function markCommissionsPaid(referrerId) {
   if (data?.error) throw new Error(data.error);
   return data?.updated ?? 0;
 }
+
+/* ── In-app announcements / broadcasts ─────────────────────────────────────
+ * Operator-side CRUD for the popup broadcast system. All actions route through
+ * the single admin-announcements Edge Function (server-side triple-gated, same
+ * as the other admin endpoints). Thin wrappers so the dashboard reads cleanly.
+ */
+
+// One element per announcement with seen/tapped/dismissed aggregates.
+export async function listAnnouncements() {
+  const { data, error } = await supabase.functions.invoke('admin-announcements', {
+    method: 'POST',
+    body: { action: 'list' },
+  });
+  if (error) throw new Error(await unwrapFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return data?.announcements ?? [];
+}
+
+// Publish a new announcement. payload: { title?, body, segment, cta_label?,
+// cta_url?, frequency, expires_at? }.
+export async function createAnnouncement(payload) {
+  const { data, error } = await supabase.functions.invoke('admin-announcements', {
+    method: 'POST',
+    body: { action: 'create', ...payload },
+  });
+  if (error) throw new Error(await unwrapFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return data?.announcement;
+}
+
+// Patch an announcement (title/body/segment/cta_label/cta_url/frequency/active/expires_at).
+export async function updateAnnouncement(id, patch) {
+  const { data, error } = await supabase.functions.invoke('admin-announcements', {
+    method: 'POST',
+    body: { action: 'update', id, patch },
+  });
+  if (error) throw new Error(await unwrapFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return true;
+}
+
+// Permanently delete an announcement (cascades its events).
+export async function deleteAnnouncement(id) {
+  const { data, error } = await supabase.functions.invoke('admin-announcements', {
+    method: 'POST',
+    body: { action: 'delete', id },
+  });
+  if (error) throw new Error(await unwrapFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return true;
+}

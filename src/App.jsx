@@ -22,6 +22,7 @@ import Privacy from './pages/Privacy.jsx';
 import RefRedirect from './pages/RefRedirect.jsx';
 import AffiliateRedirect from './pages/AffiliateRedirect.jsx';
 import NotFound from './pages/NotFound.jsx';
+import AnnouncementPopup from './components/AnnouncementPopup.jsx';
 
 // Pretty-alias short links for the platforms we'll actually share most.
 // Each one renders <RefRedirect source="..."/> and bounces to '/'. The
@@ -154,6 +155,11 @@ export default function App() {
         {/* Catch-all — anything else gets a friendly Not Found rather than blank */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+
+      {/* Global broadcast popup. Renders null unless a signed-in user has an
+          announcement to see; lives inside AuthProvider (for useAuth) and the
+          BrowserRouter from main.jsx (so its CTA can navigate). */}
+      <AnnouncementPopup />
     </AuthProvider>
   );
 }

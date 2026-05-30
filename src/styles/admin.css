@@ -1863,3 +1863,68 @@
 @media (max-width: 540px) {
   .admin-drawer { width: 100%; border-left: none; }
 }
+
+/* ── Announcements panel (admin-ann-*) ──────────────────────────────────── */
+.admin-ann-create {
+  margin-bottom: 16px;
+}
+.admin-ann-bodyfield {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+.admin-ann-textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.4);
+  color: inherit;
+}
+.admin-ann-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.admin-ann-card {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.35);
+}
+.admin-ann-card-off {
+  opacity: 0.6;
+}
+.admin-ann-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.admin-ann-card-title {
+  font-weight: 600;
+}
+.admin-ann-msg {
+  margin: 8px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: #cbd5e1;
+}
+.admin-ann-meta,
+.admin-ann-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+.admin-ann-counts {
+  margin-top: 6px;
+  font-weight: 600;
+}
