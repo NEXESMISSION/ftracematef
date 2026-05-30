@@ -8,6 +8,7 @@ import { setPresence, clearPresence } from '../lib/presence.js';
 import { setTracing } from '../lib/tracing-state.js';
 import { startRecording, isRecordingSupported } from '../lib/recorder.js';
 import ExitSurvey from '../components/ExitSurvey.jsx';
+import TraceHelp from '../components/TraceHelp.jsx';
 import {
   cssMatrix3d,
   identityCorners,
@@ -66,6 +67,10 @@ export default function Trace() {
   const handlesWrapRef   = useRef(null);
   const rafIdRef         = useRef(null);
   const hintDismissedRef = useRef(false);
+  // True from pointerdown until the first scheduleApply of a gesture, so that
+  // first move is written to the DOM SYNCHRONOUSLY (zero perceived latency);
+  // every subsequent move coalesces to the next animation frame.
+  const firstMoveRef     = useRef(false);
 
   const [transform, setTransform]           = useState(INITIAL_TRANSFORM);
   // Persisted across sessions via localStorage so the studio remembers your setup.
@@ -76,6 +81,10 @@ export default function Trace() {
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn]               = useState(false);
   const [controlsHidden, setControlsHidden] = useState(false);
+  // Help / onboarding overlay. Auto-shown the first time a user opens /trace
+  // (gated by the 'tm:trace-tutorial-seen' localStorage flag, set on dismiss);
+  // re-openable any time via the topbar "?" button.
+  const [showHelp, setShowHelp]             = useState(false);
   const [flickerOn, setFlickerOn]           = useLocalState('tm:flickerOn', false);
   const [flickerSpeed, setFlickerSpeed]     = useLocalState('tm:flickerSpeed', 3);
   // Bounds for the flicker oscillation. Defaults give a clearly-visible
@@ -249,6 +258,27 @@ export default function Trace() {
   useEffect(() => {
     const t = setTimeout(() => setShowHint(false), 4500);
     return () => clearTimeout(t);
+  }, []);
+
+  // The "Adjust" tab was removed (its X/Y/Zoom/Rotate sliders are replaced by
+  // the touch gestures + action buttons). A user whose persisted panelTab is
+  // still 'adjust' would otherwise land on a now-nonexistent tab — coerce it.
+  useEffect(() => {
+    if (panelTab === 'adjust') setPanelTab('opacity');
+  }, [panelTab, setPanelTab]);
+
+  // First-time onboarding: pop the help overlay automatically the first time a
+  // user opens /trace. The flag is set when they dismiss it ("Got it").
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem('tm:trace-tutorial-seen')) setShowHelp(true);
+    } catch { /* ignore (private mode / storage disabled) */ }
+  }, []);
+
+  const dismissHelp = useCallback(() => {
+    try { localStorage.setItem('tm:trace-tutorial-seen', '1'); }
+    catch { /* ignore */ }
+    setShowHelp(false);
   }, []);
 
   // ===== Warp: measure rendered overlay size + seed identity corners =====
@@ -601,23 +631,39 @@ export default function Trace() {
   // Schedule a single DOM write for the next frame. Repeated calls within one
   // frame coalesce — the last transform wins, so a 120Hz trackpad or a flood
   // of coalesced pointer events still costs at most one style write per frame.
+  const writeLiveTransform = useCallback(() => {
+    const cur = liveTransformRef.current;
+    if (!cur) return;
+    const el = overlayRef.current;
+    if (el) el.style.transform = buildOverlayTransform(cur);
+    const hw = handlesWrapRef.current;
+    if (hw) hw.style.transform = buildHandlesTransform(cur);
+  }, [buildOverlayTransform, buildHandlesTransform]);
+
   const scheduleApply = useCallback((t) => {
     liveTransformRef.current = t;
     // Keep the recorder's per-frame composite in sync DURING the gesture
     // (overlayStateRef is otherwise only refreshed when state commits).
     const s = overlayStateRef.current;
     s.x = t.x; s.y = t.y; s.scale = t.scale; s.rotation = t.rotation; s.flip = t.flip;
+    // FIRST move of a gesture: write to the DOM synchronously so the very first
+    // finger movement has zero perceived latency. All later moves coalesce to
+    // one DOM write per animation frame.
+    if (firstMoveRef.current) {
+      firstMoveRef.current = false;
+      if (rafIdRef.current != null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      writeLiveTransform();
+      return;
+    }
     if (rafIdRef.current != null) return;
     rafIdRef.current = requestAnimationFrame(() => {
       rafIdRef.current = null;
-      const cur = liveTransformRef.current;
-      if (!cur) return;
-      const el = overlayRef.current;
-      if (el) el.style.transform = buildOverlayTransform(cur);
-      const hw = handlesWrapRef.current;
-      if (hw) hw.style.transform = buildHandlesTransform(cur);
+      writeLiveTransform();
     });
-  }, [buildOverlayTransform, buildHandlesTransform]);
+  }, [writeLiveTransform]);
 
   // Flush any pending frame and push the live transform into React state. Done
   // once, on the last finger up, so sliders / recorder / persistence all see
@@ -643,10 +689,15 @@ export default function Trace() {
     if (wasEmpty || !liveTransformRef.current) {
       liveTransformRef.current = { ...transformRef.current };
     }
-    // Dismiss the hint once (avoids a setState on every move).
-    if (!hintDismissedRef.current) {
-      hintDismissedRef.current = true;
-      setShowHint(false);
+    // Apply the next move synchronously (zero first-frame latency). We must NOT
+    // call setState here — a re-render at gesture-start would hitch the first
+    // frame. The hint is dismissed on pointerUP instead (or by the 4.5s timer).
+    firstMoveRef.current = true;
+    // Drop the expensive drop-shadow while gesturing so each frame composites
+    // cheaply. Toggled imperatively (no React state → no re-render).
+    if (wasEmpty) {
+      const node = overlayRef.current;
+      if (node) node.classList.add('is-gesturing');
     }
 
     if (pointersRef.current.size === 1) {
@@ -708,8 +759,17 @@ export default function Trace() {
     pointersRef.current.delete(e.pointerId);
     if (pointersRef.current.size === 0) {
       gestureRef.current = null;
-      // Last finger up — sync React state to the final live transform.
+      // Last finger up — restore the drop-shadow and sync React state to the
+      // final live transform.
+      const node = overlayRef.current;
+      if (node) node.classList.remove('is-gesturing');
       commitLive();
+      // Defer the hint dismissal to gesture END so it never causes a re-render
+      // during an active drag.
+      if (!hintDismissedRef.current) {
+        hintDismissedRef.current = true;
+        setShowHint(false);
+      }
     } else if (pointersRef.current.size === 1) {
       // Switching from pinch back to drag — re-anchor against the LIVE
       // transform (state hasn't committed yet) so there's no snap.
@@ -720,6 +780,7 @@ export default function Trace() {
         startY: remaining.y,
         startTransform: { ...(liveTransformRef.current ?? transformRef.current) },
       };
+      firstMoveRef.current = true;
     }
   }, [commitLive]);
 
@@ -941,12 +1002,28 @@ export default function Trace() {
           <img src="/images/brand/logo-icon.webp" alt="" className="trace-brand-icon" />
           <span className="trace-brand-domain">tracemate.art</span>
         </div>
-        {recording && (
-          <div className="trace-rec-chip" role="status" aria-live="polite">
-            <span className="trace-rec-dot" aria-hidden="true" />
-            <span>REC {formatRecTime(recordSecs)}</span>
-          </div>
-        )}
+        <div className="trace-topbar-right">
+          {recording && (
+            <div className="trace-rec-chip" role="status" aria-live="polite">
+              <span className="trace-rec-dot" aria-hidden="true" />
+              <span>REC {formatRecTime(recordSecs)}</span>
+            </div>
+          )}
+          <button
+            type="button"
+            className="trace-help-btn"
+            onClick={() => setShowHelp(true)}
+            aria-label="Help"
+            title="Help"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9.5" />
+              <path d="M9.6 9a2.5 2.5 0 0 1 4.8.9c0 1.6-2.4 2-2.4 3.6" />
+              <circle cx="12" cy="17.4" r="1" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
+        </div>
       </header>
 
       {/* Hint */}
@@ -1025,7 +1102,6 @@ export default function Trace() {
             <div className="trace-dock-tabs" role="tablist" aria-label="Adjust mode">
               {[
                 { id: 'opacity', label: 'Opacity' },
-                { id: 'adjust',  label: 'Adjust'  },
                 { id: 'flicker', label: 'Flicker' },
               ].map((t) => (
                 <button
@@ -1058,87 +1134,6 @@ export default function Trace() {
                     style={{ '--tm-slider-fill': `${(opacity - 0.05) / 0.95 * 100}%` }}
                   />
                   <span className="trace-slider-value">{Math.round(opacity * 100)}%</span>
-                </div>
-              )}
-
-              {panelTab === 'adjust' && (
-                <div className="trace-slider-grid">
-                  {/* Move X — bounds chosen to comfortably cover any
-                      typical phone/tablet viewport without a hard wall. */}
-                  <div className="trace-slider trace-slider-compact">
-                    <span className="trace-slider-label" aria-hidden="true">X</span>
-                    <input
-                      type="range"
-                      min={-600}
-                      max={600}
-                      step={1}
-                      value={Math.round(transform.x)}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value, 10);
-                        setTransform((t) => ({ ...t, x: v }));
-                      }}
-                      aria-label="Move horizontally"
-                      style={{ '--tm-slider-fill': `${((transform.x + 600) / 1200) * 100}%` }}
-                    />
-                    <span className="trace-slider-value">{Math.round(transform.x)}</span>
-                  </div>
-                  <div className="trace-slider trace-slider-compact">
-                    <span className="trace-slider-label" aria-hidden="true">Y</span>
-                    <input
-                      type="range"
-                      min={-600}
-                      max={600}
-                      step={1}
-                      value={Math.round(transform.y)}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value, 10);
-                        setTransform((t) => ({ ...t, y: v }));
-                      }}
-                      aria-label="Move vertically"
-                      style={{ '--tm-slider-fill': `${((transform.y + 600) / 1200) * 100}%` }}
-                    />
-                    <span className="trace-slider-value">{Math.round(transform.y)}</span>
-                  </div>
-                  {/* Zoom — same 0.2..8 bounds as gesture pinch (see
-                      onPointerMove). Stepped at 0.01 for fine control. */}
-                  <div className="trace-slider trace-slider-compact">
-                    <span className="trace-slider-label" aria-hidden="true">Zoom</span>
-                    <input
-                      type="range"
-                      min={0.2}
-                      max={8}
-                      step={0.01}
-                      value={transform.scale}
-                      onChange={(e) => {
-                        const v = parseFloat(e.target.value);
-                        setTransform((t) => ({ ...t, scale: v }));
-                      }}
-                      aria-label="Zoom"
-                      style={{ '--tm-slider-fill': `${((transform.scale - 0.2) / 7.8) * 100}%` }}
-                    />
-                    <span className="trace-slider-value">{transform.scale.toFixed(2)}×</span>
-                  </div>
-                  {/* Rotate — gestures can push rotation past ±180 (no
-                      modulo); the slider clamps when used. Display in
-                      degrees, normalized into the slider's range so a
-                      "spun" overlay still has a sensible thumb position. */}
-                  <div className="trace-slider trace-slider-compact">
-                    <span className="trace-slider-label" aria-hidden="true">Rotate</span>
-                    <input
-                      type="range"
-                      min={-180}
-                      max={180}
-                      step={1}
-                      value={Math.max(-180, Math.min(180, Math.round(transform.rotation)))}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value, 10);
-                        setTransform((t) => ({ ...t, rotation: v }));
-                      }}
-                      aria-label="Rotate"
-                      style={{ '--tm-slider-fill': `${((Math.max(-180, Math.min(180, transform.rotation)) + 180) / 360) * 100}%` }}
-                    />
-                    <span className="trace-slider-value">{Math.round(transform.rotation)}°</span>
-                  </div>
                 </div>
               )}
 
@@ -1220,10 +1215,10 @@ export default function Trace() {
               )}
             </div>
 
-            {/* Compact actions row. Center moved out of here into the
-                Adjust tab is tempting but a one-tap recenter is the most
-                common shortcut, so it stays. Flicker moved out — it
-                lives in the Flicker tab now. */}
+            {/* Compact actions row. With the Adjust tab gone, these buttons
+                (recenter / flip / warp / camera / flash / record) plus the
+                touch gestures cover everything the X/Y/Zoom/Rotate sliders did.
+                Flicker lives in the Flicker tab. */}
             <div className="trace-dock-actions">
               <button
                 type="button"
@@ -1353,6 +1348,9 @@ export default function Trace() {
           </div>
         </div>
       )}
+
+      {/* Help / onboarding overlay — auto on first visit, re-openable via "?" */}
+      {showHelp && <TraceHelp onClose={dismissHelp} />}
     </div>
   );
 }

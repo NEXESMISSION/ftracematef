@@ -31,6 +31,7 @@ body:has(.trace-stage) {
   position: absolute;
   inset: 0;
   cursor: grab;
+  touch-action: none;
 }
 .trace-overlay-wrap:active { cursor: grabbing; }
 
@@ -42,9 +43,16 @@ body:has(.trace-stage) {
   max-height: 70vh;
   pointer-events: none;
   will-change: transform;
+  /* NEVER transition `transform` — the per-frame imperative gesture writes
+     would animate over the easing and feel laggy. Only opacity/filter ease. */
   transition: opacity 0.15s ease, filter 0.2s ease;
   filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.45));
 }
+/* While actively dragging / pinching / rotating, drop the expensive
+   drop-shadow so each frame composites cheaply. The shadow returns (with a
+   gentle 0.2s ease, above) the moment the gesture ends. Toggled imperatively
+   via overlayRef.classList — never React state — to avoid re-renders. */
+.trace-overlay-img.is-gesturing { filter: none; }
 /* ----- Top bar (End session + brand mark) ----- */
 .trace-topbar {
   position: absolute;
@@ -131,6 +139,34 @@ body:has(.trace-stage) {
 }
 .trace-end-btn:hover { background: rgba(0, 0, 0, 0.6); }
 .trace-end-btn:active { transform: scale(0.96); }
+
+/* Right cluster of the topbar (REC chip + Help button). */
+.trace-topbar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* "?" help button — matches the translucent topbar treatment, circular. */
+.trace-help-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.trace-help-btn svg { display: block; }
+.trace-help-btn:hover { background: rgba(0, 0, 0, 0.6); }
+.trace-help-btn:active { transform: scale(0.92); }
 
 /* ----- Hint ----- */
 .trace-hint {
@@ -282,7 +318,7 @@ body:has(.trace-stage) {
 /* ----- Segmented tab control ----- */
 .trace-dock-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 0;
   padding: 3px;
   background: rgba(255, 255, 255, 0.08);
@@ -785,6 +821,140 @@ body:has(.trace-stage) {
 }
 .warp-reset:hover { background: rgba(0, 0, 0, 0.78); }
 .warp-reset:active { transform: translateX(-50%) scale(0.96); }
+
+/* ----- Help / onboarding overlay ----- */
+.trace-help-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: traceHelpFade 0.22s ease;
+}
+@keyframes traceHelpFade { from { opacity: 0; } to { opacity: 1; } }
+
+.trace-help-card {
+  display: flex;
+  flex-direction: column;
+  width: min(440px, 100%);
+  max-height: 100%;
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  border-radius: 20px;
+  box-shadow: 6px 6px 0 var(--ink);
+  overflow: hidden;
+  animation: traceHelpPop 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes traceHelpPop {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+.trace-help-head {
+  flex-shrink: 0;
+  padding: 20px 22px 12px;
+}
+.trace-help-head h3 {
+  margin: 0 0 6px;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.trace-help-head p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.trace-help-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+}
+
+.trace-help-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 13px 4px;
+  border-bottom: 1px solid rgba(43, 33, 24, 0.1);
+}
+.trace-help-row:last-child { border-bottom: none; }
+
+.trace-help-media {
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(43, 33, 24, 0.06);
+  border: 1px solid rgba(43, 33, 24, 0.1);
+  overflow: hidden;
+}
+.trace-help-gif {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.trace-help-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--coral);
+}
+
+.trace-help-text { flex: 1; min-width: 0; }
+.trace-help-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 3px;
+}
+.trace-help-inline-icon { display: inline-flex; color: var(--coral); }
+.trace-help-inline-icon svg { width: 17px; height: 17px; }
+.trace-help-text p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.trace-help-done {
+  flex-shrink: 0;
+  margin: 12px 18px 18px;
+  padding: 13px;
+  border: 1.5px solid var(--ink);
+  border-radius: 12px;
+  background: var(--coral);
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--ink);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.trace-help-done:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--ink); }
+.trace-help-done:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink); }
 
 /* ----- Responsive ----- */
 @media (max-width: 480px) {
