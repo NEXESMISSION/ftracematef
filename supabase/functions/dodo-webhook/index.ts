@@ -307,7 +307,7 @@ Deno.serve(async (req) => {
 
   // ── 4. Process by event type ─────────────────────────────────────────
   try {
-    await processEvent(event, supabase);
+    await processEvent(event, supabase, id);
     if (logged?.id) {
       await supabase
         .from('webhook_events')
@@ -335,7 +335,7 @@ Deno.serve(async (req) => {
 // Event handlers
 // ─────────────────────────────────────────────────────────────────────────
 
-async function processEvent(event: any, supabase: any) {
+async function processEvent(event: any, supabase: any, webhookId: string) {
   const type = event.type as string | undefined;
   if (!type) return;
 
@@ -377,6 +377,26 @@ async function processEvent(event: any, supabase: any) {
     case 'subscription.plan_changed':
     case 'subscription.updated': {
       await upsertActiveSubscription(type, data, userId, supabase);
+      // Affiliate commission: only real charges (first activation + each
+      // renewal) earn a payout — plan_changed / metadata updates do NOT, so a
+      // partner can't be paid twice for the same cycle. Idempotent on
+      // charge_key. Never throws (see helper) so payment processing is never
+      // blocked by the referral subsystem.
+      if (type === 'subscription.active' || type === 'subscription.renewed') {
+        const subId     = data.subscription_id ?? data.id ?? null;
+        const periodEnd = data.next_billing_date ?? data.current_period_end ?? null;
+        const chargeKey = subId
+          ? `sub:${subId}:${periodEnd ?? webhookId}`
+          : `whid:${webhookId}`;
+        await bookReferralCommission(supabase, userId, {
+          chargeKey,
+          eventType:      type,
+          amountCents:    data.recurring_pre_tax_amount ?? data.amount ?? null,
+          currency:       data.currency ?? null,
+          subscriptionId: subId,
+          paymentId:      data.payment_id ?? null,
+        });
+      }
       return;
     }
 
@@ -498,6 +518,18 @@ async function processEvent(event: any, supabase: any) {
           }
         }
       }
+
+      // Affiliate commission for the lifetime purchase. Idempotent on
+      // charge_key (payment_id is guaranteed non-null here — we threw above
+      // otherwise). Never throws.
+      await bookReferralCommission(supabase, userId, {
+        chargeKey:      `pay:${paymentId}`,
+        eventType:      'payment.succeeded',
+        amountCents:    data.total_amount ?? data.amount ?? null,
+        currency:       data.currency ?? 'USD',
+        subscriptionId: null,
+        paymentId,
+      });
       return;
     }
 
@@ -739,6 +771,89 @@ async function markSubscriptionInactive(
     .update(update)
     .eq('user_id', userId)
     .eq('status', 'active');
+}
+
+// Book an affiliate commission for a paid charge, if the buyer was referred.
+//
+// First-touch attribution: we read profiles.referred_by (stamped at signup by
+// record_referral) rather than trusting anything on the event, so a partner
+// can only ever be credited for users they genuinely brought in.
+//
+// Commission = the referrer's flat override when set, otherwise a percentage
+// (basis points) of the sale amount. One row per real charge, deduped by
+// charge_key so webhook retries / reprocessing can't double-book.
+//
+// CRITICAL: this never throws. The payment has already been granted by the
+// time we get here; a failure in the referral subsystem (missing table on an
+// un-migrated project, transient error) must not bubble up and return a 500
+// that makes Dodo retry — or worse, leave the buyer's entitlement in limbo.
+// Failures are logged and swallowed.
+async function bookReferralCommission(
+  supabase: any,
+  userId: string,
+  opts: {
+    chargeKey: string;
+    eventType: string;
+    amountCents: number | null;
+    currency: string | null;
+    subscriptionId: string | null;
+    paymentId: string | null;
+  },
+): Promise<void> {
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('referred_by')
+      .eq('id', userId)
+      .maybeSingle();
+
+    const referrerId = profile?.referred_by ?? null;
+    if (!referrerId) return; // organic signup — nothing to pay
+
+    const { data: ref } = await supabase
+      .from('referrers')
+      .select('id, active, commission_rate_bps, commission_flat_cents')
+      .eq('id', referrerId)
+      .maybeSingle();
+    if (!ref || ref.active !== true) return; // unknown / disabled partner
+
+    const amount = typeof opts.amountCents === 'number'
+      ? opts.amountCents
+      : Number(opts.amountCents);
+
+    let commission = 0;
+    if (ref.commission_flat_cents != null) {
+      commission = ref.commission_flat_cents;
+    } else if (Number.isFinite(amount)) {
+      commission = Math.floor((amount * (ref.commission_rate_bps ?? 0)) / 10000);
+    }
+    if (!Number.isFinite(commission) || commission <= 0) return;
+
+    // upsert with ignoreDuplicates so a re-processed event for the same charge
+    // is a silent no-op instead of a unique-violation error.
+    const { error } = await supabase
+      .from('referral_commissions')
+      .upsert(
+        {
+          referrer_id:          ref.id,
+          user_id:              userId,
+          charge_key:           opts.chargeKey,
+          event_type:           opts.eventType,
+          sale_amount_cents:    Number.isFinite(amount) ? amount : null,
+          currency:             opts.currency ?? null,
+          commission_cents:     commission,
+          status:               'pending',
+          dodo_payment_id:      opts.paymentId ?? null,
+          dodo_subscription_id: opts.subscriptionId ?? null,
+        },
+        { onConflict: 'charge_key', ignoreDuplicates: true },
+      );
+    if (error) {
+      console.error('bookReferralCommission upsert failed (non-fatal):', error);
+    }
+  } catch (err) {
+    console.error('bookReferralCommission threw (non-fatal):', err);
+  }
 }
 
 // Refund a one-time payment at Dodo via the official SDK. Used when the

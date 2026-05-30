@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { supabase } from '../lib/supabase.js';
 import { endTrialSession } from '../lib/freeTrial.js';
 import { currentPresence, onPresenceChange } from '../lib/presence.js';
+import { readSource, readAffiliate } from '../lib/attribution.js';
 
 /**
  * AuthProvider exposes `{ user, profile, subscription, isPaid, loading, signOut, refresh }`
@@ -453,19 +454,13 @@ export function AuthProvider({ children }) {
       try { return document.referrer || ''; } catch { return ''; }
     })();
     // Traffic-source attribution: read the first-touch slug stamped by
-    // RefRedirect on /r/:source (or a pretty-alias route like /tiktok).
-    // We DON'T clear these keys after reading — re-reading the same value
-    // is harmless because the RPC is idempotent (only writes if the column
-    // is still null), and keeping them around lets us debug an unstamped
-    // signup ("did the link click happen at all?") from the user's browser.
-    const { source, campaign } = (() => {
-      try {
-        return {
-          source:   window.localStorage.getItem('tm:ref')          || '',
-          campaign: window.localStorage.getItem('tm:ref-campaign') || '',
-        };
-      } catch { return { source: '', campaign: '' }; }
-    })();
+    // RefRedirect on /r/:source (or a pretty-alias route like /tiktok),
+    // now from cookie OR localStorage (whichever survived the in-app
+    // browser — see lib/attribution.js). We DON'T clear these after reading:
+    // re-reading the same value is harmless because the RPC is idempotent
+    // (only writes if the column is still null), and keeping them around
+    // lets us debug an unstamped signup from the user's browser.
+    const { source, campaign } = readSource();
     // PostgrestBuilder is PromiseLike (only .then) — using .catch directly
     // throws "x.catch is not a function". Pass a no-op error handler as
     // the second .then argument instead. Same intent: silent on failure.
@@ -475,6 +470,17 @@ export function AuthProvider({ children }) {
       p_source:   source.slice(0, 32),
       p_campaign: campaign.slice(0, 60),
     }).then(() => {}, () => {});
+
+    // Affiliate referral attribution: if this browser clicked a partner's
+    // /i/:code link before signing up, stamp the new profile with that
+    // referrer so the dodo-webhook can pay commission on their purchases.
+    // First-touch + idempotent server-side (only writes if referred_by is
+    // still null), so a no-op for organic signups.
+    const affiliate = readAffiliate();
+    if (affiliate) {
+      supabase.rpc('record_referral', { p_code: affiliate.slice(0, 32) })
+        .then(() => {}, () => {});
+    }
   }, [profile]);
 
   // 3) Real-time: when the webhook flips this user's subscription, refresh.

@@ -12,6 +12,7 @@ import {
   ALLOWED_IMAGE_MIME,
 } from '../lib/pendingImage.js';
 import { beginTrialSession, canUseFreeTrial } from '../lib/freeTrial.js';
+import { removeBackground } from '../lib/removeBackground.js';
 import { usePresence } from '../hooks/usePresence.js';
 
 /**
@@ -42,6 +43,12 @@ export default function Upload() {
   const [savedFile, setSavedFile]   = useState(null);   // raw File, used for preview only
   const [loginOpen, setLoginOpen]   = useState(false);
   const [celebrateOpen, setCelebrateOpen] = useState(false);
+  // Background removal state. originalRef holds the pre-removal { url, file }
+  // so the user can restore the original in one tap.
+  const [processing, setProcessing] = useState(false);
+  const [bgRemoved, setBgRemoved]   = useState(false);
+  const [bgError, setBgError]       = useState('');
+  const originalRef                 = useRef(null);
 
   useEffect(() => {
     document.body.classList.add('upload-body');
@@ -110,7 +117,14 @@ export default function Upload() {
       return;
     }
     setError('');
+    setBgError('');
     if (preview && preview.startsWith('blob:')) URL.revokeObjectURL(preview);
+    // A fresh image drops any prior background-removal state.
+    if (originalRef.current?.url && originalRef.current.url.startsWith('blob:')) {
+      URL.revokeObjectURL(originalRef.current.url);
+    }
+    originalRef.current = null;
+    setBgRemoved(false);
 
     // Show an instant blob preview while we save the persistent copy.
     const blobUrl = URL.createObjectURL(file);
@@ -138,11 +152,63 @@ export default function Upload() {
 
   const clearImage = () => {
     if (preview && preview.startsWith('blob:')) URL.revokeObjectURL(preview);
+    if (originalRef.current?.url && originalRef.current.url.startsWith('blob:')) {
+      URL.revokeObjectURL(originalRef.current.url);
+    }
+    originalRef.current = null;
+    setBgRemoved(false);
+    setBgError('');
     setPreview(null);
     setFileName('');
     setSavedFile(null);
     clearPendingImage();
     if (inputRef.current) inputRef.current.value = '';
+  };
+
+  // Cut the background out on-device and swap the preview for the transparent
+  // PNG. Remembers the original so "Restore original" can undo it. The result
+  // is persisted to sessionStorage so it survives the sign-in / payment
+  // round-trips, exactly like a normal upload.
+  const removeBg = async () => {
+    if (!preview || processing) return;
+    setProcessing(true);
+    setBgError('');
+    try {
+      const { blob, url } = await removeBackground(preview, { tolerance: 46 });
+      const baseName = (fileName || 'image').replace(/\.[^.]+$/, '');
+      const file = new File([blob], `${baseName}-nobg.png`, { type: 'image/png' });
+      if (!bgRemoved) {
+        // First removal — stash the original for undo.
+        originalRef.current = { url: preview, file: savedFile };
+      } else if (preview.startsWith('blob:')) {
+        // Re-running on an already-cut image — revoke the intermediate.
+        URL.revokeObjectURL(preview);
+      }
+      setPreview(url);
+      setFileName(file.name);
+      setSavedFile(file);
+      setBgRemoved(true);
+      const saved = await savePendingImage(file);
+      if (!saved) console.warn('[upload] no-bg image too large to persist across redirects');
+    } catch (err) {
+      console.warn('[upload] background removal failed:', err);
+      setBgError('Could not remove the background. This works best on images with a solid, even background.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const restoreOriginal = async () => {
+    const orig = originalRef.current;
+    if (!orig || processing) return;
+    if (preview && preview.startsWith('blob:')) URL.revokeObjectURL(preview);
+    setPreview(orig.url);
+    setSavedFile(orig.file);
+    setFileName(orig.file?.name || fileName);
+    setBgRemoved(false);
+    setBgError('');
+    originalRef.current = null;
+    if (orig.file) await savePendingImage(orig.file);
   };
 
   const startTracing = () => {
@@ -228,15 +294,61 @@ export default function Upload() {
             </label>
           ) : (
             <div className="upload-preview">
-              <img src={preview} alt="Selected reference" />
-              <button type="button" className="upload-change-btn" onClick={clearImage}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M2.5 8 a5.5 5.5 0 1 0 1.7 -3.9 M2.5 2.5 V5.2 H5.2" />
-                </svg>
-                Choose a different image
-              </button>
+              <img
+                src={preview}
+                alt="Selected reference"
+                className={bgRemoved ? 'is-transparent' : ''}
+              />
+              <div className="upload-preview-actions">
+                {!bgRemoved ? (
+                  <button
+                    type="button"
+                    className="upload-bg-btn"
+                    onClick={removeBg}
+                    disabled={processing}
+                  >
+                    {processing ? (
+                      <span className="upload-spinner" aria-hidden="true" />
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                           strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M2 2 L14 14 M14 2 L2 14" opacity="0.35" />
+                        <rect x="2" y="2" width="12" height="12" rx="2" />
+                      </svg>
+                    )}
+                    {processing ? 'Removing…' : 'Remove background'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="upload-bg-btn is-active"
+                    onClick={restoreOriginal}
+                    disabled={processing}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M2.5 8 a5.5 5.5 0 1 0 1.7 -3.9 M2.5 2.5 V5.2 H5.2" />
+                    </svg>
+                    Restore original
+                  </button>
+                )}
+                <button type="button" className="upload-change-btn" onClick={clearImage}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M2.5 8 a5.5 5.5 0 1 0 1.7 -3.9 M2.5 2.5 V5.2 H5.2" />
+                  </svg>
+                  Choose a different image
+                </button>
+              </div>
             </div>
+          )}
+
+          {bgError && <p className="upload-error">{bgError}</p>}
+          {bgRemoved && !bgError && (
+            <p className="upload-bg-hint">
+              Background removed on your device. Best on solid backgrounds — if
+              edges look rough, restore and trace the original.
+            </p>
           )}
 
           {error && <p className="upload-error">{error}</p>}

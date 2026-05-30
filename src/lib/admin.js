@@ -45,8 +45,10 @@ export async function getUserActivity(userId) {
 }
 
 /**
- * Server-side analytics rollup for the StatsPanel + the webhook health
- * sidecar. Returns:
+ * Server-side analytics rollup + the webhook health sidecar. The business
+ * stats panel that consumed `stats` was removed (a better one is coming); the
+ * dashboard currently only uses `webhook_health` from this call, but the
+ * `stats` payload is still returned for whatever replaces it. Returns:
  *   { stats: { funnel, revenue, activity, engagement, top_users, at_risk },
  *     webhook_health: { stuck_count, stuck_24h_count, oldest_stuck_age_secs, recent } }
  *
@@ -66,4 +68,66 @@ export async function getAdminStats() {
     stats:          data?.stats ?? null,
     webhook_health: data?.webhook_health ?? null,
   };
+}
+
+/* ── Referral / affiliate program ──────────────────────────────────────────
+ * All operator-side referral CRUD + payout actions route through the single
+ * admin-referrals Edge Function (server-side triple-gated, same as the other
+ * admin endpoints). Thin wrappers so the dashboard reads cleanly.
+ */
+
+// One element per referrer with signup/sale/commission aggregates.
+export async function listReferrers() {
+  const { data, error } = await supabase.functions.invoke('admin-referrals', {
+    method: 'POST',
+    body: { action: 'list' },
+  });
+  if (error) throw new Error(await unwrapFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return data?.referrers ?? [];
+}
+
+// Create a partner. `code` is optional — omit to auto-generate a short slug.
+export async function createReferrer(payload) {
+  const { data, error } = await supabase.functions.invoke('admin-referrals', {
+    method: 'POST',
+    body: { action: 'create', ...payload },
+  });
+  if (error) throw new Error(await unwrapFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return data?.referrer;
+}
+
+// Patch a partner (name/email/code/active/rate/flat/notes).
+export async function updateReferrer(id, patch) {
+  const { data, error } = await supabase.functions.invoke('admin-referrals', {
+    method: 'POST',
+    body: { action: 'update', id, patch },
+  });
+  if (error) throw new Error(await unwrapFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return true;
+}
+
+// Issue a fresh self-view access token (invalidates the old partner link).
+export async function rotateReferrerToken(id) {
+  const { data, error } = await supabase.functions.invoke('admin-referrals', {
+    method: 'POST',
+    body: { action: 'rotate_token', id },
+  });
+  if (error) throw new Error(await unwrapFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return data?.access_token;
+}
+
+// Flip every pending commission for a partner to paid (after you've sent the
+// money). Returns the count marked paid.
+export async function markCommissionsPaid(referrerId) {
+  const { data, error } = await supabase.functions.invoke('admin-referrals', {
+    method: 'POST',
+    body: { action: 'mark_paid', referrer_id: referrerId },
+  });
+  if (error) throw new Error(await unwrapFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return data?.updated ?? 0;
 }

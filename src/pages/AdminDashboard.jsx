@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { listAllUsers, getUserActivity, getAdminStats } from '../lib/admin.js';
+import {
+  listAllUsers, getUserActivity, getAdminStats,
+  listReferrers, createReferrer, updateReferrer, rotateReferrerToken, markCommissionsPaid,
+} from '../lib/admin.js';
 import { friendlyError } from '../lib/errors.js';
 import { usePresence } from '../hooks/usePresence.js';
 import { PLAN_LABEL, PLAN_BY_ID } from '../lib/plans.js';
@@ -399,131 +402,6 @@ function Timeline({ activity, journey }) {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────────────── */
-/* Stats panel — server-side rollup of funnel, revenue, activity, top users,
-   and at-risk paying customers. The per-user list below answers "who?";
-   this panel answers "how's the business doing?". */
-
-function formatMoneyCents(cents, currency = 'USD') {
-  if (cents == null) return '—';
-  const n = Number(cents);
-  if (!Number.isFinite(n)) return '—';
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: n >= 100_00 ? 0 : 2,
-    }).format(n / 100);
-  } catch {
-    return `$${(n / 100).toFixed(2)}`;
-  }
-}
-
-function pct(part, whole) {
-  if (!whole) return '0%';
-  const v = (part / whole) * 100;
-  if (v >= 10)  return `${Math.round(v)}%`;
-  if (v >= 1)   return `${v.toFixed(1)}%`;
-  return `${v.toFixed(2)}%`;
-}
-
-// Tiny inline bar chart — pure SVG, no chart library. 14 days × 2 series
-// (signups + tracings) stacked vertically with a shared y-axis. Hover tip
-// uses native title attribute so we don't need a tooltip layer.
-function ActivitySparkline({ days }) {
-  const data = days ?? [];
-  if (data.length === 0) {
-    return <div className="admin-stats-empty">No activity yet.</div>;
-  }
-  const max = Math.max(
-    1,
-    ...data.map((d) => Math.max(d.signups || 0, d.tracings || 0)),
-  );
-  const W = 280, H = 90, pad = 4;
-  const slot = (W - pad * 2) / data.length;
-  const barW = Math.max(2, slot * 0.36);
-  const yFor = (n) => H - pad - (n / max) * (H - pad * 2);
-  return (
-    <div className="admin-stats-chart-wrap">
-      <div className="admin-stats-chart-legend">
-        <span><span className="admin-stats-swatch admin-stats-swatch-tracings" /> Tracings</span>
-        <span><span className="admin-stats-swatch admin-stats-swatch-signups" /> Signups</span>
-      </div>
-      <svg
-        className="admin-stats-chart"
-        viewBox={`0 0 ${W} ${H}`}
-        role="img"
-        aria-label="14-day activity"
-      >
-        {data.map((d, i) => {
-          const xCenter = pad + slot * (i + 0.5);
-          const xT = xCenter - barW - 1;
-          const xS = xCenter + 1;
-          const yT = yFor(d.tracings || 0);
-          const yS = yFor(d.signups || 0);
-          const title = `${d.date} — ${d.tracings || 0} tracings, ${d.signups || 0} signups, ${d.paid || 0} paid`;
-          return (
-            <g key={d.date}>
-              <title>{title}</title>
-              <rect
-                className="admin-stats-bar admin-stats-bar-tracings"
-                x={xT} y={yT}
-                width={barW} height={Math.max(0, H - pad - yT)}
-              />
-              <rect
-                className="admin-stats-bar admin-stats-bar-signups"
-                x={xS} y={yS}
-                width={barW} height={Math.max(0, H - pad - yS)}
-              />
-            </g>
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
-
-function FunnelPanel({ funnel }) {
-  if (!funnel) return null;
-  const steps = [
-    { key: 'signed_up',      label: 'Signed up',      n: funnel.signed_up      ?? 0 },
-    { key: 'opened_studio',  label: 'Opened studio',  n: funnel.opened_studio  ?? 0 },
-    { key: 'used_trial',     label: 'Used a session', n: funnel.used_trial     ?? 0 },
-    { key: 'currently_paid', label: 'Paying now',     n: funnel.currently_paid ?? 0 },
-  ];
-  const top = steps[0].n || 1;
-  return (
-    <div className="admin-stats-funnel">
-      {steps.map((s, i) => {
-        const prev = i === 0 ? null : steps[i - 1].n;
-        return (
-          <div key={s.key} className="admin-stats-funnel-step">
-            <div className="admin-stats-funnel-bar">
-              <div
-                className="admin-stats-funnel-fill"
-                style={{ width: `${Math.max(2, (s.n / top) * 100)}%` }}
-              />
-              <span className="admin-stats-funnel-label">{s.label}</span>
-              <span className="admin-stats-funnel-count">{s.n}</span>
-            </div>
-            <div className="admin-stats-funnel-meta">
-              {prev != null && (
-                <span title={`vs previous step`}>
-                  {pct(s.n, prev)} of {steps[i - 1].label.toLowerCase()}
-                </span>
-              )}
-              {i === steps.length - 1 && top > 0 && (
-                <span className="admin-stats-funnel-overall" title="Overall conversion">
-                  · {pct(s.n, top)} overall
-                </span>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 // Single source of truth for the stats + webhook-health rollup. Called at
 // the page level so the WebhookHealthPanel can stay visible across tab
@@ -558,169 +436,6 @@ function useAdminMeta() {
   return { stats, health, error, loading };
 }
 
-function StatsPanel({ stats, error, loading }) {
-
-  if (loading && !stats) {
-    return (
-      <section className="admin-stats">
-        <header className="admin-stats-head">
-          <h2>Business stats</h2>
-        </header>
-        <div className="admin-stats-loading">
-          <span className="admin-spinner" aria-hidden="true" />
-          <span>Loading stats…</span>
-        </div>
-      </section>
-    );
-  }
-  if (error) {
-    return (
-      <section className="admin-stats">
-        <header className="admin-stats-head">
-          <h2>Business stats</h2>
-        </header>
-        <p className="admin-error" style={{ margin: 12 }}>{error}</p>
-      </section>
-    );
-  }
-  if (!stats) return null;
-
-  const { funnel, revenue, activity, engagement, top_users, at_risk } = stats;
-  const planEntries = Object.entries(revenue?.plans ?? {});
-
-  return (
-    <section className="admin-stats" aria-labelledby="admin-stats-title">
-      <header className="admin-stats-head">
-        <h2 id="admin-stats-title">Business stats</h2>
-        <span className="admin-stats-when">
-          updated {stats.computed_at ? formatTraceRelative(stats.computed_at) : 'just now'}
-        </span>
-      </header>
-
-      <div className="admin-stats-grid">
-        {/* ── Revenue tile ───────────────────────────────────────────── */}
-        <div className="admin-stats-card admin-stats-revenue">
-          <div className="admin-stats-card-head">
-            <h3>Revenue</h3>
-          </div>
-          <div className="admin-stats-revenue-headline">
-            <div>
-              <span className="admin-stats-revenue-value">{formatMoneyCents(revenue?.mrr_cents)}</span>
-              <span className="admin-stats-revenue-label">/ month (MRR)</span>
-            </div>
-            <div className="admin-stats-revenue-secondary">
-              <span>{formatMoneyCents(revenue?.lifetime_revenue_cents)} lifetime</span>
-            </div>
-          </div>
-          <dl className="admin-stats-mini">
-            <div><dt>New paid · today</dt>     <dd>{revenue?.paid_today      ?? 0}</dd></div>
-            <div><dt>New paid · week</dt>      <dd>{revenue?.paid_this_week  ?? 0}</dd></div>
-            <div><dt>New paid · month</dt>     <dd>{revenue?.paid_this_month ?? 0}</dd></div>
-          </dl>
-          {planEntries.length > 0 && (
-            <div className="admin-stats-plans">
-              {planEntries.map(([plan, n]) => (
-                <span key={plan} className="admin-stats-plan-pill">
-                  <strong>{n}</strong> {PLAN_LABEL[plan] ?? plan}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── Funnel tile ───────────────────────────────────────────── */}
-        <div className="admin-stats-card">
-          <div className="admin-stats-card-head">
-            <h3>Conversion funnel</h3>
-          </div>
-          <FunnelPanel funnel={funnel} />
-        </div>
-
-        {/* ── Activity / engagement tile ────────────────────────────── */}
-        <div className="admin-stats-card">
-          <div className="admin-stats-card-head">
-            <h3>Activity · last 14 days</h3>
-          </div>
-          <ActivitySparkline days={activity} />
-          <dl className="admin-stats-mini">
-            <div>
-              <dt>Active · 24h</dt>
-              <dd>{engagement?.active_24h ?? 0}</dd>
-            </div>
-            <div>
-              <dt>Active · 7d</dt>
-              <dd>{engagement?.active_7d ?? 0}</dd>
-            </div>
-            <div>
-              <dt>Tracings · 24h</dt>
-              <dd>{engagement?.tracings_24h ?? 0}</dd>
-            </div>
-            <div>
-              <dt>Time traced · 7d</dt>
-              <dd>{formatDuration(engagement?.tracing_seconds_7d ?? 0)}</dd>
-            </div>
-          </dl>
-        </div>
-
-        {/* ── Top users tile ────────────────────────────────────────── */}
-        <div className="admin-stats-card">
-          <div className="admin-stats-card-head">
-            <h3>Top tracers</h3>
-          </div>
-          {top_users?.length ? (
-            <ol className="admin-stats-list">
-              {top_users.map((u) => (
-                <li key={u.id}>
-                  <span className="admin-stats-list-id">
-                    {u.email ?? '—'}
-                    {u.is_paid && <span className="admin-stats-list-tag">paid</span>}
-                  </span>
-                  <span className="admin-stats-list-meta">
-                    {formatDuration(u.total_trace_seconds)}
-                    {' · '}
-                    {u.trace_sessions} sess
-                  </span>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <div className="admin-stats-empty">No tracings yet.</div>
-          )}
-        </div>
-
-        {/* ── At-risk tile ──────────────────────────────────────────── */}
-        <div className="admin-stats-card admin-stats-card-wide">
-          <div className="admin-stats-card-head">
-            <h3>At risk · paid + idle 14+ days</h3>
-            <span className="admin-stats-card-meta">{at_risk?.length ?? 0}</span>
-          </div>
-          {at_risk?.length ? (
-            <ul className="admin-stats-list admin-stats-list-risk">
-              {at_risk.map((u) => (
-                <li key={u.id}>
-                  <span className="admin-stats-list-id">
-                    {u.email ?? '—'}
-                    <span className="admin-stats-list-tag">{PLAN_LABEL[u.plan] ?? u.plan}</span>
-                  </span>
-                  <span className="admin-stats-list-meta">
-                    {u.last_seen_at
-                      ? `idle ${u.days_since_seen}d`
-                      : 'never opened'}
-                    {u.current_period_end && (
-                      <> · renews {new Date(u.current_period_end).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="admin-stats-empty">All paying customers active. 🎉</div>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 /* ─────────────────────────────────────────────────────────────────────── */
 /* Acquisition — group signups by signup_source (set by /r/:source clicks).
@@ -729,55 +444,80 @@ function StatsPanel({ stats, error, loading }) {
    count descending so the channel sending the most volume is on top.    */
 
 function AcquisitionPanel({ users }) {
-  const rows = useMemo(() => {
-    if (!Array.isArray(users)) return [];
+  // Which source rows are expanded to show their per-campaign breakdown.
+  const [open, setOpen] = useState(() => new Set());
+
+  const { rows, totals } = useMemo(() => {
+    if (!Array.isArray(users)) return { rows: [], totals: { signups: 0, paid: 0 } };
     const bySource = new Map();
     let unattributed = 0;
     let unattributedPaid = 0;
     for (const u of users) {
+      // Admins skew the funnel — drop them, same as the count tiles.
+      if (u?.is_admin) continue;
       const src = (u?.signup_source || '').trim();
       if (!src) {
         unattributed += 1;
         if (u?.is_paid) unattributedPaid += 1;
         continue;
       }
-      const cur = bySource.get(src) ?? { source: src, signups: 0, paid: 0 };
+      const cur = bySource.get(src) ?? { source: src, signups: 0, paid: 0, campaigns: new Map() };
       cur.signups += 1;
       if (u.is_paid) cur.paid += 1;
+      // Nest the ?c=<label> sub-breakdown so a single channel split across
+      // many posts/ads is legible without burning a top-level slug each time.
+      const camp = (u?.signup_campaign || '').trim() || '(none)';
+      const cc = cur.campaigns.get(camp) ?? { campaign: camp, signups: 0, paid: 0 };
+      cc.signups += 1;
+      if (u.is_paid) cc.paid += 1;
+      cur.campaigns.set(camp, cc);
       bySource.set(src, cur);
     }
-    const list = Array.from(bySource.values()).sort((a, b) => b.signups - a.signups);
-    // Always pin "(direct / unknown)" at the bottom — it's the catch-all
-    // bucket for users who came in before /r/:source existed, typed the
-    // URL directly, or arrived via a channel we haven't tagged. Useful as
-    // a sanity check ("what % of signups are still unattributed?") but
-    // never the lead row.
+    const list = Array.from(bySource.values())
+      .map((r) => ({
+        ...r,
+        campaigns: Array.from(r.campaigns.values()).sort((a, b) => b.signups - a.signups),
+      }))
+      .sort((a, b) => b.signups - a.signups);
+    // Always pin "(direct / unknown)" at the bottom — the catch-all for users
+    // who came in before tagged links existed, typed the URL directly, or
+    // arrived via a channel we haven't tagged. A sanity check on how much
+    // traffic is still unattributed, never the lead row.
     if (unattributed > 0) {
       list.push({
         source: '(direct / unknown)',
         signups: unattributed,
         paid: unattributedPaid,
+        campaigns: [],
         muted: true,
       });
     }
-    return list;
+    const tot = list.reduce(
+      (acc, r) => ({ signups: acc.signups + r.signups, paid: acc.paid + r.paid }),
+      { signups: 0, paid: 0 },
+    );
+    return { rows: list, totals: tot };
   }, [users]);
 
-  const totals = rows.reduce(
-    (acc, r) => ({ signups: acc.signups + r.signups, paid: acc.paid + r.paid }),
-    { signups: 0, paid: 0 },
-  );
+  const toggle = useCallback((src) => {
+    setOpen((cur) => {
+      const next = new Set(cur);
+      if (next.has(src)) next.delete(src); else next.add(src);
+      return next;
+    });
+  }, []);
 
   return (
     <section className="admin-stats" aria-labelledby="admin-acq-title">
       <header className="admin-stats-head">
         <h2 id="admin-acq-title">Acquisition by source</h2>
         <span className="admin-stats-when">
-          share <code>tracemate.art/r/&lt;source&gt;</code> or one of the
-          aliases (<code>/tiktok</code>, <code>/reddit</code>, <code>/yt</code>,
+          share <code>tracemate.art/r/&lt;source&gt;</code> or an alias
+          (<code>/tiktok</code>, <code>/reddit</code>, <code>/yt</code>,
           <code>/ig</code>, <code>/x</code>, <code>/threads</code>, <code>/tt</code>)
           and the slug shows up here. Add <code>?c=&lt;label&gt;</code> for
-          per-post breakdowns.
+          per-post breakdowns — click a source to expand them. Now stamped to a
+          cookie + localStorage, so social in-app browsers attribute reliably.
         </span>
       </header>
       {rows.length === 0 ? (
@@ -794,16 +534,45 @@ function AcquisitionPanel({ users }) {
           </div>
           {rows.map((r) => {
             const conv = r.signups > 0 ? Math.round((r.paid / r.signups) * 100) : 0;
+            // A source has a meaningful campaign breakdown when it has more
+            // than one bucket, or a single bucket that isn't the "(none)"
+            // catch-all. Otherwise the row isn't expandable.
+            const realCampaigns = (r.campaigns ?? []).filter((c) => c.campaign !== '(none)');
+            const expandable = realCampaigns.length > 0;
+            const isOpen = open.has(r.source);
             return (
-              <div
-                key={r.source}
-                className={`admin-acq-row ${r.muted ? 'admin-acq-row-muted' : ''}`}
-                role="row"
-              >
-                <span className="admin-acq-source" role="cell">{r.source}</span>
-                <span role="cell">{r.signups}</span>
-                <span role="cell">{r.paid}</span>
-                <span role="cell">{conv}%</span>
+              <div key={r.source} className="admin-acq-group" role="presentation">
+                <div
+                  className={`admin-acq-row ${r.muted ? 'admin-acq-row-muted' : ''} ${expandable ? 'admin-acq-row-expandable' : ''}`}
+                  role="row"
+                  onClick={expandable ? () => toggle(r.source) : undefined}
+                  style={expandable ? { cursor: 'pointer' } : undefined}
+                >
+                  <span className="admin-acq-source" role="cell">
+                    {expandable && (
+                      <span aria-hidden="true" style={{ display: 'inline-block', width: 14 }}>
+                        {isOpen ? '▾' : '▸'}
+                      </span>
+                    )}
+                    {r.source}
+                  </span>
+                  <span role="cell">{r.signups}</span>
+                  <span role="cell">{r.paid}</span>
+                  <span role="cell">{conv}%</span>
+                </div>
+                {isOpen && expandable && realCampaigns.map((c) => {
+                  const cconv = c.signups > 0 ? Math.round((c.paid / c.signups) * 100) : 0;
+                  return (
+                    <div key={c.campaign} className="admin-acq-row admin-acq-row-sub" role="row">
+                      <span className="admin-acq-source" role="cell" style={{ paddingLeft: 28 }}>
+                        ?c={c.campaign}
+                      </span>
+                      <span role="cell">{c.signups}</span>
+                      <span role="cell">{c.paid}</span>
+                      <span role="cell">{cconv}%</span>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
@@ -816,6 +585,288 @@ function AcquisitionPanel({ users }) {
                 {totals.signups > 0 ? Math.round((totals.paid / totals.signups) * 100) : 0}%
               </strong>
             </span>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
+/* Referrals — affiliate partners + commission payouts. Each partner has a
+   unique /i/<code> link; signups and sales referred through it are tracked
+   here, with a one-click "mark paid" once you've sent their commission. Data
+   comes from the admin-referrals Edge Function (get_referral_stats rollup). */
+
+// cents → "$x.xx" (commissions are stored in cents; we display USD-style).
+function fmtCents(cents) {
+  const n = Number(cents);
+  if (!Number.isFinite(n)) return '$0';
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: 'USD',
+      maximumFractionDigits: n % 100 === 0 ? 0 : 2,
+    }).format(n / 100);
+  } catch {
+    return `$${(n / 100).toFixed(2)}`;
+  }
+}
+
+// Human-readable commission terms for a referrer row.
+function commissionLabel(r) {
+  if (r.commission_flat_cents != null) return `${fmtCents(r.commission_flat_cents)} / sale`;
+  return `${(Number(r.commission_rate_bps) || 0) / 100}%`;
+}
+
+function ReferralsPanel() {
+  const [rows, setRows]       = useState(null);
+  const [error, setError]     = useState(null);
+  const [busy, setBusy]       = useState(false);
+  const [notice, setNotice]   = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ name: '', email: '', code: '', rate: '20', flat: '' });
+
+  const origin = (() => {
+    try { return window.location.origin; } catch { return 'https://tracemate.art'; }
+  })();
+
+  const load = useCallback(async () => {
+    try {
+      const data = await listReferrers();
+      setRows(Array.isArray(data) ? data : []);
+      setError(null);
+    } catch (e) {
+      setError(friendlyError(e, 'Could not load referrers.'));
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const flash = useCallback((msg) => {
+    setNotice(msg);
+    setTimeout(() => setNotice(''), 2500);
+  }, []);
+
+  const copy = useCallback((text, label) => {
+    try {
+      navigator.clipboard?.writeText(text);
+      flash(`${label} copied`);
+    } catch { flash('Copy failed — select manually'); }
+  }, [flash]);
+
+  const onCreate = useCallback(async (e) => {
+    e.preventDefault();
+    setBusy(true); setError(null);
+    try {
+      const payload = {
+        name:  form.name.trim() || null,
+        email: form.email.trim() || null,
+      };
+      if (form.code.trim()) payload.code = form.code.trim();
+      // Flat overrides rate when present. Rate is entered as a percent.
+      if (form.flat.trim() !== '') {
+        payload.commission_flat_cents = Math.round(parseFloat(form.flat) * 100);
+      } else {
+        payload.commission_rate_bps = Math.round(parseFloat(form.rate || '0') * 100);
+      }
+      await createReferrer(payload);
+      setForm({ name: '', email: '', code: '', rate: '20', flat: '' });
+      setShowCreate(false);
+      await load();
+      flash('Partner created');
+    } catch (err) {
+      setError(friendlyError(err, 'Could not create partner.'));
+    } finally {
+      setBusy(false);
+    }
+  }, [form, load, flash]);
+
+  const onToggleActive = useCallback(async (r) => {
+    setBusy(true); setError(null);
+    try {
+      await updateReferrer(r.id, { active: !r.active });
+      await load();
+    } catch (err) {
+      setError(friendlyError(err, 'Could not update partner.'));
+    } finally { setBusy(false); }
+  }, [load]);
+
+  const onEditRate = useCallback(async (r) => {
+    const cur = r.commission_flat_cents != null
+      ? `flat ${(r.commission_flat_cents / 100).toFixed(2)}`
+      : `${(Number(r.commission_rate_bps) || 0) / 100}`;
+    const input = window.prompt(
+      `Commission for "${r.code}".\nEnter a percent (e.g. 20) or "flat 2.50" for a fixed $ per sale.`,
+      cur,
+    );
+    if (input == null) return;
+    setBusy(true); setError(null);
+    try {
+      const m = input.trim().toLowerCase();
+      if (m.startsWith('flat')) {
+        const amt = parseFloat(m.replace('flat', '').trim());
+        if (!Number.isFinite(amt)) throw new Error('Invalid flat amount');
+        await updateReferrer(r.id, { commission_flat_cents: Math.round(amt * 100) });
+      } else {
+        const pct = parseFloat(m);
+        if (!Number.isFinite(pct)) throw new Error('Invalid percent');
+        // Clearing the flat override (null) so the percent takes effect.
+        await updateReferrer(r.id, { commission_rate_bps: Math.round(pct * 100), commission_flat_cents: null });
+      }
+      await load();
+      flash('Commission updated');
+    } catch (err) {
+      setError(friendlyError(err, 'Could not update commission.'));
+    } finally { setBusy(false); }
+  }, [load, flash]);
+
+  const onMarkPaid = useCallback(async (r) => {
+    if (!window.confirm(`Mark ${fmtCents(r.commission_pending_cents)} as paid to "${r.code}"? Do this after you've actually sent the money.`)) return;
+    setBusy(true); setError(null);
+    try {
+      const n = await markCommissionsPaid(r.id);
+      await load();
+      flash(`Marked ${n} commission${n === 1 ? '' : 's'} paid`);
+    } catch (err) {
+      setError(friendlyError(err, 'Could not mark paid.'));
+    } finally { setBusy(false); }
+  }, [load, flash]);
+
+  const totals = useMemo(() => {
+    const list = rows ?? [];
+    return list.reduce((acc, r) => ({
+      signups: acc.signups + (Number(r.signups) || 0),
+      sales:   acc.sales   + (Number(r.sales)   || 0),
+      pending: acc.pending + (Number(r.commission_pending_cents) || 0),
+      paid:    acc.paid    + (Number(r.commission_paid_cents)    || 0),
+    }), { signups: 0, sales: 0, pending: 0, paid: 0 });
+  }, [rows]);
+
+  return (
+    <section className="admin-stats" aria-labelledby="admin-ref-title">
+      <header className="admin-stats-head">
+        <h2 id="admin-ref-title">Referrals &amp; commissions</h2>
+        <span className="admin-stats-when">
+          give a partner their <code>{origin}/i/&lt;code&gt;</code> link. Signups
+          and sales through it are tracked below; commission accrues on the first
+          payment <em>and</em> every renewal. Pay them, then hit “Mark paid”.
+        </span>
+      </header>
+
+      {notice && <p className="admin-ref-notice">{notice}</p>}
+      {error && <p className="admin-error" style={{ margin: 12 }}>{error}</p>}
+
+      <div className="admin-ref-toolbar">
+        <button type="button" className="admin-ref-btn" onClick={() => setShowCreate((v) => !v)}>
+          {showCreate ? 'Cancel' : '+ New partner'}
+        </button>
+        <button type="button" className="admin-ref-btn admin-ref-btn-ghost" onClick={load} disabled={busy}>
+          Refresh
+        </button>
+      </div>
+
+      {showCreate && (
+        <form className="admin-ref-create" onSubmit={onCreate}>
+          <input
+            className="admin-search" placeholder="Partner name"
+            value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          />
+          <input
+            className="admin-search" placeholder="Email (optional)"
+            value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+          />
+          <input
+            className="admin-search" placeholder="code (blank = auto)"
+            value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+          />
+          <input
+            className="admin-search" placeholder="% rate" style={{ width: 90 }}
+            value={form.rate} onChange={(e) => setForm((f) => ({ ...f, rate: e.target.value }))}
+            disabled={form.flat.trim() !== ''}
+          />
+          <input
+            className="admin-search" placeholder="$ flat (overrides %)" style={{ width: 150 }}
+            value={form.flat} onChange={(e) => setForm((f) => ({ ...f, flat: e.target.value }))}
+          />
+          <button type="submit" className="admin-ref-btn" disabled={busy}>Create</button>
+        </form>
+      )}
+
+      {rows === null && !error ? (
+        <div className="admin-stats-loading">
+          <span className="admin-spinner" aria-hidden="true" />
+          <span>Loading partners…</span>
+        </div>
+      ) : (rows && rows.length === 0) ? (
+        <div className="admin-stats-empty" style={{ padding: 16 }}>
+          No partners yet — create one and share their <code>/i/&lt;code&gt;</code> link.
+        </div>
+      ) : (
+        <div className="admin-ref-table" role="table">
+          <div className="admin-ref-row admin-ref-head" role="row">
+            <span role="columnheader">Partner</span>
+            <span role="columnheader">Rate</span>
+            <span role="columnheader">Signups</span>
+            <span role="columnheader">Paying</span>
+            <span role="columnheader">Sales</span>
+            <span role="columnheader">Owed</span>
+            <span role="columnheader">Paid</span>
+            <span role="columnheader">Actions</span>
+          </div>
+          {(rows ?? []).map((r) => (
+            <div key={r.id} className={`admin-ref-row ${r.active ? '' : 'admin-ref-row-inactive'}`} role="row">
+              <span className="admin-ref-partner" role="cell">
+                <span className="admin-ref-code">/i/{r.code}</span>
+                <span className="admin-ref-name">
+                  {r.name || '—'}{!r.active && <span className="admin-ref-tag">disabled</span>}
+                </span>
+                <span className="admin-ref-links">
+                  <button type="button" className="admin-ref-link" onClick={() => copy(`${origin}/i/${r.code}`, 'Referral link')}>
+                    Copy link
+                  </button>
+                  {r.access_token && (
+                    <button type="button" className="admin-ref-link" onClick={() => copy(`${origin}/partner?t=${r.access_token}`, 'Partner dashboard link')}>
+                      Copy stats link
+                    </button>
+                  )}
+                </span>
+              </span>
+              <span role="cell">
+                <button type="button" className="admin-ref-link" onClick={() => onEditRate(r)} title="Edit commission">
+                  {commissionLabel(r)}
+                </button>
+              </span>
+              <span role="cell">{r.signups ?? 0}</span>
+              <span role="cell">{r.paying_now ?? 0}</span>
+              <span role="cell">{r.sales ?? 0}</span>
+              <span role="cell"><strong>{fmtCents(r.commission_pending_cents)}</strong></span>
+              <span role="cell">{fmtCents(r.commission_paid_cents)}</span>
+              <span className="admin-ref-actions" role="cell">
+                <button
+                  type="button" className="admin-ref-btn admin-ref-btn-sm"
+                  onClick={() => onMarkPaid(r)}
+                  disabled={busy || !(Number(r.commission_pending_cents) > 0)}
+                >
+                  Mark paid
+                </button>
+                <button
+                  type="button" className="admin-ref-link"
+                  onClick={() => onToggleActive(r)} disabled={busy}
+                >
+                  {r.active ? 'Disable' : 'Enable'}
+                </button>
+              </span>
+            </div>
+          ))}
+          <div className="admin-ref-row admin-ref-foot" role="row">
+            <span role="cell"><strong>Total</strong></span>
+            <span role="cell" />
+            <span role="cell"><strong>{totals.signups}</strong></span>
+            <span role="cell" />
+            <span role="cell"><strong>{totals.sales}</strong></span>
+            <span role="cell"><strong>{fmtCents(totals.pending)}</strong></span>
+            <span role="cell"><strong>{fmtCents(totals.paid)}</strong></span>
+            <span role="cell" />
           </div>
         </div>
       )}
@@ -888,6 +939,10 @@ function SurveyPanel({ users, onPickUser }) {
   // bucket or a draw category narrows down. Recomputed cheaply alongside the
   // rollup.
   const [filter, setFilter] = useState('all');
+  // Incremental rendering — only mount a page of respondent cards at a time.
+  const RESP_PAGE = 20;
+  const [respShown, setRespShown] = useState(RESP_PAGE);
+  useEffect(() => { setRespShown(RESP_PAGE); }, [filter]);
 
   const { ageRows, drawRows, totals, respondents } = useMemo(() => {
     if (!Array.isArray(users)) {
@@ -1091,7 +1146,7 @@ function SurveyPanel({ users, onPickUser }) {
           </div>
 
           <ul className="admin-survey-respondents">
-            {filteredRespondents.map((r) => {
+            {filteredRespondents.slice(0, respShown).map((r) => {
               const planLabel = r.is_paid && r.plan
                 ? PLAN_LABEL[r.plan] ?? r.plan
                 : (r.plan === 'free' || !r.plan ? 'Free' : (PLAN_LABEL[r.plan] ?? r.plan));
@@ -1144,6 +1199,20 @@ function SurveyPanel({ users, onPickUser }) {
               );
             })}
           </ul>
+          {filteredRespondents.length > respShown && (
+            <div className="admin-loadmore">
+              <button
+                type="button"
+                className="admin-loadmore-btn"
+                onClick={() => setRespShown((c) => c + RESP_PAGE)}
+              >
+                Load {Math.min(RESP_PAGE, filteredRespondents.length - respShown)} more
+              </button>
+              <span className="admin-loadmore-meta">
+                Showing {Math.min(respShown, filteredRespondents.length)} of {filteredRespondents.length}
+              </span>
+            </div>
+          )}
         </>
       )}
     </section>
@@ -1449,6 +1518,56 @@ function ActivityPanel({ user }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
+/* Activity drawer — a slide-in overlay panel that shows one user's stats +
+   timeline. Replaces the old inline accordion that pushed the whole list
+   around when you expanded a row (jarring, and it re-flowed every other row).
+   The drawer floats above everything, fetches on open, and closes on Esc /
+   backdrop / ✕ — works from the Users OR the Survey tab. */
+
+function ActivityDrawer({ user, onClose }) {
+  // Esc-to-close + lock body scroll while the drawer is open.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  return (
+    <div className="admin-drawer-root" role="dialog" aria-modal="true" aria-label="User activity">
+      <div className="admin-drawer-backdrop" onClick={onClose} />
+      <aside className="admin-drawer" role="document">
+        <header className="admin-drawer-head">
+          <div className="admin-drawer-id">
+            <span className="admin-drawer-email">{user.email ?? '—'}</span>
+            {user.display_name && <span className="admin-drawer-name">{user.display_name}</span>}
+          </div>
+          <button
+            type="button"
+            className="admin-drawer-close"
+            onClick={onClose}
+            aria-label="Close activity"
+          >
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                 strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 4 L12 12 M12 4 L4 12" />
+            </svg>
+          </button>
+        </header>
+        <div className="admin-drawer-body">
+          <TraceStatsTiles user={user} />
+          <ActivityPanel user={user} />
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
 
 export default function AdminDashboard() {
   const { user, signOut } = useAuth();
@@ -1462,7 +1581,14 @@ export default function AdminDashboard() {
   const [sort, setSort]         = useState('newest');  // 'newest' | 'active' | 'time' | 'sessions'
   const [query, setQuery]       = useState('');
   const [tick, setTick]         = useState(0);       // re-render every 30s for "online" decay
-  const [expanded, setExpanded] = useState(null);    // currently-expanded user_id
+  const [expanded, setExpanded] = useState(null);    // user_id whose activity drawer is open
+  // Incremental rendering. We only mount PAGE_SIZE rows at a time and grow on
+  // demand, so a large account list never dumps hundreds of DOM nodes (with
+  // presence dots, pills, and meta grids each) into the page at once. Counts +
+  // funnel tiles still reflect the full set — they're cheap numeric loops over
+  // the array, not DOM.
+  const PAGE_SIZE = 25;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   // Top-level view toggle — the user list is the workhorse, stats and traffic
   // panels are reference data. Tabbing them keeps the dashboard from being a
   // wall of charts every time you open it.
@@ -1595,9 +1721,17 @@ export default function AdminDashboard() {
     return sorted;
   }, [users, filter, query, sort, tick]);
 
-  const toggleExpand = useCallback((id) => {
-    setExpanded((cur) => (cur === id ? null : id));
-  }, []);
+  // Any change to what's being shown collapses back to the first page so the
+  // operator isn't scrolled into the middle of a freshly-filtered list.
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [filter, sort, query]);
+
+  // The user whose activity drawer is open (looked up fresh each render by id
+  // so a 30s list refresh keeps the drawer showing up-to-date data). Works
+  // from any tab — the drawer is an overlay, not an inline expansion.
+  const expandedUser = useMemo(
+    () => (expanded && users ? users.find((u) => u.id === expanded) ?? null : null),
+    [expanded, users],
+  );
 
   return (
     <div
@@ -1664,10 +1798,11 @@ export default function AdminDashboard() {
             (the day-to-day workhorse) is what loads first. */}
         <nav className="admin-views" role="tablist" aria-label="Dashboard view">
           {[
-            { id: 'users',   label: 'Users' },
-            { id: 'stats',   label: 'Stats' },
-            { id: 'survey',  label: 'Survey' },
-            { id: 'traffic', label: 'Traffic' },
+            { id: 'users',     label: 'Users' },
+            { id: 'stats',     label: 'Acquisition' },
+            { id: 'referrals', label: 'Referrals' },
+            { id: 'survey',    label: 'Survey' },
+            { id: 'traffic',   label: 'Traffic' },
           ].map((v) => (
             <button
               key={v.id}
@@ -1682,29 +1817,14 @@ export default function AdminDashboard() {
           ))}
         </nav>
 
-        {view === 'stats' && (
-          <>
-            <StatsPanel stats={meta.stats} error={meta.error} loading={meta.loading} />
-            <AcquisitionPanel users={users} />
-          </>
-        )}
+        {view === 'stats' && <AcquisitionPanel users={users} />}
+        {view === 'referrals' && <ReferralsPanel />}
         {view === 'survey' && (
           <SurveyPanel
             users={users}
-            onPickUser={(uid) => {
-              // Pivot the dashboard to the matching user row in the
-              // Users tab so the operator can read their full activity
-              // log without clicking back and forth between sections.
-              setView('users');
-              setExpanded(uid);
-              // Scroll the user-list anchor into view on the next frame —
-              // setView swaps the rendered tree synchronously but the new
-              // section's DOM node isn't laid out until React commits.
-              requestAnimationFrame(() => {
-                const card = document.querySelector(`[data-user-id="${uid}"]`);
-                if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              });
-            }}
+            // The activity drawer is an overlay, so picking a respondent opens
+            // it right here — no tab pivot or scroll-into-view gymnastics.
+            onPickUser={(uid) => setExpanded(uid)}
           />
         )}
         {view === 'traffic' && <TrafficPanel />}
@@ -1790,7 +1910,7 @@ export default function AdminDashboard() {
 
         {users && filtered.length > 0 && (
           <ul className="admin-list">
-            {filtered.map((u) => {
+            {filtered.slice(0, visibleCount).map((u) => {
               const online    = isOnline(u.last_seen_at);
               const tracing   = isTracingNow(u);
               const tone      = STATUS_TONE[u.status] ?? 'neutral';
@@ -1899,30 +2019,41 @@ export default function AdminDashboard() {
                       <button
                         type="button"
                         className="admin-row-toggle"
-                        onClick={() => toggleExpand(u.id)}
-                        aria-expanded={isOpen}
-                        aria-controls={`admin-activity-${u.id}`}
+                        onClick={() => setExpanded(u.id)}
+                        aria-haspopup="dialog"
                       >
-                        {isOpen ? 'Hide activity' : 'View activity'}
+                        Activity
                       </button>
                     </div>
                   </div>
-
-                  {isOpen && (
-                    <div id={`admin-activity-${u.id}`} className="admin-row-activity">
-                      <TraceStatsTiles user={u} />
-                      <ActivityPanel user={u} />
-                    </div>
-                  )}
                 </li>
               );
             })}
           </ul>
         )}
+
+        {/* Incremental load — only PAGE_SIZE rows are mounted at a time. */}
+        {users && filtered.length > visibleCount && (
+          <div className="admin-loadmore">
+            <button
+              type="button"
+              className="admin-loadmore-btn"
+              onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+            >
+              Load {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more
+            </button>
+            <span className="admin-loadmore-meta">
+              Showing {Math.min(visibleCount, filtered.length)} of {filtered.length}
+            </span>
+          </div>
+        )}
           </>
         )}
       </main>
 
+      {expandedUser && (
+        <ActivityDrawer user={expandedUser} onClose={() => setExpanded(null)} />
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLocalState } from '../lib/useLocalState.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
@@ -48,6 +48,24 @@ export default function Trace() {
   const streamRef   = useRef(null);
   const pointersRef = useRef(new Map());
   const gestureRef  = useRef(null);
+
+  // ── Imperative gesture pipeline ──────────────────────────────────────────
+  // The overlay transform is written DIRECTLY to the DOM node during a gesture
+  // (drag / pinch / rotate), throttled to one write per animation frame, so a
+  // finger move never triggers a React re-render. React state (`transform`) is
+  // synced only once, on release. Without this the whole 1250-line component
+  // re-rendered on every pointermove — the source of the lag/jank.
+  //
+  // liveTransformRef holds the authoritative transform DURING a gesture (state
+  // lags until commit); transformRef mirrors committed state so the deps-free
+  // pointer handlers read the freshest value; warpMatrixRef carries the warp
+  // suffix so imperative writes match what React would render.
+  const liveTransformRef = useRef(null);
+  const transformRef     = useRef(INITIAL_TRANSFORM);
+  const warpMatrixRef    = useRef('');
+  const handlesWrapRef   = useRef(null);
+  const rafIdRef         = useRef(null);
+  const hintDismissedRef = useRef(false);
 
   const [transform, setTransform]           = useState(INITIAL_TRANSFORM);
   // Persisted across sessions via localStorage so the studio remembers your setup.
@@ -561,17 +579,82 @@ export default function Trace() {
   }, [torchOn]);
 
   // ===== Gesture handling: drag (1 pointer), pinch + rotate (2 pointers) =====
+  // All three handlers are dependency-free (deps: []) and read live values from
+  // refs, so React never recreates them and never re-renders mid-gesture.
+
+  // Build the exact transform string React would render, so imperative writes
+  // are pixel-identical to the state-driven path (no jump on commit).
+  const buildOverlayTransform = useCallback((t) => (
+    `translate(-50%, -50%) ` +
+    `translate(${t.x}px, ${t.y}px) ` +
+    `scale(${t.flip ? -t.scale : t.scale}, ${t.scale}) ` +
+    `rotate(${t.rotation}deg)` +
+    (warpMatrixRef.current ? ` ${warpMatrixRef.current}` : '')
+  ), []);
+
+  const buildHandlesTransform = useCallback((t) => (
+    `translate(${t.x}px, ${t.y}px) ` +
+    `scale(${t.flip ? -t.scale : t.scale}, ${t.scale}) ` +
+    `rotate(${t.rotation}deg)`
+  ), []);
+
+  // Schedule a single DOM write for the next frame. Repeated calls within one
+  // frame coalesce — the last transform wins, so a 120Hz trackpad or a flood
+  // of coalesced pointer events still costs at most one style write per frame.
+  const scheduleApply = useCallback((t) => {
+    liveTransformRef.current = t;
+    // Keep the recorder's per-frame composite in sync DURING the gesture
+    // (overlayStateRef is otherwise only refreshed when state commits).
+    const s = overlayStateRef.current;
+    s.x = t.x; s.y = t.y; s.scale = t.scale; s.rotation = t.rotation; s.flip = t.flip;
+    if (rafIdRef.current != null) return;
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      const cur = liveTransformRef.current;
+      if (!cur) return;
+      const el = overlayRef.current;
+      if (el) el.style.transform = buildOverlayTransform(cur);
+      const hw = handlesWrapRef.current;
+      if (hw) hw.style.transform = buildHandlesTransform(cur);
+    });
+  }, [buildOverlayTransform, buildHandlesTransform]);
+
+  // Flush any pending frame and push the live transform into React state. Done
+  // once, on the last finger up, so sliders / recorder / persistence all see
+  // the final values.
+  const commitLive = useCallback(() => {
+    if (rafIdRef.current != null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    const t = liveTransformRef.current;
+    if (!t) return;
+    const el = overlayRef.current;
+    if (el) el.style.transform = buildOverlayTransform(t);
+    setTransform(t);
+  }, [buildOverlayTransform]);
+
   const onPointerDown = useCallback((e) => {
     // See onHandleDown — capture failures shouldn't kill the gesture.
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    const wasEmpty = pointersRef.current.size === 0;
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    // Seed the live transform from committed state on the first finger down.
+    if (wasEmpty || !liveTransformRef.current) {
+      liveTransformRef.current = { ...transformRef.current };
+    }
+    // Dismiss the hint once (avoids a setState on every move).
+    if (!hintDismissedRef.current) {
+      hintDismissedRef.current = true;
+      setShowHint(false);
+    }
 
     if (pointersRef.current.size === 1) {
       gestureRef.current = {
         type: 'drag',
         startX: e.clientX,
         startY: e.clientY,
-        startTransform: { ...transform },
+        startTransform: { ...liveTransformRef.current },
       };
     } else if (pointersRef.current.size === 2) {
       const pts = Array.from(pointersRef.current.values());
@@ -581,15 +664,20 @@ export default function Trace() {
         type: 'pinch',
         startDist:  Math.hypot(dx, dy),
         startAngle: (Math.atan2(dy, dx) * 180) / Math.PI,
-        startTransform: { ...transform },
+        startTransform: { ...liveTransformRef.current },
       };
     }
-  }, [transform]);
+  }, []);
+
+  // Rotation deadzone (degrees). A pinch is usually meant as pure zoom, but
+  // tiny finger jitter spins the overlay and reads as "rotation is too
+  // twitchy/fast". We ignore the first few degrees, then track 1:1 with no
+  // jump, so deliberate twists still feel natural.
+  const ROTATE_DEADZONE = 5;
 
   const onPointerMove = useCallback((e) => {
     if (!pointersRef.current.has(e.pointerId)) return;
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    setShowHint(false);
 
     const g = gestureRef.current;
     if (!g) return;
@@ -597,7 +685,7 @@ export default function Trace() {
     if (g.type === 'drag' && pointersRef.current.size === 1) {
       const dx = e.clientX - g.startX;
       const dy = e.clientY - g.startY;
-      setTransform({
+      scheduleApply({
         ...g.startTransform,
         x: g.startTransform.x + dx,
         y: g.startTransform.y + dy,
@@ -609,26 +697,31 @@ export default function Trace() {
       const dist  = Math.hypot(dx, dy);
       const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
       const scale = Math.min(8, Math.max(0.2, g.startTransform.scale * (dist / g.startDist)));
-      const rotation = g.startTransform.rotation + (angle - g.startAngle);
-      setTransform({ ...g.startTransform, scale, rotation });
+      let dAngle = angle - g.startAngle;
+      if (Math.abs(dAngle) <= ROTATE_DEADZONE) dAngle = 0;
+      else dAngle -= Math.sign(dAngle) * ROTATE_DEADZONE;
+      scheduleApply({ ...g.startTransform, scale, rotation: g.startTransform.rotation + dAngle });
     }
-  }, []);
+  }, [scheduleApply]);
 
   const onPointerUp = useCallback((e) => {
     pointersRef.current.delete(e.pointerId);
     if (pointersRef.current.size === 0) {
       gestureRef.current = null;
+      // Last finger up — sync React state to the final live transform.
+      commitLive();
     } else if (pointersRef.current.size === 1) {
-      // Switching from pinch back to drag — re-anchor
+      // Switching from pinch back to drag — re-anchor against the LIVE
+      // transform (state hasn't committed yet) so there's no snap.
       const remaining = Array.from(pointersRef.current.values())[0];
       gestureRef.current = {
         type: 'drag',
         startX: remaining.x,
         startY: remaining.y,
-        startTransform: { ...transform },
+        startTransform: { ...(liveTransformRef.current ?? transformRef.current) },
       };
     }
-  }, [transform]);
+  }, [commitLive]);
 
   // Wheel on desktop = zoom (Ctrl/⌘ + wheel rotates)
   const onWheel = useCallback((e) => {
@@ -756,23 +849,35 @@ export default function Trace() {
     navigate('/upload');
   };
 
-  if (!imageUrl) return null;
-
+  // Warp suffix + ref mirrors for the imperative gesture pipeline. Computed
+  // before the early return so the layout effect (a hook) stays unconditional.
   const warpMatrix =
     corners && baseSize && !isIdentity(corners, baseSize.w, baseSize.h)
       ? cssMatrix3d(baseSize.w, baseSize.h, corners)
       : '';
+  transformRef.current  = transform;
+  warpMatrixRef.current = warpMatrix;
+
+  // Apply transform imperatively for every NON-gesture change (sliders, wheel,
+  // recenter, flip, warp). Runs before paint (no flash). The transform is
+  // deliberately NOT in the React style below, so re-renders from the flicker
+  // rAF / recording timer can never reset the overlay mid-gesture.
+  useLayoutEffect(() => {
+    if (gestureRef.current) return; // a live gesture owns the node
+    const el = overlayRef.current;
+    if (el) el.style.transform = buildOverlayTransform(transform);
+    const hw = handlesWrapRef.current;
+    if (hw) hw.style.transform = buildHandlesTransform(transform);
+    liveTransformRef.current = { ...transform };
+  }, [transform, warpMatrix, buildOverlayTransform, buildHandlesTransform]);
+
+  if (!imageUrl) return null;
 
   const overlayStyle = {
-    transform:
-      `translate(-50%, -50%) ` +
-      `translate(${transform.x}px, ${transform.y}px) ` +
-      `scale(${transform.flip ? -transform.scale : transform.scale}, ${transform.scale}) ` +
-      `rotate(${transform.rotation}deg)` +
-      (warpMatrix ? ` ${warpMatrix}` : ''),
     opacity: flickerOn ? flickerOpacity : opacity,
-    // Skip the 0.15s opacity easing while flickering — rAF already drives a smooth curve.
-    transition: flickerOn ? 'transform 0.15s ease, filter 0.2s ease' : undefined,
+    // Only opacity/filter ease here — NEVER transform, or the imperative
+    // per-frame gesture writes would animate over a transition and feel laggy.
+    transition: 'opacity 0.2s ease, filter 0.2s ease',
   };
 
   const handleWrapStyle = baseSize ? {
@@ -804,7 +909,7 @@ export default function Trace() {
         />
 
         {warpMode && corners && handleWrapStyle && (
-          <div className="warp-handles" style={handleWrapStyle}>
+          <div className="warp-handles" ref={handlesWrapRef} style={handleWrapStyle}>
             {(['tl', 'tr', 'br', 'bl']).map((key) => (
               <button
                 key={key}

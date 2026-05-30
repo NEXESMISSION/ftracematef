@@ -1,0 +1,91 @@
+/* Affiliate self-view page (/partner). Standalone, public — kept deliberately
+   simple and on-brand with the cream/ink palette from globals.css. */
+
+.partner-page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--cream, #faf6ef);
+}
+
+.partner-card {
+  width: 100%;
+  max-width: 640px;
+  background: #fff;
+  border: 1px solid var(--cream-deep, #efe7d8);
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);
+}
+
+.partner-title {
+  margin: 0 0 4px;
+  font-size: 24px;
+  color: var(--ink, #2c2417);
+}
+.partner-sub {
+  margin: 0 0 2px;
+  color: var(--ink-soft, #7a7060);
+  font-size: 14px;
+}
+.partner-sub code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--cream-deep, #efe7d8);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+.partner-terms {
+  margin: 6px 0 18px;
+  font-weight: 600;
+  color: var(--ink, #2c2417);
+}
+.partner-muted { color: var(--ink-soft, #7a7060); }
+.partner-error {
+  color: #b4453a;
+  background: #fbeae8;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+.partner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin: 8px 0 18px;
+}
+.partner-tile {
+  background: var(--cream, #faf6ef);
+  border: 1px solid var(--cream-deep, #efe7d8);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.partner-tile-hero {
+  background: var(--ink, #2c2417);
+  border-color: var(--ink, #2c2417);
+}
+.partner-tile-hero .partner-tile-value,
+.partner-tile-hero .partner-tile-label {
+  color: var(--cream, #faf6ef);
+}
+.partner-tile-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink, #2c2417);
+  line-height: 1.1;
+}
+.partner-tile-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft, #7a7060);
+}
+.partner-foot {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--ink-soft, #7a7060);
+}

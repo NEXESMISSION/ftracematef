@@ -99,6 +99,27 @@ supabase functions deploy dodo-webhook
 
 When you're ready to go live, change `DODO_ENVIRONMENT` to `live_mode` and use a live API key.
 
+### Referral / affiliate program
+
+Run the referral migration once (`supabase/migrations/20260530000000_referrals.sql`)
+in the SQL editor or via `supabase db push`, then deploy the two referral
+functions. `referral-stats` is public (partners have no account — the token in
+their `/partner?t=…` link is the credential), so it **must** be deployed with
+`--no-verify-jwt`:
+
+```bash
+supabase functions deploy admin-referrals
+supabase functions deploy referral-stats --no-verify-jwt
+# or: npm run sb:deploy:referrals
+```
+
+Then open `/admin-me` → **Referrals** to create a partner. Share their
+`tracemate.art/i/<code>` link; signups and sales attributed to it accrue
+commission (first payment + every renewal), and you mark it paid once you've
+sent the money. New partners default to 20% — set a different % or a flat
+$/sale per partner. `admin-referrals` reuses the `ADMIN_EMAILS` allowlist (no
+new secrets).
+
 ### Optional: enable the dev self-test panel
 
 The `/account` page has a hidden self-test panel that lets an admin flip

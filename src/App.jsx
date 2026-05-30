@@ -20,6 +20,7 @@ import PricingPage from './pages/PricingPage.jsx';
 import Terms from './pages/Terms.jsx';
 import Privacy from './pages/Privacy.jsx';
 import RefRedirect from './pages/RefRedirect.jsx';
+import AffiliateRedirect from './pages/AffiliateRedirect.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 // Pretty-alias short links for the platforms we'll actually share most.
@@ -35,6 +36,10 @@ const REF_ALIASES = ['tiktok', 'tt', 'reddit', 'yt', 'ig', 'x', 'threads'];
 // Admin dashboard is operator-only and ships its own bundle of UI + data
 // fetching helpers. Lazy-loaded so non-admins never download the chunk.
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
+
+// Affiliate self-view — niche, no account needed, only opened by partners
+// who have a token link. Lazy so it never weighs on the main bundle.
+const Partner = lazy(() => import('./pages/Partner.jsx'));
 
 // One-shot free trial: the moment a free user navigates AWAY from /trace,
 // their single session is consumed for good. Doing this at the route layer
@@ -102,6 +107,19 @@ export default function App() {
         {REF_ALIASES.map((slug) => (
           <Route key={slug} path={`/${slug}`} element={<RefRedirect source={slug} />} />
         ))}
+
+        {/* Affiliate referral links — tracemate.art/i/:code. Stamps the
+            partner's code first-touch (cookie + localStorage) and bounces to
+            '/'. The commission system pays out on signups + sales attributed
+            to it. */}
+        <Route path="/i/:code" element={<AffiliateRedirect />} />
+
+        {/* Affiliate self-view — partners open this with their private token
+            link to see their own signups / sales / commission. No account. */}
+        <Route
+          path="/partner"
+          element={<Suspense fallback={null}><Partner /></Suspense>}
+        />
 
         {/* Public — anyone can browse + start an upload */}
         <Route path="/"              element={<Home />} />
