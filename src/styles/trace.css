@@ -970,3 +970,47 @@ body:has(.trace-stage) {
   .trace-icon-btn { height: 34px; border-radius: 9px; }
   .trace-slider-grid { grid-template-columns: 1fr; }
 }
+
+/* Custom pointer-driven slider (replaces native range; fixes stuck-thumb on touch) */
+.trace-slider .tm-slider {
+  position: relative;
+  flex: 1;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;            /* we own the gesture; prevents WebView scroll-steal */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.trace-slider .tm-slider.is-disabled { opacity: 0.4; pointer-events: none; }
+.trace-slider .tm-slider-rail {
+  position: absolute;
+  left: 0; right: 0;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+.trace-slider .tm-slider-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--coral);
+}
+.trace-slider .tm-slider-thumb {
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--coral);
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  transform: translate(-50%, -50%);
+  pointer-events: none;          /* the track div handles all pointer math */
+}
+.trace-slider .tm-slider:focus-visible { outline: none; }
+.trace-slider .tm-slider:focus-visible .tm-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(232,122,122,0.5), 0 1px 4px rgba(0,0,0,0.35);
+}

@@ -9,6 +9,7 @@ import { setTracing } from '../lib/tracing-state.js';
 import { startRecording, isRecordingSupported } from '../lib/recorder.js';
 import ExitSurvey from '../components/ExitSurvey.jsx';
 import TraceHelp from '../components/TraceHelp.jsx';
+import TraceSlider from '../components/TraceSlider.jsx';
 import {
   cssMatrix3d,
   identityCorners,
@@ -99,9 +100,9 @@ export default function Trace() {
   const [baseSize, setBaseSize]             = useState(null);
   const handleDragRef                       = useRef(null);
   // Bottom-dock segmented control. 'opacity' = the single opacity slider
-  // (default; cheapest to render), 'adjust' = the move/zoom/rotate
-  // sliders, 'flicker' = the pulse-mode panel. Stored locally so a tab
-  // refresh doesn't dump the user back into Opacity mid-tracing.
+  // (default; cheapest to render), 'flicker' = the pulse-mode panel.
+  // Stored locally so a tab refresh doesn't dump the user back into
+  // Opacity mid-tracing.
   const [panelTab, setPanelTab] = useLocalState('tm:panelTab', 'opacity');
 
   // Idle dim. After 10s with no click/tap/wheel/keypress the on-screen
@@ -260,11 +261,12 @@ export default function Trace() {
     return () => clearTimeout(t);
   }, []);
 
-  // The "Adjust" tab was removed (its X/Y/Zoom/Rotate sliders are replaced by
-  // the touch gestures + action buttons). A user whose persisted panelTab is
-  // still 'adjust' would otherwise land on a now-nonexistent tab — coerce it.
+  // The move/zoom/rotate tab was removed (its sliders are replaced by the
+  // touch gestures + action buttons). A user whose persisted panelTab is
+  // still the removed id would otherwise land on a now-nonexistent tab —
+  // coerce it back to a valid tab.
   useEffect(() => {
-    if (panelTab === 'adjust') setPanelTab('opacity');
+    if (panelTab !== 'opacity' && panelTab !== 'flicker') setPanelTab('opacity');
   }, [panelTab, setPanelTab]);
 
   // First-time onboarding: pop the help overlay automatically the first time a
@@ -715,6 +717,8 @@ export default function Trace() {
         type: 'pinch',
         startDist:  Math.hypot(dx, dy),
         startAngle: (Math.atan2(dy, dx) * 180) / Math.PI,
+        startCx: (pts[0].x + pts[1].x) / 2,
+        startCy: (pts[0].y + pts[1].y) / 2,
         startTransform: { ...liveTransformRef.current },
       };
     }
@@ -751,7 +755,18 @@ export default function Trace() {
       let dAngle = angle - g.startAngle;
       if (Math.abs(dAngle) <= ROTATE_DEADZONE) dAngle = 0;
       else dAngle -= Math.sign(dAngle) * ROTATE_DEADZONE;
-      scheduleApply({ ...g.startTransform, scale, rotation: g.startTransform.rotation + dAngle });
+      // Centroid panning: the overlay follows the midpoint of the two fingers
+      // so scale + rotation + translation all apply together in one frame
+      // (standard pinch-zoom-pan).
+      const cx = (pts[0].x + pts[1].x) / 2;
+      const cy = (pts[0].y + pts[1].y) / 2;
+      scheduleApply({
+        ...g.startTransform,
+        scale,
+        rotation: g.startTransform.rotation + dAngle,
+        x: g.startTransform.x + (cx - g.startCx),
+        y: g.startTransform.y + (cy - g.startCy),
+      });
     }
   }, [scheduleApply]);
 
@@ -1098,8 +1113,8 @@ export default function Trace() {
               <div className="trace-rec-error" role="alert">{recordError}</div>
             )}
 
-            {/* Segmented tab control. Three modes; switching is instant. */}
-            <div className="trace-dock-tabs" role="tablist" aria-label="Adjust mode">
+            {/* Segmented tab control. Two modes; switching is instant. */}
+            <div className="trace-dock-tabs" role="tablist" aria-label="Overlay mode">
               {[
                 { id: 'opacity', label: 'Opacity' },
                 { id: 'flicker', label: 'Flicker' },
@@ -1121,17 +1136,15 @@ export default function Trace() {
             <div className="trace-dock-panel">
               {panelTab === 'opacity' && (
                 <div className="trace-slider">
-                  <input
-                    id="opacity"
-                    type="range"
-                    min="0.05"
-                    max="1"
-                    step="0.01"
+                  <TraceSlider
                     value={opacity}
-                    onChange={(e) => setOpacity(parseFloat(e.target.value))}
+                    min={0.05}
+                    max={1}
+                    step={0.01}
                     disabled={flickerOn}
-                    aria-label="Opacity"
-                    style={{ '--tm-slider-fill': `${(opacity - 0.05) / 0.95 * 100}%` }}
+                    ariaLabel="Opacity"
+                    onChange={setOpacity}
+                    className="trace-slider-input"
                   />
                   <span className="trace-slider-value">{Math.round(opacity * 100)}%</span>
                 </div>
@@ -1157,55 +1170,46 @@ export default function Trace() {
                     <>
                       <div className="trace-slider trace-slider-compact">
                         <span className="trace-slider-label" aria-hidden="true">Speed</span>
-                        <input
-                          type="range"
-                          min="1"
-                          max="10"
-                          step="0.5"
+                        <TraceSlider
                           value={flickerSpeed}
-                          onChange={(e) => setFlickerSpeed(parseFloat(e.target.value))}
-                          aria-label="Flicker speed"
-                          style={{ '--tm-slider-fill': `${(flickerSpeed - 1) / 9 * 100}%` }}
+                          min={1}
+                          max={10}
+                          step={0.5}
+                          ariaLabel="Flicker speed"
+                          onChange={(v) => setFlickerSpeed(v)}
+                          className="trace-slider-input"
                         />
                         <span className="trace-slider-value">{flickerSpeed.toFixed(1)}×</span>
                       </div>
                       <div className="trace-slider trace-slider-compact">
                         <span className="trace-slider-label" aria-hidden="true">Min</span>
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.01"
+                        <TraceSlider
                           value={flickerMin}
-                          onChange={(e) => {
-                            const next = parseFloat(e.target.value);
-                            setFlickerMin(next);
-                            if (next >= flickerMax - 0.05) {
-                              setFlickerMax(Math.min(1, next + 0.05));
-                            }
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          ariaLabel="Flicker minimum opacity"
+                          onChange={(v) => {
+                            setFlickerMin(v);
+                            if (v >= flickerMax - 0.05) setFlickerMax(Math.min(1, v + 0.05));
                           }}
-                          aria-label="Flicker minimum opacity"
-                          style={{ '--tm-slider-fill': `${flickerMin * 100}%` }}
+                          className="trace-slider-input"
                         />
                         <span className="trace-slider-value">{Math.round(flickerMin * 100)}%</span>
                       </div>
                       <div className="trace-slider trace-slider-compact">
                         <span className="trace-slider-label" aria-hidden="true">Max</span>
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.01"
+                        <TraceSlider
                           value={flickerMax}
-                          onChange={(e) => {
-                            const next = parseFloat(e.target.value);
-                            setFlickerMax(next);
-                            if (next <= flickerMin + 0.05) {
-                              setFlickerMin(Math.max(0, next - 0.05));
-                            }
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          ariaLabel="Flicker maximum opacity"
+                          onChange={(v) => {
+                            setFlickerMax(v);
+                            if (v <= flickerMin + 0.05) setFlickerMin(Math.max(0, v - 0.05));
                           }}
-                          aria-label="Flicker maximum opacity"
-                          style={{ '--tm-slider-fill': `${flickerMax * 100}%` }}
+                          className="trace-slider-input"
                         />
                         <span className="trace-slider-value">{Math.round(flickerMax * 100)}%</span>
                       </div>
@@ -1215,10 +1219,10 @@ export default function Trace() {
               )}
             </div>
 
-            {/* Compact actions row. With the Adjust tab gone, these buttons
-                (recenter / flip / warp / camera / flash / record) plus the
-                touch gestures cover everything the X/Y/Zoom/Rotate sliders did.
-                Flicker lives in the Flicker tab. */}
+            {/* Compact actions row. These buttons (recenter / flip / warp /
+                camera / flash / record) plus the touch gestures cover
+                everything the X/Y/Zoom/Rotate sliders did. Flicker lives in
+                the Flicker tab. */}
             <div className="trace-dock-actions">
               <button
                 type="button"
