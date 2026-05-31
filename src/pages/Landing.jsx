@@ -4,6 +4,7 @@ import Nav from '../components/Nav.jsx';
 import Hero from '../components/Hero.jsx';
 import Marquee from '../components/Marquee.jsx';
 import HowItWorks from '../components/HowItWorks.jsx';
+import AudienceSections from '../components/AudienceSections.jsx';
 import Gallery from '../components/Gallery.jsx';
 import Pricing from '../components/Pricing.jsx';
 import GetApp from '../components/GetApp.jsx';
@@ -27,6 +28,7 @@ export default function Landing() {
       <Hero onPlayClick={openVideo} />
       <Marquee />
       <HowItWorks />
+      <AudienceSections />
       <Gallery />
       {!isPaid && <Pricing />}
       <GetApp />
