@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { listCreations, toggleLike, deleteCreation, reportCreation } from '../lib/creations.js';
+import { listCreations, toggleLike, deleteCreation, reportCreation, getStreakLeaderboard } from '../lib/creations.js';
 
 const PAGE = 30;
 
@@ -21,6 +21,8 @@ export default function Community() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [busyId, setBusyId] = useState(null);
   const [flipped, setFlipped] = useState(() => new Set()); // ids showing reference
+  const [tab, setTab] = useState('gallery');   // 'gallery' | 'streaks'
+  const [board, setBoard] = useState(null);    // streak leaderboard rows
 
   // First page (and reload when the signed-in user changes).
   useEffect(() => {
@@ -93,23 +95,68 @@ export default function Community() {
     return next;
   });
 
+  // Lazy-load the streak leaderboard the first time the tab is opened.
+  useEffect(() => {
+    if (tab === 'streaks' && board === null) {
+      getStreakLeaderboard(20).then(setBoard).catch(() => setBoard([]));
+    }
+  }, [tab, board]);
+
   return (
     <section className="community-card" aria-labelledby="community-title">
       <div className="community-head">
-        <h2 id="community-title">Community gallery</h2>
-        {items && items.length > 0 && (
-          <span className="community-count">{items.length}{cursor ? '+' : ''}</span>
-        )}
+        <h2 id="community-title">Community</h2>
+        <div className="community-tabs" role="tablist">
+          <button
+            type="button" role="tab" aria-selected={tab === 'gallery'}
+            className={`community-tab ${tab === 'gallery' ? 'is-active' : ''}`}
+            onClick={() => setTab('gallery')}
+          >Gallery</button>
+          <button
+            type="button" role="tab" aria-selected={tab === 'streaks'}
+            className={`community-tab ${tab === 'streaks' ? 'is-active' : ''}`}
+            onClick={() => setTab('streaks')}
+          >🔥 Streaks</button>
+        </div>
       </div>
 
-      {items === null && <p className="community-muted">Loading…</p>}
-      {items && items.length === 0 && (
+      {/* ── Streak leaderboard ── */}
+      {tab === 'streaks' && (
+        <>
+          {board === null && <p className="community-muted">Loading…</p>}
+          {board && board.length === 0 && (
+            <p className="community-muted">No streaks yet — trace today to start one!</p>
+          )}
+          {board && board.length > 0 && (
+            <div className="community-board">
+              {board.map((r) => (
+                <div key={r.rank} className="board-row">
+                  <span className={`board-rank ${r.rank <= 3 ? 'is-top' : ''}`}>
+                    {r.rank <= 3 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}
+                  </span>
+                  {r.avatar_url
+                    ? <img className="board-avatar" src={r.avatar_url} alt="" />
+                    : <span className="board-avatar board-avatar-fallback">{(r.display_name || '?')[0].toUpperCase()}</span>}
+                  <span className="board-name">{r.display_name}</span>
+                  <span className="board-metric-val">
+                    <strong>🔥 {r.current_streak}</strong>
+                    <small>{r.current_streak === 1 ? 'day' : 'days'}</small>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === 'gallery' && items === null && <p className="community-muted">Loading…</p>}
+      {tab === 'gallery' && items && items.length === 0 && (
         <p className="community-muted">
           No creations yet. Finish a trace and tap “Show off your work” to be the first!
         </p>
       )}
 
-      {items && items.length > 0 && (
+      {tab === 'gallery' && items && items.length > 0 && (
         <>
           <div className="community-grid">
             {items.map((it) => {

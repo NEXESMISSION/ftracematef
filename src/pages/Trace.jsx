@@ -109,6 +109,9 @@ export default function Trace() {
   // OFF — the source image is private unless they explicitly opt in.
   const [shareReference, setShareReference] = useState(false);
   const [camOpen, setCamOpen] = useState(false);   // C2 camera-capture modal
+  // After a photo is captured, hold it for a compact compose step (preview +
+  // note + share) before it actually posts — { file, url } | null.
+  const [pendingShot, setPendingShot] = useState(null);
   // Help / onboarding overlay. Auto-shown the first time a user opens /trace
   // (gated by the 'tm:trace-tutorial-seen' localStorage flag, set on dismiss);
   // re-openable any time via the topbar "?" button.
@@ -1011,18 +1014,30 @@ export default function Trace() {
     setExitPrompt(true);
   };
 
-  // C2 — publish the captured photo of the finished drawing to the feed, along
-  // with a copy of the reference image (imageUrl) so viewers see what was
-  // traced. `file` comes from the in-app camera (CameraCapture).
-  const onPublishResult = async (file) => {
+  // C2 — a photo was captured by the camera. Move to the compose step rather
+  // than posting straight away, so the user can add a note / choose to show the
+  // reference with the result in front of them.
+  const onShotCaptured = (file) => {
     setCamOpen(false);
-    if (!file || !user?.id) return;
-    setExitPrompt(true);   // keep the prompt visible to show progress
+    if (!file) return;
+    setPendingShot({ file, url: URL.createObjectURL(file) });
+  };
+
+  // Discard the captured shot and return to the studio.
+  const cancelCompose = () => {
+    if (pendingShot?.url) URL.revokeObjectURL(pendingShot.url);
+    setPendingShot(null);
+    setPublishMsg('');
+  };
+
+  // C2 — actually publish the composed post (photo + note + optional reference).
+  const onPost = async () => {
+    if (!pendingShot || !user?.id) return;
     setPublishing(true);
     setPublishMsg('Publishing…');
     try {
       await publishCreation({
-        file,
+        file: pendingShot.file,
         // Only attach the traced reference if the user opted in (privacy).
         reference: shareReference ? (imageUrl || null) : null,
         note: noteText,
@@ -1032,8 +1047,7 @@ export default function Trace() {
       // Mark this run as having produced a saved result, like a recording does.
       recordedRef.current = true;
       setPublishMsg('Published! 🎉');
-      // Land on the account page so they immediately see their new creation
-      // in the community gallery.
+      // Land on the account page so they immediately see their new creation.
       setTimeout(() => doExit('/account'), 700);
     } catch (err) {
       console.warn('[trace] publish failed:', err);
@@ -1463,17 +1477,40 @@ export default function Trace() {
         </div>
       )}
 
-      {/* C2 — publish-your-result prompt, shown when ending a session. */}
+      {/* C2 — simple "show off your work?" prompt when ending a session. */}
       {exitPrompt && (
         <div className="trace-ask" role="dialog" aria-modal="true" aria-labelledby="exit-title">
-          <div className="trace-ask-backdrop" onClick={() => !publishing && setExitPrompt(false)} />
+          <div className="trace-ask-backdrop" onClick={() => setExitPrompt(false)} />
           <div className="trace-ask-card">
             <div className="trace-streak-flame" aria-hidden="true">🎨</div>
             <h3 id="exit-title" className="trace-ask-title">Show off your work?</h3>
             <p className="trace-ask-text">
-              Snap a photo of your finished drawing to share it on the community feed.
+              Take a photo of your finished drawing to share it with the community.
             </p>
-            {/* C2 — optional note that travels with the shared result. */}
+            <div className="trace-ask-actions">
+              <button type="button" className="trace-ask-btn" onClick={() => doExit('/account')}>
+                Skip
+              </button>
+              <button
+                type="button"
+                className="trace-ask-btn trace-ask-btn-primary"
+                onClick={() => { setExitPrompt(false); setCamOpen(true); }}
+              >
+                Take a photo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* C2 — compose step: shown after a photo is captured. Preview + note +
+          optional "show what I traced", then Post. */}
+      {pendingShot && (
+        <div className="trace-ask" role="dialog" aria-modal="true" aria-labelledby="compose-title">
+          <div className="trace-ask-backdrop" onClick={() => !publishing && cancelCompose()} />
+          <div className="trace-ask-card">
+            <h3 id="compose-title" className="trace-ask-title">Share your drawing</h3>
+            <img className="trace-compose-preview" src={pendingShot.url} alt="Your finished drawing" />
             <textarea
               className="trace-note-input"
               placeholder="Add a note (optional) — e.g. my first try!"
@@ -1483,7 +1520,6 @@ export default function Trace() {
               onChange={(e) => setNoteText(e.target.value)}
               disabled={publishing}
             />
-            {/* C2 privacy — opt in to also share the image they traced. */}
             <label className="trace-share-ref">
               <input
                 type="checkbox"
@@ -1495,16 +1531,11 @@ export default function Trace() {
             </label>
             {publishMsg && <p className="trace-ask-text" style={{ fontWeight: 800 }}>{publishMsg}</p>}
             <div className="trace-ask-actions">
-              <button type="button" className="trace-ask-btn" onClick={doExit} disabled={publishing}>
-                Skip
+              <button type="button" className="trace-ask-btn" onClick={cancelCompose} disabled={publishing}>
+                Cancel
               </button>
-              <button
-                type="button"
-                className="trace-ask-btn trace-ask-btn-primary"
-                onClick={() => { setExitPrompt(false); setCamOpen(true); }}
-                disabled={publishing}
-              >
-                {publishing ? 'Publishing…' : 'Take a photo'}
+              <button type="button" className="trace-ask-btn trace-ask-btn-primary" onClick={onPost} disabled={publishing}>
+                {publishing ? 'Posting…' : 'Post'}
               </button>
             </div>
           </div>
@@ -1516,7 +1547,7 @@ export default function Trace() {
         open={camOpen}
         title="Photo of your drawing"
         onClose={() => { setCamOpen(false); setExitPrompt(true); }}
-        onCapture={onPublishResult}
+        onCapture={onShotCaptured}
       />
 
       {/* B2 — daily streak celebration (today's first trace). */}

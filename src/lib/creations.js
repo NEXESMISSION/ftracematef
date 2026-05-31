@@ -183,6 +183,13 @@ export async function setCreationHidden(creationId, hidden) {
   if (error) throw error;
 }
 
+/** B2 — streak leaderboard rows (ranked by current streak). */
+export async function getStreakLeaderboard(limit = 20) {
+  const { data, error } = await supabase.rpc('get_streak_leaderboard', { p_limit: limit });
+  if (error) throw error;
+  return data || [];
+}
+
 /** Owner (or admin): delete a creation (row + all its storage objects). */
 export async function deleteCreation(row) {
   const del = await supabase.from('creations').delete().eq('id', row.id);

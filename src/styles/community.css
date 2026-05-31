@@ -232,3 +232,101 @@ a.like-btn { text-decoration: none; }
   -webkit-tap-highlight-color: transparent;
 }
 .creation-report:hover { background: #c0392b; }
+
+/* ── Community tabs (Gallery / Streaks) ── */
+.community-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  background: rgba(43, 33, 24, 0.06);
+  border-radius: 999px;
+}
+.community-tab {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft, #6b5d4d);
+  font-family: 'Nunito', sans-serif;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.community-tab:hover { color: var(--ink, #2b2118); }
+.community-tab.is-active {
+  background: var(--coral, #e87a7a);
+  color: #fff;
+  box-shadow: 1px 1px 0 var(--ink, #2b2118);
+}
+
+/* ── Streak leaderboard ── */
+.community-board { display: flex; flex-direction: column; gap: 8px; }
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 13px;
+  border: 2px solid var(--ink, #2b2118);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 2px 2px 0 var(--ink, #2b2118);
+}
+.board-row:first-child {
+  background: linear-gradient(180deg, rgba(255, 214, 107, 0.22), #fff);
+}
+.board-rank {
+  flex-shrink: 0;
+  width: 28px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--ink-soft, #6b5d4d);
+}
+.board-rank.is-top { font-size: 18px; }
+.board-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  object-fit: cover;
+  background: #eee;
+  flex-shrink: 0;
+}
+.board-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--coral, #e87a7a);
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+}
+.board-name {
+  flex: 1;
+  font-weight: 700;
+  color: var(--ink, #2b2118);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.board-metric-val {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.1;
+}
+.board-metric-val strong {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink, #2b2118);
+  font-variant-numeric: tabular-nums;
+}
+.board-metric-val small {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-soft, #6b5d4d);
+}

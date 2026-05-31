@@ -699,6 +699,17 @@ body:has(.trace-stage) {
 }
 .trace-share-ref input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--coral); cursor: pointer; }
 
+/* C2 — compose-step preview of the captured drawing. */
+.trace-compose-preview {
+  width: 100%;
+  max-height: 38vh;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #f3efe7;
+  margin: 0 0 12px;
+  display: block;
+}
+
 /* Option list inside a popup (e.g. the Camera menu). */
 .trace-menu-list {
   display: flex;
