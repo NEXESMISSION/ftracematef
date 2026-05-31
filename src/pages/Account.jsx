@@ -765,8 +765,7 @@ export default function Account() {
        </div>
       </main>
 
-      {/* ── Mobile bottom nav: Account · Streaks · (Trace) · Gallery.
-          Hidden on desktop. ── */}
+      {/* ── Mobile bottom nav: Account · Streaks · Gallery. Hidden on desktop. ── */}
       <nav className="acct-tabbar" aria-label="Account sections">
         <button
           type="button"
@@ -791,15 +790,6 @@ export default function Account() {
           <span className="acct-tabbar-emoji" aria-hidden="true">🔥</span>
           <span>Streaks</span>
         </button>
-
-        <Link to="/upload" className="acct-tabbar-start" aria-label="Start tracing">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M4 7 H6.5 L8 5 H16 L17.5 7 H20 a1.5 1.5 0 0 1 1.5 1.5 V18 a1.5 1.5 0 0 1 -1.5 1.5 H4 a1.5 1.5 0 0 1 -1.5 -1.5 V8.5 A1.5 1.5 0 0 1 4 7 Z" />
-            <circle cx="12" cy="13" r="3.6" />
-          </svg>
-          <span className="acct-tabbar-start-label">Trace</span>
-        </Link>
 
         <button
           type="button"

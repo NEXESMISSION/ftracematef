@@ -112,14 +112,22 @@ export async function publishCreation({ file, reference, title, note, userId, wa
 }
 
 /**
- * The feed, newest-first, paginated. Pass `before` (an ISO timestamp from the
- * last row of the previous page) to load older items. Returns
- * { items, nextCursor } where nextCursor is null when the feed is exhausted.
+ * The feed, offset-paginated with a sort + optional reference-only filter.
+ *   sort: 'new' (newest) | 'top' (most liked)
+ *   onlyReference: only creations that include a traced reference image
+ *   offset: how many rows to skip (page * limit)
+ * Returns { items, nextCursor } where nextCursor is the next offset (number)
+ * or null when the feed is exhausted.
  */
-export async function listCreations({ limit = 30, before = null, currentUserId = null, includeHidden = false } = {}) {
+export async function listCreations({
+  limit = 30, offset = 0, sort = 'new', onlyReference = false,
+  currentUserId = null, includeHidden = false,
+} = {}) {
   const { data, error } = await supabase.rpc('get_creations_feed', {
     p_limit: limit,
-    p_before: before,
+    p_offset: offset,
+    p_sort: sort,
+    p_only_reference: onlyReference,
     p_include_hidden: includeHidden,
   });
   if (error) throw error;
@@ -153,8 +161,8 @@ export async function listCreations({ limit = 30, before = null, currentUserId =
     likedByMe: likedSet.has(r.id),
   }));
 
-  // Full page → there may be more; cursor is the oldest row's timestamp.
-  const nextCursor = rows.length === limit ? rows[rows.length - 1].created_at : null;
+  // Full page → there may be more; next cursor is the next offset.
+  const nextCursor = rows.length === limit ? offset + limit : null;
   return { items, nextCursor };
 }
 
@@ -188,6 +196,74 @@ export async function getStreakLeaderboard(limit = 20) {
   const { data, error } = await supabase.rpc('get_streak_leaderboard', { p_limit: limit });
   if (error) throw error;
   return data || [];
+}
+
+/** The caller's own streak rank — { rank, current_streak, total } | null. */
+export async function getMyStreakRank() {
+  const { data, error } = await supabase.rpc('my_streak_rank');
+  if (error) return null;
+  return Array.isArray(data) ? (data[0] || null) : (data || null);
+}
+
+const TRACED_BUCKET = 'traced';
+export function tracedPublicUrl(path) {
+  return supabase.storage.from(TRACED_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+/**
+ * Capture a SUPER-optimized thumbnail of the image a user is tracing, so the
+ * operator can see what kinds of images get traced. Tiny (≤360px, low quality)
+ * — this is telemetry, not a gallery asset — and entirely best-effort: any
+ * failure is swallowed so it never affects the tracing session.
+ */
+export async function captureTracedImage({ source, userId, label }) {
+  if (!source || !userId) return;
+  try {
+    const thumb = await makeThumbnail(source, { maxDim: 360, quality: 0.6 });
+    if (!thumb?.file) return;
+    const ext = (thumb.file.type.split('/')[1] || 'webp').replace('jpeg', 'jpg');
+    const rand = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const path = `${userId}/${rand}.${ext}`;
+    const up = await supabase.storage.from(TRACED_BUCKET).upload(path, thumb.file, {
+      contentType: thumb.file.type, upsert: false,
+    });
+    if (thumb.url) URL.revokeObjectURL(thumb.url);
+    if (up.error) return;
+    await supabase.from('traced_images').insert({
+      user_id: userId, thumb_path: path, label: (label || '').slice(0, 120) || null,
+    });
+  } catch { /* telemetry — never throw into the tracing flow */ }
+}
+
+/** Admin: list captured traced images (what people trace). Paginated. */
+export async function getTracedImages(limit = 120, before = null) {
+  const { data, error } = await supabase.rpc('get_traced_images', { p_limit: limit, p_before: before });
+  if (error) throw error;
+  const rows = data || [];
+  const items = rows.map((r) => ({
+    id: r.id,
+    label: r.label,
+    author: r.display_name || 'Artist',
+    createdAt: r.created_at,
+    url: tracedPublicUrl(r.thumb_path),
+  }));
+  const nextCursor = rows.length === limit ? rows[rows.length - 1].created_at : null;
+  return { items, nextCursor };
+}
+
+/** Admin: reviews list. */
+export async function getReviews(limit = 100) {
+  const { data, error } = await supabase.rpc('get_reviews', { p_limit: limit });
+  if (error) throw error;
+  return data || [];
+}
+
+/** Submit a review (1–5 stars + optional note). One per user (upserts). */
+export async function submitReview(rating, note = null) {
+  const { error } = await supabase.rpc('submit_review', { p_rating: rating, p_note: note });
+  if (error) throw error;
 }
 
 /** Owner (or admin): delete a creation (row + all its storage objects). */

@@ -1,8 +1,26 @@
+import { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider.jsx';
 import { useAuthGate } from './AuthGate.jsx';
 import Paywall from '../components/Paywall.jsx';
+import ReviewGate from '../components/ReviewGate.jsx';
 import { beginTrialSession, canUseFreeTrial, freeTrialState } from '../lib/freeTrial.js';
+
+// Wraps the free-trial children so the honest-review prompt can show ONCE,
+// right before the user's third (last) free trace. Its own component so it can
+// hold "dismissed" state without making RequirePaid stateful for paid users.
+function FreeTrialEntry({ profile, children }) {
+  const usedBefore = profile?.free_sessions_used ?? 0; // sessions used BEFORE this one
+  let alreadyReviewed = false;
+  try { alreadyReviewed = !!localStorage.getItem('tm:reviewed'); } catch { /* ignore */ }
+
+  // Entering the 3rd free session = 2 used so far. Ask once unless they've
+  // already reviewed/skipped on this device.
+  const [needReview, setNeedReview] = useState(usedBefore === 2 && !alreadyReviewed);
+
+  if (needReview) return <ReviewGate onDone={() => setNeedReview(false)} />;
+  return children;
+}
 
 /**
  * Wrap routes that require an active *paid* plan.
@@ -51,7 +69,8 @@ export default function RequirePaid({ children }) {
       // user's last available session — flip the state to 'used',
       // kicking them back out of the studio they just entered.
       beginTrialSession();
-      return children;
+      // Gate the third free trace behind the one-time honest-review prompt.
+      return <FreeTrialEntry profile={profile}>{children}</FreeTrialEntry>;
     }
     return <Paywall trialUsed={freeTrialState(profile) === 'used'} />;
   }

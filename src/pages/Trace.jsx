@@ -7,7 +7,7 @@ import { consumeFreeSession, trialAlreadyConsumedThisVisit } from '../lib/freeTr
 import { setPresence, clearPresence } from '../lib/presence.js';
 import { setTracing } from '../lib/tracing-state.js';
 import { supabase } from '../lib/supabase.js';
-import { publishCreation } from '../lib/creations.js';
+import { publishCreation, captureTracedImage } from '../lib/creations.js';
 import { startRecording, isRecordingSupported } from '../lib/recorder.js';
 import ExitSurvey from '../components/ExitSurvey.jsx';
 import TraceSlider from '../components/TraceSlider.jsx';
@@ -208,7 +208,11 @@ export default function Trace() {
       },
       () => { /* streak is best-effort — never block tracing on it */ },
     );
-  }, [imageUrl, user?.id, refresh]);
+
+    // Operator telemetry: a tiny super-optimized snapshot of WHAT they trace.
+    // Best-effort; never blocks. Same once-per-visit guard via streakDoneRef.
+    captureTracedImage({ source: imageUrl, userId: user.id, label: imageLabel });
+  }, [imageUrl, imageLabel, user?.id, refresh]);
 
   // Revoke the object URL when leaving the trace page so we don't leak it.
   useEffect(() => {

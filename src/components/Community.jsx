@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { listCreations, toggleLike, deleteCreation, reportCreation, getStreakLeaderboard } from '../lib/creations.js';
+import { listCreations, toggleLike, deleteCreation, reportCreation, getStreakLeaderboard, getMyStreakRank } from '../lib/creations.js';
 import CompareLightbox from './CompareLightbox.jsx';
 
 const PAGE = 30;
@@ -28,12 +28,22 @@ export default function Community({ tab: tabProp, onTabChange }) {
   const tab = tabProp ?? tabLocal;
   const setTab = (t) => { if (onTabChange) onTabChange(t); else setTabLocal(t); };
   const [board, setBoard] = useState(null);    // streak leaderboard rows
+  const [myRank, setMyRank] = useState(null);  // caller's own rank (when outside top 20)
+  // Gallery filter: 'new' | 'top' | 'reference'.
+  const [filter, setFilter] = useState('new');
 
-  // First page (and reload when the signed-in user changes).
+  // First page — reloads on user change OR filter change.
   useEffect(() => {
     let cancelled = false;
     setItems(null);
-    listCreations({ limit: PAGE, currentUserId: user?.id || null })
+    setCursor(null);
+    listCreations({
+      limit: PAGE,
+      offset: 0,
+      sort: filter === 'top' ? 'top' : 'new',
+      onlyReference: filter === 'reference',
+      currentUserId: user?.id || null,
+    })
       .then(({ items: rows, nextCursor }) => {
         if (cancelled) return;
         setItems(rows);
@@ -41,20 +51,23 @@ export default function Community({ tab: tabProp, onTabChange }) {
       })
       .catch(() => { if (!cancelled) { setItems([]); setCursor(null); } });
     return () => { cancelled = true; };
-  }, [user?.id]);
+  }, [user?.id, filter]);
 
   const loadMore = useCallback(async () => {
-    if (!cursor || loadingMore) return;
+    if (cursor == null || loadingMore) return;
     setLoadingMore(true);
     try {
       const { items: rows, nextCursor } = await listCreations({
-        limit: PAGE, before: cursor, currentUserId: user?.id || null,
+        limit: PAGE, offset: cursor,
+        sort: filter === 'top' ? 'top' : 'new',
+        onlyReference: filter === 'reference',
+        currentUserId: user?.id || null,
       });
       setItems((cur) => [...(cur || []), ...rows]);
       setCursor(nextCursor);
     } catch { /* keep what we have */ }
     finally { setLoadingMore(false); }
-  }, [cursor, loadingMore, user?.id]);
+  }, [cursor, loadingMore, user?.id, filter]);
 
   const onLike = async (it) => {
     if (!user) return;
@@ -94,12 +107,18 @@ export default function Community({ tab: tabProp, onTabChange }) {
     } catch { /* ignore */ }
   };
 
-  // Lazy-load the streak leaderboard the first time the tab is opened.
+  // Lazy-load the streak leaderboard (+ the caller's own rank) when opened.
   useEffect(() => {
     if (tab === 'streaks' && board === null) {
       getStreakLeaderboard(20).then(setBoard).catch(() => setBoard([]));
+      if (user) getMyStreakRank().then(setMyRank).catch(() => setMyRank(null));
     }
-  }, [tab, board]);
+  }, [tab, board, user]);
+
+  // Show the "your rank" row only when the user has a streak AND isn't already
+  // visible in the top-20 board above.
+  const showMyRank = myRank && myRank.current_streak > 0
+    && board && !board.some((r) => r.rank === myRank.rank);
 
   return (
     <section className="community-card" aria-labelledby="community-title">
@@ -145,13 +164,50 @@ export default function Community({ tab: tabProp, onTabChange }) {
               ))}
             </div>
           )}
+
+          {/* The caller's own rank, pinned below when they're outside the top 20. */}
+          {showMyRank && (
+            <div className="community-board community-myrank">
+              <div className="board-row is-me">
+                <span className="board-rank">{myRank.rank}</span>
+                <span className="board-avatar board-avatar-fallback">You</span>
+                <span className="board-name">Your rank</span>
+                <span className="board-metric-val">
+                  <strong>🔥 {myRank.current_streak}</strong>
+                  <small>of {myRank.total}</small>
+                </span>
+              </div>
+            </div>
+          )}
         </>
+      )}
+
+      {/* Gallery filters. */}
+      {tab === 'gallery' && (
+        <div className="community-filters" role="tablist" aria-label="Filter creations">
+          {[
+            { id: 'new', label: 'Newest' },
+            { id: 'top', label: 'Most liked' },
+            { id: 'reference', label: 'With reference' },
+          ].map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="tab"
+              aria-selected={filter === f.id}
+              className={`community-filter ${filter === f.id ? 'is-active' : ''}`}
+              onClick={() => setFilter(f.id)}
+            >{f.label}</button>
+          ))}
+        </div>
       )}
 
       {tab === 'gallery' && items === null && <p className="community-muted">Loading…</p>}
       {tab === 'gallery' && items && items.length === 0 && (
         <p className="community-muted">
-          No creations yet. Finish a trace and tap “Show off your work” to be the first!
+          {filter === 'reference'
+            ? 'No creations with a reference yet.'
+            : 'No creations yet. Finish a trace and tap “Show off your work” to be the first!'}
         </p>
       )}
 

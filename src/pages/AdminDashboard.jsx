@@ -6,7 +6,7 @@ import {
   listReferrers, createReferrer, updateReferrer, rotateReferrerToken, markCommissionsPaid,
   listAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement,
 } from '../lib/admin.js';
-import { listCreations, deleteCreation, setCreationHidden } from '../lib/creations.js';
+import { listCreations, deleteCreation, setCreationHidden, getReviews, getTracedImages } from '../lib/creations.js';
 import {
   LIBRARY_CATEGORIES, libraryCategoryLabel,
   listLibraryImages, addLibraryImage, deleteLibraryImage,
@@ -1783,7 +1783,7 @@ function GalleryPanel() {
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const { items: rows, nextCursor } = await listCreations({ limit: 60, before: cursor, includeHidden: true });
+      const { items: rows, nextCursor } = await listCreations({ limit: 60, offset: cursor, includeHidden: true });
       setItems((c) => [...(c || []), ...rows]);
       setCursor(nextCursor);
     } catch { /* keep what we have */ }
@@ -1839,6 +1839,107 @@ function GalleryPanel() {
           <div style={{ padding: 12 }}>
             <button type="button" className="admin-ref-btn" onClick={more} disabled={loadingMore}>
               {loadingMore ? 'Loading…' : 'Load more'}
+            </button>
+          </div>
+        )}
+        </>
+      )}
+    </section>
+  );
+}
+
+/* Reviews panel — honest reviews collected before the 3rd free trace.        */
+function ReviewsPanel() {
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    getReviews(200).then(setRows).catch(() => { setErr('Could not load reviews.'); setRows([]); });
+  }, []);
+
+  const avg = rows && rows.length
+    ? (rows.reduce((s, r) => s + (r.rating || 0), 0) / rows.length).toFixed(1)
+    : null;
+
+  return (
+    <section className="admin-stats">
+      <header className="admin-stats-head">
+        <h2>Reviews</h2>
+        <span className="admin-stats-when">
+          {rows ? `${rows.length} review${rows.length === 1 ? '' : 's'}${avg ? ` · avg ${avg}★` : ''}` : 'Loading…'}
+        </span>
+      </header>
+      {err && <p className="admin-error" style={{ margin: 12 }}>{err}</p>}
+      {rows && rows.length === 0 && <p className="admin-ref-muted" style={{ padding: 12 }}>No reviews yet.</p>}
+      {rows && rows.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
+          {rows.map((r) => (
+            <div key={r.id} style={{ border: '1px solid rgba(0,0,0,0.12)', borderRadius: 12, padding: '10px 12px', background: '#fff' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                <strong style={{ fontSize: 13 }}>{r.display_name}</strong>
+                <span style={{ fontSize: 11, color: '#8a7d6b' }}>{formatTraceRelative(r.created_at)}</span>
+              </div>
+              <div style={{ color: '#e8a020', fontSize: 15, letterSpacing: '1px' }}>
+                {'★'.repeat(r.rating)}<span style={{ color: '#d8cdbb' }}>{'★'.repeat(5 - r.rating)}</span>
+              </div>
+              {r.note && <p style={{ margin: '4px 0 0', fontSize: 13, color: '#4a3f33', lineHeight: 1.45 }}>{r.note}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* Traced panel — what kinds of images people trace (super-optimized thumbs).  */
+function TracedPanel() {
+  const [items, setItems] = useState(null);
+  const [cursor, setCursor] = useState(null);
+  const [more, setMore] = useState(false);
+  const [err, setErr] = useState('');
+
+  const load = () => {
+    setItems(null);
+    getTracedImages(120).then(({ items: rows, nextCursor }) => { setItems(rows); setCursor(nextCursor); })
+      .catch(() => { setErr('Could not load traced images.'); setItems([]); });
+  };
+  useEffect(() => { load(); }, []);
+
+  const loadMore = async () => {
+    if (!cursor || more) return;
+    setMore(true);
+    try {
+      const { items: rows, nextCursor } = await getTracedImages(120, cursor);
+      setItems((c) => [...(c || []), ...rows]);
+      setCursor(nextCursor);
+    } catch { /* keep */ }
+    finally { setMore(false); }
+  };
+
+  return (
+    <section className="admin-stats">
+      <header className="admin-stats-head">
+        <h2>What people trace</h2>
+        <span className="admin-stats-when">{items ? `${items.length}${cursor ? '+' : ''} captured` : 'Loading…'}</span>
+      </header>
+      {err && <p className="admin-error" style={{ margin: 12 }}>{err}</p>}
+      {items && items.length === 0 && <p className="admin-ref-muted" style={{ padding: 12 }}>No traced images captured yet.</p>}
+      {items && items.length > 0 && (
+        <>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10, padding: 12 }}>
+          {items.map((it) => (
+            <div key={it.id} style={{ border: '1px solid rgba(0,0,0,0.12)', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
+              <img src={it.url} alt={it.label || ''} loading="lazy" decoding="async"
+                   style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block', background: '#f3efe7' }} />
+              <div style={{ padding: '6px 8px', fontSize: 11, color: '#6b5d4d', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {it.author}
+              </div>
+            </div>
+          ))}
+        </div>
+        {cursor && (
+          <div style={{ padding: 12 }}>
+            <button type="button" className="admin-ref-btn" onClick={loadMore} disabled={more}>
+              {more ? 'Loading…' : 'Load more'}
             </button>
           </div>
         )}
@@ -1993,12 +2094,15 @@ export default function AdminDashboard() {
     return () => clearInterval(id);
   }, []);
 
-  // Pull-to-refresh on mobile (PWA): drag down from the top of the page
-  // to force a fresh fetch without hunting for the URL bar. Desktop
-  // mouse-drag works too — handy for testing.
+  // Pull-to-refresh — touch devices only. On desktop a mouse-drag from the
+  // top was hijacking normal click-drags (text selection, etc.) and firing
+  // an unwanted refresh, so we gate it to genuine touch screens.
+  const isTouch = typeof window !== 'undefined'
+    && (('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0);
   const { pullDistance, triggered, isRefreshing, threshold } = usePullToRefresh({
     onRefresh: loadUsers,
     threshold: 70,
+    enabled: isTouch,
   });
 
   const counts = useMemo(() => {
@@ -2158,6 +2262,8 @@ export default function AdminDashboard() {
             { id: 'referrals', label: 'Referrals' },
             { id: 'survey',    label: 'Survey' },
             { id: 'traffic',   label: 'Traffic' },
+            { id: 'reviews',   label: 'Reviews' },
+            { id: 'traced',    label: 'Traced' },
             { id: 'gallery',   label: 'Gallery' },
             { id: 'library',   label: 'Library' },
           ].map((v) => (
@@ -2186,6 +2292,8 @@ export default function AdminDashboard() {
           />
         )}
         {view === 'traffic' && <TrafficPanel />}
+        {view === 'reviews' && <ReviewsPanel />}
+        {view === 'traced'  && <TracedPanel />}
         {view === 'gallery' && <GalleryPanel />}
         {view === 'library' && <LibraryPanel />}
 

@@ -27,6 +27,13 @@ const DRAWS = [
   { id: 'other',      emoji: '✨', label: 'A bit of all'    },
 ];
 
+// Gender — single select. Whitelisted server-side (girl/boy/other).
+const GENDERS = [
+  { id: 'girl',  label: 'Girl'  },
+  { id: 'boy',   label: 'Boy'   },
+  { id: 'other', label: 'Other' },
+];
+
 const NOTE_MAX = 280;
 
 /**
@@ -37,9 +44,10 @@ const NOTE_MAX = 280;
 export default function ExitSurvey({ onDone }) {
   const { profile, refresh } = useAuth();
 
-  const [age, setAge]     = useState('');
-  const [draws, setDraws] = useState([]);
-  const [note, setNote]   = useState('');
+  const [age, setAge]       = useState('');
+  const [gender, setGender] = useState('');
+  const [draws, setDraws]   = useState([]);
+  const [note, setNote]     = useState('');
   const [busy, setBusy]   = useState(false);
   const [error, setError] = useState(null);
   const [done, setDone]   = useState(false);
@@ -50,22 +58,23 @@ export default function ExitSurvey({ onDone }) {
     );
   };
 
-  const ready = !!age && draws.length > 0;
+  const ready = !!age && !!gender && draws.length > 0;
 
   const submit = async () => {
     if (busy) return;
     setError(null);
     if (!ready) {
-      setError('Pick your age and at least one thing you draw.');
+      setError('Pick your age, who you are, and at least one thing you draw.');
       return;
     }
     setBusy(true);
     try {
       const trimmed = note.trim();
       const { error: rpcError } = await supabase.rpc('record_survey', {
-        p_age:   age,
-        p_draws: draws,
-        p_note:  trimmed ? trimmed : null,
+        p_age:    age,
+        p_draws:  draws,
+        p_note:   trimmed ? trimmed : null,
+        p_gender: gender,
       });
       if (rpcError) {
         // Backend may not have the 3-arg signature yet (the survey_note
@@ -78,7 +87,7 @@ export default function ExitSurvey({ onDone }) {
           || msg.includes('function') && (msg.includes('does not exist') || msg.includes('not found') || msg.includes('no function matches'))
           || msg.includes('argument');
         if (!looksLikeSignatureMismatch) throw rpcError;
-        const retry = await supabase.rpc('record_survey', { p_age: age, p_draws: draws });
+        const retry = await supabase.rpc('record_survey', { p_age: age, p_draws: draws, p_note: trimmed ? trimmed : null });
         if (retry.error) throw retry.error;
       }
       try { await refresh(); } catch { /* non-fatal */ }
@@ -130,9 +139,31 @@ export default function ExitSurvey({ onDone }) {
         </div>
       </section>
 
+      <section className="exit-survey-block" aria-labelledby="survey-gender-q">
+        <h3 id="survey-gender-q" className="exit-survey-q">
+          <span className="exit-survey-q-num">2</span>
+          Are you a…
+        </h3>
+        <div className="exit-survey-chips" role="radiogroup" aria-label="Are you a girl or boy">
+          {GENDERS.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              role="radio"
+              aria-checked={gender === g.id}
+              className={`exit-survey-chip${gender === g.id ? ' is-active' : ''}`}
+              onClick={() => setGender(g.id)}
+              disabled={busy}
+            >
+              <span className="exit-survey-chip-label">{g.label}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
       <section className="exit-survey-block" aria-labelledby="survey-draws-q">
         <h3 id="survey-draws-q" className="exit-survey-q">
-          <span className="exit-survey-q-num">2</span>
+          <span className="exit-survey-q-num">3</span>
           What do you like to draw?
           <span className="exit-survey-optional"> (pick any)</span>
         </h3>
@@ -155,7 +186,7 @@ export default function ExitSurvey({ onDone }) {
 
       <section className="exit-survey-block exit-survey-note-block" aria-labelledby="survey-note-q">
         <h3 id="survey-note-q" className="exit-survey-q">
-          <span className="exit-survey-q-num">3</span>
+          <span className="exit-survey-q-num">4</span>
           A note or a request?
           <span className="exit-survey-optional"> (optional)</span>
         </h3>
@@ -184,7 +215,7 @@ export default function ExitSurvey({ onDone }) {
           {busy
             ? 'Saving…'
             : !ready
-              ? 'Pick your age + what you draw →'
+              ? 'Answer the quick questions →'
               : 'Save & back to tracing →'}
         </button>
       </div>
