@@ -76,7 +76,7 @@ const PLAN_FROM_PRODUCT: Record<string, string> = {};
 //   DODO_PRICE_MONTHLY_CENTS_EUR=560
 //   DODO_PRICE_QUARTERLY_CENTS_USD=1000
 //   DODO_PRICE_QUARTERLY_CENTS_EUR=800
-//   DODO_PRICE_LIFETIME_CENTS_USD=2500
+//   DODO_PRICE_LIFETIME_CENTS_USD=1500
 // A currency the operator hasn't configured for a plan is treated as not
 // allowlisted and the event is rejected — that's the right default, since
 // we can't validate "is this enough money" without knowing the floor.
