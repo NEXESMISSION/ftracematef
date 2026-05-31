@@ -1619,6 +1619,33 @@
 }
 .profile-foot .profile-btn { padding: 13px 28px; font-size: 14px; }
 
+/* ── Admin entry, pinned at the very bottom (operators only) ── */
+.profile-admin-foot {
+  margin-top: 18px;
+  display: flex;
+  justify-content: center;
+}
+.profile-admin-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border: 1.5px dashed rgba(43, 33, 24, 0.28);
+  background: transparent;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.profile-admin-link:hover {
+  opacity: 1;
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
 /* ── Receipts (collapsible) ── */
 .profile-receipts { padding: 0; }
 .profile-receipts:hover { transform: none; box-shadow: 4px 4px 0 var(--ink); }

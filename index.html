@@ -110,6 +110,40 @@
             "email": "hi@tracemate.art",
             "availableLanguage": ["English"]
           }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://www.tracemate.art/#app",
+          "name": "TraceMate",
+          "url": "https://www.tracemate.art/",
+          "applicationCategory": "DesignApplication",
+          "applicationSubCategory": "AR tracing & learn-to-draw app",
+          "operatingSystem": "Web (iOS 14+, Android 10+, iPadOS, desktop browsers with a webcam)",
+          "browserRequirements": "Requires a modern browser with camera access. No install.",
+          "description": "Browser-based augmented-reality tracing app to learn drawing. Point your phone camera at paper, see any image as a live overlay, and trace it by hand. A practice tool for beginners, kids, and adults — and a no-install Da Vinci Eye alternative.",
+          "image": "https://www.tracemate.art/images/og/og-cover.png",
+          "publisher": { "@id": "https://www.tracemate.art/#organization" },
+          "featureList": [
+            "Live AR overlay on real paper through your phone camera",
+            "No app install — runs in the browser",
+            "Adjustable opacity and scale",
+            "Built-in image library",
+            "Works on iPhone, Android, iPad, and desktop",
+            "Reference image stays on your device",
+            "One free tracing session per account"
+          ],
+          "offers": {
+            "@type": "AggregateOffer",
+            "priceCurrency": "USD",
+            "lowPrice": "7.00",
+            "highPrice": "15.00",
+            "offerCount": 3,
+            "offers": [
+              { "@type": "Offer", "name": "Monthly", "price": "7.00", "priceCurrency": "USD", "category": "subscription" },
+              { "@type": "Offer", "name": "3 Months", "price": "10.00", "priceCurrency": "USD", "category": "subscription" },
+              { "@type": "Offer", "name": "Lifetime", "price": "15.00", "priceCurrency": "USD", "category": "one-time" }
+            ]
+          }
         }
       ]
     }

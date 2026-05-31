@@ -6,9 +6,8 @@ import {
   listReferrers, createReferrer, updateReferrer, rotateReferrerToken, markCommissionsPaid,
   listAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement,
 } from '../lib/admin.js';
-import { listCreations, deleteCreation, setCreationHidden, getReviews, getTracedImages } from '../lib/creations.js';
+import { listCreations, deleteCreation, setCreationHidden, clearCreationNote, getReviews, getTracedImages } from '../lib/creations.js';
 import {
-  LIBRARY_CATEGORIES, libraryCategoryLabel,
   listLibraryImages, addLibraryImage, deleteLibraryImage,
 } from '../lib/library.js';
 import { friendlyError } from '../lib/errors.js';
@@ -1803,6 +1802,14 @@ function GalleryPanel() {
     } catch (e) { setErr(e?.message || 'Update failed.'); }
   };
 
+  const clearNote = async (it) => {
+    if (!window.confirm('Clear this caption? The artwork stays.')) return;
+    try {
+      await clearCreationNote(it.id);
+      setItems((c) => c?.map((x) => x.id === it.id ? { ...x, note: null } : x));
+    } catch (e) { setErr(e?.message || 'Update failed.'); }
+  };
+
   const btn = (color) => ({ marginTop: 4, fontSize: 11, color, background: 'transparent', border: `1px solid ${color}55`, borderRadius: 6, padding: '3px 8px', cursor: 'pointer' });
 
   return (
@@ -1825,10 +1832,13 @@ function GalleryPanel() {
                 <span style={{ fontSize: 11, color: '#8a7d6b' }}>
                   ♥ {it.likeCount} · {formatTraceRelative(it.createdAt)}{it.referenceUrl ? ' · has reference' : ''}
                 </span>
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <button type="button" onClick={() => toggleHidden(it)} style={btn('#8a6d1a')}>
                     {it.hidden ? 'Unhide' : 'Hide'}
                   </button>
+                  {it.note && (
+                    <button type="button" onClick={() => clearNote(it)} style={btn('#6b5d4d')}>Clear note</button>
+                  )}
                   <button type="button" onClick={() => remove(it)} style={btn('#c0392b')}>Delete</button>
                 </div>
               </div>
@@ -1952,7 +1962,6 @@ function TracedPanel() {
 /* Library panel — manage the pre-uploaded tracing image library (A1).        */
 function LibraryPanel() {
   const [items, setItems] = useState([]);
-  const [category, setCategory] = useState(LIBRARY_CATEGORIES[0].id);
   const [title, setTitle] = useState('');
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -1966,7 +1975,7 @@ function LibraryPanel() {
     if (!file) { setMsg('Pick an image file first.'); return; }
     setBusy(true); setMsg('');
     try {
-      await addLibraryImage({ file, category, title });
+      await addLibraryImage({ file, title });
       setTitle(''); setFile(null); if (e.target.reset) e.target.reset();
       await load(); setMsg('Added to the library.');
     } catch (err) { setMsg(err?.message || 'Upload failed.'); }
@@ -1989,12 +1998,6 @@ function LibraryPanel() {
 
       <form onSubmit={onSubmit} style={{ display: 'grid', gap: 10, padding: 12, maxWidth: 420 }}>
         <label style={{ display: 'grid', gap: 4, fontWeight: 700, fontSize: 13 }}>
-          Category
-          <select value={category} onChange={(e) => setCategory(e.target.value)} style={inp}>
-            {LIBRARY_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-          </select>
-        </label>
-        <label style={{ display: 'grid', gap: 4, fontWeight: 700, fontSize: 13 }}>
           Title (optional)
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Naruto bust" style={inp} />
         </label>
@@ -2010,7 +2013,6 @@ function LibraryPanel() {
         {items.map((it) => (
           <div key={it.id} style={{ border: '1px solid rgba(0,0,0,0.12)', borderRadius: 10, padding: 6, background: '#fff' }}>
             <img src={it.thumbUrl || it.url} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: 110, objectFit: 'contain', background: '#faf6ef', borderRadius: 6 }} />
-            <div style={{ fontSize: 11, opacity: 0.7 }}>{libraryCategoryLabel(it.category)}</div>
             <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title || '—'}</div>
             <button type="button" onClick={() => remove(it)}
                     style={{ fontSize: 11, marginTop: 4, cursor: 'pointer', border: '1px solid #c0392b', color: '#c0392b', background: 'transparent', borderRadius: 6, padding: '3px 8px' }}>

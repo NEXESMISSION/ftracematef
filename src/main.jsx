@@ -18,6 +18,7 @@ import './styles/library.css';
 import './styles/community.css';
 import './styles/camera.css';
 import './styles/compare.css';
+import './styles/guide.css';
 
 // Native-only bootstrap. Both functions short-circuit on the web — no
 // network, no plugin import, no perf cost.

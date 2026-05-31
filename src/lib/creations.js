@@ -80,13 +80,24 @@ export async function publishCreation({ file, reference, title, note, userId, wa
 
     // Reference copy — only when the user explicitly opted to share what they
     // traced (privacy). Watermarked like the result so a shared source image
-    // still carries the Trace Mate mark. Best-effort; never blocks publishing.
+    // still carries the Trace Mate mark. We also generate a small thumbnail so
+    // the before/after compare popup can show the reference instantly instead
+    // of waiting on the full-size download. Best-effort; never blocks publish.
     let referencePath = null;
+    let referenceThumbPath = null;
     if (reference) {
       try {
         const ref = await processImage(reference, { watermark });
         referencePath = await uploadBlob(ref, userId);
         uploaded.push(referencePath);
+        try {
+          const refThumb = await makeThumbnail(ref, { maxDim: 512, quality: 0.82 });
+          if (refThumb?.file) {
+            referenceThumbPath = await uploadBlob(refThumb.file, userId);
+            if (refThumb.url) URL.revokeObjectURL(refThumb.url);
+            uploaded.push(referenceThumbPath);
+          }
+        } catch { /* reference thumb is optional */ }
       } catch { /* ignore */ }
     }
 
@@ -97,6 +108,7 @@ export async function publishCreation({ file, reference, title, note, userId, wa
         storage_path: path,
         thumb_path: thumbPath,
         reference_path: referencePath,
+        reference_thumb_path: referenceThumbPath,
         title: title || null,
         note: (note || '').trim().slice(0, 200) || null,
       })
@@ -153,9 +165,11 @@ export async function listCreations({
     url: creationPublicUrl(r.storage_path),
     thumbUrl: r.thumb_path ? creationPublicUrl(r.thumb_path) : creationPublicUrl(r.storage_path),
     referenceUrl: r.reference_path ? creationPublicUrl(r.reference_path) : null,
+    referenceThumbUrl: r.reference_thumb_path ? creationPublicUrl(r.reference_thumb_path) : null,
     storage_path: r.storage_path,
     thumb_path: r.thumb_path,
     reference_path: r.reference_path,
+    reference_thumb_path: r.reference_thumb_path,
     author: r.author || 'Artist',
     avatarUrl: r.avatar_url || null,
     likedByMe: likedSet.has(r.id),
@@ -187,6 +201,14 @@ export async function setCreationHidden(creationId, hidden) {
   const { error } = await supabase.rpc('set_creation_hidden', {
     p_creation_id: creationId,
     p_hidden: hidden,
+  });
+  if (error) throw error;
+}
+
+/** Admin: clear a creation's note/caption without deleting the artwork. */
+export async function clearCreationNote(creationId) {
+  const { error } = await supabase.rpc('admin_clear_creation_note', {
+    p_creation_id: creationId,
   });
   if (error) throw error;
 }
@@ -275,6 +297,7 @@ export async function deleteCreation(row) {
     row.storage_path || fromUrl(row.url),
     row.thumb_path || fromUrl(row.thumbUrl),
     row.reference_path || fromUrl(row.referenceUrl),
+    row.reference_thumb_path || fromUrl(row.referenceThumbUrl),
   ].filter(Boolean);
   if (paths.length) await supabase.storage.from(BUCKET).remove(paths).catch(() => {});
 }

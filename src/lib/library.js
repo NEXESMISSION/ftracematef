@@ -5,21 +5,14 @@
  * public `library` Storage bucket. Public read; admin-only writes (enforced by
  * RLS). The user picker calls listLibraryImages(); the admin page uses
  * addLibraryImage()/deleteLibraryImage().
+ *
+ * The library is a single flat collection — no categories. New uploads land
+ * under a 'general' prefix.
  */
 import { supabase } from './supabase.js';
 import { optimizeImage, makeThumbnail } from './imageOptimize.js';
 
 const BUCKET = 'library';
-
-export const LIBRARY_CATEGORIES = [
-  { id: 'anime',  label: 'Anime' },
-  { id: 'movies', label: 'Movie Characters' },
-  { id: 'music',  label: 'Hip-Hop & K-Pop' },
-];
-
-export function libraryCategoryLabel(id) {
-  return LIBRARY_CATEGORIES.find((c) => c.id === id)?.label || id;
-}
 
 export function libraryPublicUrl(path) {
   return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
@@ -42,7 +35,8 @@ export async function listLibraryImages() {
 }
 
 /** Admin: optimize → upload to the bucket → insert the catalog row. */
-export async function addLibraryImage({ file, category, title }) {
+export async function addLibraryImage({ file, title }) {
+  const category = 'general';
   let toUpload = file;
   try {
     const opt = await optimizeImage(file, { maxDim: 2048, quality: 0.9 });

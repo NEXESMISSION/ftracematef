@@ -26,6 +26,7 @@ export default function Footer() {
           <h4 className="footer-col-title hand">Explore</h4>
           <nav className="footer-links" aria-label="Footer navigation">
             <a href="#how">How it works</a>
+            <Link to="/how-to-use">Drawing guide</Link>
             <a href="#gallery">Gallery</a>
             <a href="#pricing">Pricing</a>
           </nav>

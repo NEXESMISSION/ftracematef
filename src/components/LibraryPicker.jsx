@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
-import { LIBRARY_CATEGORIES, listLibraryImages } from '../lib/library.js';
+import { listLibraryImages } from '../lib/library.js';
 
 /**
- * A1 — Library picker modal. Tabbed by category; tapping an image hands the
+ * A1 — Library picker modal. One flat collection; tapping an image hands the
  * row back to the parent (onPick), which loads it into the tracing flow.
  *
- * Props: open, onClose, onPick(row)  — row has { url, title, category, ... }.
+ * Props: open, onClose, onPick(row)  — row has { url, title, ... }.
  */
 export default function LibraryPicker({ open, onClose, onPick }) {
-  const [tab, setTab] = useState(LIBRARY_CATEGORIES[0].id);
   const [items, setItems] = useState(null); // null = loading
   const [error, setError] = useState('');
 
@@ -24,7 +23,7 @@ export default function LibraryPicker({ open, onClose, onPick }) {
   }, [open]);
 
   if (!open) return null;
-  const shown = (items || []).filter((i) => i.category === tab);
+  const shown = items || [];
 
   return (
     <div className="lib-modal" role="dialog" aria-modal="true" aria-label="Image library">
@@ -40,26 +39,11 @@ export default function LibraryPicker({ open, onClose, onPick }) {
           </button>
         </div>
 
-        <div className="lib-tabs" role="tablist" aria-label="Categories">
-          {LIBRARY_CATEGORIES.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === c.id}
-              className={`lib-tab ${tab === c.id ? 'is-active' : ''}`}
-              onClick={() => setTab(c.id)}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-
         <div className="lib-body">
           {items === null && <p className="lib-muted">Loading…</p>}
           {error && <p className="lib-error">{error}</p>}
           {items !== null && !error && shown.length === 0 && (
-            <p className="lib-muted">Nothing in this category yet.</p>
+            <p className="lib-muted">Nothing in the library yet.</p>
           )}
           {shown.length > 0 && (
             <div className="lib-grid">

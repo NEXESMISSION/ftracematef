@@ -234,10 +234,12 @@ main, header, section, footer { position: relative; z-index: 1; }
   align-items: center;
   gap: 12px;
 }
-.brand > img:not(.brand-icon) { width: clamp(140px, 16vw, 200px); height: auto; }
+/* The wordmark is rendered through <Img>, which wraps local assets in a
+   <picture>, so the <img> is NOT a direct child of .brand — target the class. */
+.brand .brand-word { width: clamp(112px, 11vw, 158px); height: auto; }
 .brand-icon {
-  width: clamp(34px, 3.6vw, 44px);
-  height: clamp(34px, 3.6vw, 44px);
+  width: clamp(30px, 3vw, 38px);
+  height: clamp(30px, 3vw, 38px);
   border-radius: 12px;
   object-fit: cover;
   border: 2px solid var(--ink);
@@ -2093,8 +2095,8 @@ main, header, section, footer { position: relative; z-index: 1; }
   .nav { padding-top: 20px; gap: 12px; flex-wrap: nowrap; }
   .nav-links { display: none; }
   /* Shrink the brand so brand + CTA always fit on the narrowest phones. */
-  .brand > img:not(.brand-icon) { width: clamp(110px, 28vw, 150px); }
-  .brand-icon { width: 32px; height: 32px; }
+  .brand .brand-word { width: clamp(96px, 24vw, 130px); }
+  .brand-icon { width: 28px; height: 28px; }
 
   .nav { padding-bottom: 24px; }
   .hero { padding-top: 64px; padding-bottom: 70px; }
@@ -2638,71 +2640,81 @@ main, header, section, footer { position: relative; z-index: 1; }
   .shorts-row .demo-reel-frame:nth-of-type(even) { transform: rotate(1deg); }
 }
 
-/* ── F1 — audience proof rows (compact). Headline + a tight reel strip. ──── */
-.aud-rows {
+/* ── F1 — audience cards. One clean card per audience; optional reel strip. ─ */
+.aud-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: clamp(14px, 2vw, 20px);
+  margin-top: clamp(20px, 3vw, 30px);
+}
+.aud-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: clamp(20px, 3vw, 32px);
-  margin-top: clamp(18px, 3vw, 28px);
+  align-items: flex-start;
+  gap: 8px;
+  padding: clamp(20px, 2.6vw, 28px);
+  border-radius: 22px;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  box-shadow: 4px 4px 0 var(--ink);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
-.aud-row {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
+.aud-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0 var(--ink);
 }
-.aud-row-head h3 {
+/* Soft per-audience tint so the row reads as three distinct, friendly cards. */
+.aud-card--anime     { background: #fff2e8; }
+.aud-card--aesthetic { background: #fdeef4; }
+.aud-card--kids      { background: #eef6ec; }
+
+.aud-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(46px, 5vw, 56px);
+  height: clamp(46px, 5vw, 56px);
+  border-radius: 16px;
+  border: 2px solid var(--ink);
+  background: #fff;
+  box-shadow: 2px 2px 0 var(--ink);
+  font-size: clamp(24px, 3vw, 30px);
+  line-height: 1;
+  margin-bottom: 2px;
+}
+.aud-card h3 {
   font-family: 'Nunito', sans-serif;
-  font-size: clamp(17px, 2vw, 22px);
+  font-size: clamp(18px, 2vw, 22px);
   font-weight: 800;
   letter-spacing: -0.01em;
   color: var(--ink);
-  margin: 0 0 2px;
+  margin: 0;
 }
-.aud-row-head p {
+.aud-card p {
   margin: 0;
   color: var(--ink-soft);
-  font-size: clamp(13px, 1.1vw, 15px);
-  line-height: 1.45;
+  font-size: clamp(14px, 1.1vw, 15.5px);
+  line-height: 1.5;
 }
+
+/* Optional reel strip inside a card (only renders when a card has videos). */
 .aud-reels {
   display: flex;
   gap: 10px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 4px;
+  margin-top: 6px;
+  width: 100%;
   scrollbar-width: none;
 }
 .aud-reels::-webkit-scrollbar { display: none; }
 .aud-reel { flex: 0 0 auto; }
-
-/* Small phone-shaped slots — a slim strip, not full-bleed frames. */
-.aud-slot-empty,
+.aud-reel .demo-reel-frame { width: 140px; transform: none; }
 .aud-slot-pending {
-  position: relative;
-  width: 96px;
+  width: 140px;
   aspect-ratio: 9 / 16;
   border-radius: 14px;
-  border: 1.5px dashed rgba(43, 33, 24, 0.25);
-  background:
-    repeating-linear-gradient(45deg, rgba(43,33,24,0.035) 0 10px, transparent 10px 20px),
-    var(--paper);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-.aud-slot-pending { border-style: solid; border-color: var(--ink); background: var(--ink); }
-.aud-slot-empty span {
-  font-family: 'Caveat', cursive;
-  font-size: 15px;
-  color: var(--ink-soft);
-  opacity: 0.7;
-}
-/* When real reels are present, let them size to the existing .demo-reel-frame
-   rule (it already caps width); the strip scrolls if they overflow. */
-.aud-reel .demo-reel-frame { width: 150px; transform: none; }
-@media (min-width: 700px) {
-  .aud-row { grid-template-columns: 230px 1fr; align-items: center; gap: 18px; }
-  .aud-slot-empty, .aud-slot-pending { width: 110px; }
-  .aud-reel .demo-reel-frame { width: 170px; }
+  background: var(--ink);
 }

@@ -1,6 +1,46 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 /**
+ * Progressive image for the compare popup. Shows a tiny thumbnail instantly
+ * (the result's thumb is already cached from the grid; the reference now has
+ * its own thumb too) and fades the full-resolution image in on top once it has
+ * decoded — so the popup never shows a blank black square while a 2048px image
+ * downloads. A spinner shows only until the full image is ready.
+ */
+function CmpImage({ thumb, full, alt }) {
+  const [loaded, setLoaded] = useState(false);
+
+  // Reset when the source changes (popup reused for a new item).
+  useEffect(() => { setLoaded(false); }, [full]);
+
+  return (
+    <>
+      {thumb && (
+        <img
+          className="cmp-img cmp-img-ph"
+          src={thumb}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          decoding="async"
+        />
+      )}
+      {!loaded && <span className="cmp-spinner" aria-hidden="true" />}
+      <img
+        className={`cmp-img cmp-img-hi ${loaded ? 'is-loaded' : ''}`}
+        src={full}
+        alt={alt}
+        draggable={false}
+        decoding="async"
+        fetchpriority="high"
+        onLoad={() => setLoaded(true)}
+        ref={(n) => { if (n && n.complete && n.naturalWidth) setLoaded(true); }}
+      />
+    </>
+  );
+}
+
+/**
  * Full-screen popup that compares a creation's RESULT photo against the
  * REFERENCE image the user traced, using a draggable before/after slider.
  *
@@ -8,7 +48,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
  * Left side = reference (what they traced), right side = result (what they
  * made). If there's no reference, it just shows the result full-size.
  *
- * Props: item ({ url, referenceUrl, author, note }) | null, onClose().
+ * Props: item ({ url, thumbUrl, referenceUrl, referenceThumbUrl, author, note })
+ *        | null, onClose().
  */
 export default function CompareLightbox({ item, onClose }) {
   const [pos, setPos] = useState(50);   // 0..100, % revealed of the result
@@ -68,11 +109,11 @@ export default function CompareLightbox({ item, onClose }) {
             onPointerCancel={onPointerUp}
           >
             {/* Base layer: the result (what they made). */}
-            <img className="cmp-img" src={item.url} alt={`Result by ${item.author}`} draggable={false} />
+            <CmpImage thumb={item.thumbUrl} full={item.url} alt={`Result by ${item.author}`} />
             {/* Top layer: the reference, clipped to the left of the handle. */}
             <div className="cmp-clip" style={{ width: `${pos}%` }}>
-              <div className="cmp-clip-inner" ref={null}>
-                <img className="cmp-img" src={item.referenceUrl} alt="Reference traced" draggable={false} />
+              <div className="cmp-clip-inner">
+                <CmpImage thumb={item.referenceThumbUrl} full={item.referenceUrl} alt="Reference traced" />
               </div>
             </div>
 
@@ -91,7 +132,7 @@ export default function CompareLightbox({ item, onClose }) {
           </div>
         ) : (
           <div className="cmp-frame cmp-frame-single">
-            <img className="cmp-img" src={item.url} alt={`Result by ${item.author}`} draggable={false} />
+            <CmpImage thumb={item.thumbUrl} full={item.url} alt={`Result by ${item.author}`} />
           </div>
         )}
 

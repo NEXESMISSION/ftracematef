@@ -44,3 +44,6 @@ supabase/.temp/
 
 # Stray build logs
 build_out.txt
+
+# Local preview/dev tooling config
+.claude/

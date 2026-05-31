@@ -755,6 +755,20 @@ export default function Account() {
             Sign out
           </button>
         </div>
+
+        {/* ── Admin entry — only rendered for operators, pinned at the very
+            bottom of the account page. Regular users never see this. ── */}
+        {isAdminUser(profile) && (
+          <div className="profile-admin-foot">
+            <Link to="/admin-me" className="profile-admin-link" aria-label="Open admin dashboard">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 2 L20 5.5 V11 c0 5-3.5 8.5-8 11 -4.5-2.5-8-6-8-11 V5.5 Z" />
+              </svg>
+              Admin dashboard
+            </Link>
+          </div>
+        )}
        </div>{/* /acct-pane-account */}
 
        {/* ── Community pane: Gallery + Streaks. On mobile it's shown for both

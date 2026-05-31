@@ -9,6 +9,8 @@ Allow: /login
 Allow: /upload
 Allow: /terms
 Allow: /privacy
+Allow: /how-to-use
+Allow: /proportions
 
 # Private / authenticated routes — no value to crawlers
 Disallow: /account

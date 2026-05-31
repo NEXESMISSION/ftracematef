@@ -19,6 +19,7 @@ import CheckoutSuccess from './pages/CheckoutSuccess.jsx';
 import PricingPage from './pages/PricingPage.jsx';
 import Terms from './pages/Terms.jsx';
 import Privacy from './pages/Privacy.jsx';
+import HowToUse from './pages/HowToUse.jsx';
 import RefRedirect from './pages/RefRedirect.jsx';
 import AffiliateRedirect from './pages/AffiliateRedirect.jsx';
 import NotFound from './pages/NotFound.jsx';
@@ -131,6 +132,10 @@ export default function App() {
         <Route path="/pricing"       element={<PricingPage />} />
         <Route path="/terms"         element={<Terms />} />
         <Route path="/privacy"       element={<Privacy />} />
+
+        {/* Best-practices guide — SEO/AI surface. /proportions is an alias. */}
+        <Route path="/how-to-use"    element={<HowToUse />} />
+        <Route path="/proportions"   element={<HowToUse />} />
 
         {/* Auth required (free users allowed) */}
         <Route path="/account"          element={<RequireAuth><Account /></RequireAuth>} />

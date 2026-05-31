@@ -29,7 +29,7 @@ export default function Nav() {
     <header className="nav tm-section-pad">
       <Link to="/" className="brand" aria-label="Trace Mate home">
         <Img src="/images/brand/logo-icon.webp" alt="" className="brand-icon" aria-hidden="true" priority />
-        <Img src="/images/brand/logo.webp" alt="Trace Mate" priority />
+        <Img src="/images/brand/logo.webp" alt="Trace Mate" className="brand-word" priority />
       </Link>
 
       <nav className="nav-links" aria-label="Primary">
