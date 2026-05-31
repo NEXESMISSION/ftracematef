@@ -995,12 +995,13 @@ export default function Trace() {
   const flipHorizontal = () => setTransform((t) => ({ ...t, flip: !t.flip }));
   const switchCamera   = () => setFacingMode((m) => (m === 'environment' ? 'user' : 'environment'));
 
-  // Actually tear down the camera and leave. Called after the publish prompt
-  // (either path) or directly from the camera-error screen.
-  const doExit = () => {
+  // Actually tear down the camera and leave. `to` defaults to /upload (used by
+  // Skip and the camera-error screen); a successful publish passes '/account'
+  // so the user lands on their home page and can see their new creation.
+  const doExit = (to = '/upload') => {
     const stream = streamRef.current;
     if (stream) stream.getTracks().forEach((t) => t.stop());
-    navigate('/upload');
+    navigate(to);
   };
 
   // Stop button → offer to publish the result first (C2). The actual exit
@@ -1031,7 +1032,9 @@ export default function Trace() {
       // Mark this run as having produced a saved result, like a recording does.
       recordedRef.current = true;
       setPublishMsg('Published! 🎉');
-      setTimeout(doExit, 700);
+      // Land on the account page so they immediately see their new creation
+      // in the community gallery.
+      setTimeout(() => doExit('/account'), 700);
     } catch (err) {
       console.warn('[trace] publish failed:', err);
       setPublishMsg(err?.message || 'Could not publish. Try again.');
