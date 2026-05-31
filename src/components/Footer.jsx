@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import Img from './Img.jsx';
 
 export default function Footer() {
   return (
@@ -16,7 +17,7 @@ export default function Footer() {
 
       <div className="footer-inner tm-section-pad">
         <div className="footer-brand">
-          <img src="/images/brand/logo.webp" alt="Trace Mate" className="footer-logo" />
+          <Img src="/images/brand/logo.webp" alt="Trace Mate" className="footer-logo" />
           <p className="footer-tag hand">See it. Trace it. Create it.</p>
           <p className="footer-sub">Made with care for creators everywhere <span aria-hidden="true">✦</span></p>
         </div>

@@ -66,8 +66,12 @@
     <!-- Performance: preconnect to Google Fonts + preload critical assets -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="image" href="/images/hero/phone-preview.webp" fetchpriority="high" />
-    <link rel="preload" as="image" href="/images/brand/logo.webp" />
+    <!-- Above-the-fold hero + logo. AVIF preload (with type so non-supporting
+         browsers ignore it and fall back to the <picture> webp) for the
+         smallest possible first paint. -->
+    <link rel="preload" as="image" href="/images/hero/phone-preview.avif" type="image/avif" fetchpriority="high" />
+    <link rel="preload" as="image" href="/images/ui/btn-try-now.avif" type="image/avif" />
+    <link rel="preload" as="image" href="/images/brand/logo.avif" type="image/avif" />
 
     <link
       href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Patrick+Hand&family=Nunito:wght@400;500;600;700;800&family=Shadows+Into+Light&family=Instrument+Serif:ital@0;1&display=swap"

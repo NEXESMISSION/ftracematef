@@ -1,0 +1,114 @@
+{
+  "/images/auth/welcome-480": {
+    "w": 480,
+    "h": 474
+  },
+  "/images/auth/welcome": {
+    "w": 694,
+    "h": 686
+  },
+  "/images/brand/logo-icon": {
+    "w": 206,
+    "h": 204
+  },
+  "/images/brand/logo": {
+    "w": 354,
+    "h": 73
+  },
+  "/images/gallery/cat-pencil": {
+    "w": 508,
+    "h": 505
+  },
+  "/images/gallery/polaroid-collage": {
+    "w": 508,
+    "h": 505
+  },
+  "/images/gallery/polaroid-scene": {
+    "w": 508,
+    "h": 291
+  },
+  "/images/gallery/testimonial": {
+    "w": 520,
+    "h": 173
+  },
+  "/images/hero/phone-preview": {
+    "w": 676,
+    "h": 564
+  },
+  "/images/install/android-step-1": {
+    "w": 600,
+    "h": 1300
+  },
+  "/images/install/android-step-2": {
+    "w": 600,
+    "h": 1300
+  },
+  "/images/install/android-step-3": {
+    "w": 600,
+    "h": 1300
+  },
+  "/images/install/ios-step-1": {
+    "w": 600,
+    "h": 1299
+  },
+  "/images/install/ios-step-2": {
+    "w": 600,
+    "h": 1299
+  },
+  "/images/install/ios-step-3": {
+    "w": 600,
+    "h": 1299
+  },
+  "/images/install/ios-step-4": {
+    "w": 600,
+    "h": 1299
+  },
+  "/images/og/og-cover": {
+    "w": 1200,
+    "h": 630
+  },
+  "/images/og/og-square": {
+    "w": 1200,
+    "h": 1200
+  },
+  "/images/popup/floating-cat": {
+    "w": 1293,
+    "h": 832
+  },
+  "/images/steps/01-upload": {
+    "w": 636,
+    "h": 1126
+  },
+  "/images/steps/02-point": {
+    "w": 636,
+    "h": 1126
+  },
+  "/images/steps/03-outline": {
+    "w": 636,
+    "h": 1126
+  },
+  "/images/steps/04-trace": {
+    "w": 636,
+    "h": 1126
+  },
+  "/images/store/android": {
+    "w": 584,
+    "h": 225
+  },
+  "/images/store/ios": {
+    "w": 584,
+    "h": 225
+  },
+  "/images/ui/btn-try-now": {
+    "w": 761,
+    "h": 328
+  },
+  "/images/welcome/welcome-1": {
+    "w": 1293,
+    "h": 832
+  },
+  "/images/welcome/welcome-2": {
+    "w": 1293,
+    "h": 832
+  }
+}

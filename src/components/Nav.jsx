@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import Img from './Img.jsx';
 
 // Synchronously check localStorage for a Supabase session token, so we can
 // render the right CTA on first paint instead of flashing the visitor CTA
@@ -27,8 +28,8 @@ export default function Nav() {
   return (
     <header className="nav tm-section-pad">
       <Link to="/" className="brand" aria-label="Trace Mate home">
-        <img src="/images/brand/logo-icon.webp" alt="" className="brand-icon" aria-hidden="true" />
-        <img src="/images/brand/logo.webp" alt="Trace Mate" />
+        <Img src="/images/brand/logo-icon.webp" alt="" className="brand-icon" aria-hidden="true" priority />
+        <Img src="/images/brand/logo.webp" alt="Trace Mate" priority />
       </Link>
 
       <nav className="nav-links" aria-label="Primary">
@@ -44,7 +45,7 @@ export default function Nav() {
         </Link>
       ) : (
         <Link className="img-btn img-btn-sm" to="/login" aria-label="Try it Now">
-          <img src="/images/ui/btn-try-now.webp" alt="Try it Now" />
+          <Img src="/images/ui/btn-try-now.webp" alt="Try it Now" priority />
         </Link>
       )}
     </header>

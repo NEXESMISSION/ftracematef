@@ -3,6 +3,8 @@
 // the .how-shorts-head + .shorts-row blocks below.
 // import DemoReel from './DemoReel.jsx';
 
+import Img from './Img.jsx';
+
 const STEPS = [
   { src: '/images/steps/01-upload.webp',  alt: 'Step 1 — Upload or select any image.' },
   { src: '/images/steps/02-point.webp',   alt: 'Step 2 — Point your camera at your paper.' },
@@ -38,7 +40,7 @@ export default function HowItWorks() {
         {STEPS.map((step, i) => (
           <span key={step.src} style={{ display: 'contents' }}>
             <figure className="how-card">
-              <img src={step.src} alt={step.alt} />
+              <Img src={step.src} alt={step.alt} />
             </figure>
             {i < STEPS.length - 1 && <StepArrow />}
           </span>

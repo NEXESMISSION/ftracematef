@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import InstallModal from './InstallModal.jsx';
+import Img from './Img.jsx';
 
 export default function GetApp() {
   const [platform, setPlatform] = useState(null);
@@ -23,7 +24,7 @@ export default function GetApp() {
             onClick={() => open('ios')}
             aria-label="Install on iPhone"
           >
-            <img src="/images/store/ios.webp" alt="Install on iPhone" />
+            <Img src="/images/store/ios.webp" alt="Install on iPhone" />
           </button>
 
           <button
@@ -32,7 +33,7 @@ export default function GetApp() {
             onClick={() => open('android')}
             aria-label="Install on Android"
           >
-            <img src="/images/store/android.webp" alt="Install on Android" />
+            <Img src="/images/store/android.webp" alt="Install on Android" />
           </button>
         </div>
       </div>

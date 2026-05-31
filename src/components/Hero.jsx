@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import Img from './Img.jsx';
 
 // Demo YouTube video id. Set when the demo is recorded; the button only
 // renders once a real id is in place — no more dead button shipping a
@@ -52,7 +53,7 @@ export default function Hero({ onPlayClick }) {
                 The Hero CTA is reserved for the visitor's primary action. */}
             {!isOrLikelySignedIn && (
               <Link className="img-btn" to="/login" aria-label="Try it Now">
-                <img src="/images/ui/btn-try-now.webp" alt="Try it Now" />
+                <Img src="/images/ui/btn-try-now.webp" alt="Try it Now" priority />
               </Link>
             )}
 
@@ -75,7 +76,7 @@ export default function Hero({ onPlayClick }) {
         <div className="hero-phone">
           <span className="hero-spark hero-spark-l" aria-hidden="true">✦</span>
           <div className="phone-frame">
-            <img src="/images/hero/phone-preview.webp" alt="Trace Mate app preview" />
+            <Img src="/images/hero/phone-preview.webp" alt="Trace Mate app preview" priority />
           </div>
           <span className="hero-spark hero-spark-r" aria-hidden="true">✧</span>
         </div>
