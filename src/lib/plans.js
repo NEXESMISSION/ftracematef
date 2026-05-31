@@ -46,11 +46,11 @@ export const PLANS = [
   {
     id: 'lifetime',
     name: 'Lifetime',
-    price: 25,
-    wasPrice: 35,
+    price: 15,
+    wasPrice: 25,
     period: 'one-time · forever',
     shortPeriod: 'one-time',
-    badge: '29% off',
+    badge: '40% off',
     cta: 'Claim Lifetime',
     gold: true,
     features: [
@@ -78,5 +78,5 @@ export const PLAN_LABEL = {
   free:      'Free tier',
   monthly:   'Monthly · $7/mo',
   quarterly: '3 Months · $10',
-  lifetime:  'Lifetime · $25',
+  lifetime:  'Lifetime · $15',
 };

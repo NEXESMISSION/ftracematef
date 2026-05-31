@@ -56,6 +56,34 @@ export function AuthProvider({ children }) {
     window.location.replace('/login');
   }, []);
 
+  // Confirm-before-kick. The raw "remoteSid != localSid" check fired far too
+  // eagerly: a page refresh, a second tab re-claiming, the realtime profile
+  // stream racing our own claim_session write, or any transient stale read
+  // would briefly show a session id that isn't ours and log the user out "for
+  // no reason". A GENUINE new-device takeover, by contrast, leaves a different
+  // sid in the DB permanently. So instead of kicking on the first mismatch, we
+  // wait a beat and re-read: only if the foreign sid is STILL there do we sign
+  // out. One pending confirmation at a time (the timer ref guards re-entry).
+  const confirmTimerRef = useRef(null);
+  const confirmSupersededThenSignOut = useCallback((userId) => {
+    if (supersededRef.current || confirmTimerRef.current) return;
+    confirmTimerRef.current = setTimeout(async () => {
+      confirmTimerRef.current = null;
+      if (supersededRef.current) return;
+      const mySid = localSessionIdRef.current;
+      if (!userId || !mySid) return; // signed out / no claim — nothing to enforce
+      try {
+        const { data, error } = await supabase
+          .from('profiles').select('current_session_id').eq('id', userId).maybeSingle();
+        if (error || !data) return;                 // can't confirm → never kick
+        const remote = data.current_session_id ?? null;
+        if (remote && remote !== mySid) {
+          forceSignOutSuperseded();                 // confirmed takeover
+        }
+      } catch { /* network blip → don't kick */ }
+    }, 2500);
+  }, [forceSignOutSuperseded]);
+
   // Returns true on success, false on error (so callers can decide).
   const loadUserData = useCallback(async (userId) => {
     if (!userId) {
@@ -225,8 +253,10 @@ export function AuthProvider({ children }) {
       const remoteSid = profileRes.data?.current_session_id ?? null;
       const localSid  = localSessionIdRef.current;
       if (remoteSid && localSid && remoteSid !== localSid) {
-        forceSignOutSuperseded();
-        return false;
+        // Don't kick immediately — confirm the takeover is real (see helper).
+        // Keep the session usable meanwhile; a true takeover signs out in ~2.5s,
+        // a transient race resolves with no interruption.
+        confirmSupersededThenSignOut(userId);
       }
 
       setProfile(profileRes.data ?? null);
@@ -238,7 +268,7 @@ export function AuthProvider({ children }) {
       setSubscription(null);
       return false;
     }
-  }, [forceSignOutSuperseded]);
+  }, [forceSignOutSuperseded, confirmSupersededThenSignOut]);
 
   // Initial session + onAuthStateChange handler.
   // Both wrap loadUserData in their own try/finally so we *always* clear `loading`.

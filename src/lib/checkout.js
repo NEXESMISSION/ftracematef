@@ -19,7 +19,7 @@ export async function startCheckout(plan) {
   // makes it to the payment page (Dodo outage, browser back, etc.). Pass
   // the chosen plan so a "Bailed checkout" row in /admin-me shows which
   // plan they tried — without it the operator only sees "they bailed",
-  // not whether it was a $7/mo or $25 lifetime conversation. Fire-and-
+  // not whether it was a $7/mo or $15 lifetime conversation. Fire-and-
   // forget; the RPC whitelists known plan ids server-side.
   supabase.rpc('mark_journey_event', { p_event: 'checkout', p_plan: plan }).then(() => {}, () => {});
   return data.checkout_url;
