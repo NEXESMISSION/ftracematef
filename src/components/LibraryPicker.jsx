@@ -1,0 +1,84 @@
+import { useEffect, useState } from 'react';
+import { LIBRARY_CATEGORIES, listLibraryImages } from '../lib/library.js';
+
+/**
+ * A1 — Library picker modal. Tabbed by category; tapping an image hands the
+ * row back to the parent (onPick), which loads it into the tracing flow.
+ *
+ * Props: open, onClose, onPick(row)  — row has { url, title, category, ... }.
+ */
+export default function LibraryPicker({ open, onClose, onPick }) {
+  const [tab, setTab] = useState(LIBRARY_CATEGORIES[0].id);
+  const [items, setItems] = useState(null); // null = loading
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setItems(null);
+    setError('');
+    listLibraryImages()
+      .then((rows) => { if (!cancelled) setItems(rows); })
+      .catch(() => { if (!cancelled) { setError('Could not load the library.'); setItems([]); } });
+    return () => { cancelled = true; };
+  }, [open]);
+
+  if (!open) return null;
+  const shown = (items || []).filter((i) => i.category === tab);
+
+  return (
+    <div className="lib-modal" role="dialog" aria-modal="true" aria-label="Image library">
+      <div className="lib-backdrop" onClick={onClose} />
+      <div className="lib-card">
+        <div className="lib-head">
+          <h2 className="lib-title">Pick from the library</h2>
+          <button type="button" className="lib-close" onClick={onClose} aria-label="Close">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                 strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+              <path d="M4 4 L12 12 M12 4 L4 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="lib-tabs" role="tablist" aria-label="Categories">
+          {LIBRARY_CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === c.id}
+              className={`lib-tab ${tab === c.id ? 'is-active' : ''}`}
+              onClick={() => setTab(c.id)}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="lib-body">
+          {items === null && <p className="lib-muted">Loading…</p>}
+          {error && <p className="lib-error">{error}</p>}
+          {items !== null && !error && shown.length === 0 && (
+            <p className="lib-muted">Nothing in this category yet.</p>
+          )}
+          {shown.length > 0 && (
+            <div className="lib-grid">
+              {shown.map((it) => (
+                <button
+                  key={it.id}
+                  type="button"
+                  className="lib-item"
+                  onClick={() => onPick(it)}
+                  title={it.title || ''}
+                >
+                  <img src={it.url} alt={it.title || 'Library image'} loading="lazy" />
+                  {it.title && <span className="lib-item-title">{it.title}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

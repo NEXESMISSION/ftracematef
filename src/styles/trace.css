@@ -77,24 +77,24 @@ body:has(.trace-stage) {
   transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  height: 32px;
-  padding: 0 12px 0 8px;
+  gap: 9px;
+  height: 40px;
+  padding: 0 16px 0 11px;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 12px;
   color: #111;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   letter-spacing: 0.01em;
   user-select: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 .trace-brand-icon {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   display: block;
   object-fit: contain;
 }
@@ -472,14 +472,267 @@ body:has(.trace-stage) {
   cursor: not-allowed;
 }
 
-/* ----- Compact icon-only action row ----- */
+/* ----- Primary action row (big icon + label buttons) ----- */
 .trace-dock-actions {
   display: flex;
-  gap: 6px;
-  justify-content: center;
-  flex-wrap: nowrap;
-  padding-top: 4px;
+  gap: 8px;
+  align-items: stretch;
+  padding-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+.trace-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 58px;
+  padding: 8px 4px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 160ms ease, border-color 160ms ease,
+              transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.trace-btn svg { width: 22px; height: 22px; display: block; }
+.trace-btn:hover { background: rgba(255, 255, 255, 0.16); }
+.trace-btn:active { transform: scale(0.95); }
+.trace-btn.is-active { background: #fff; border-color: #fff; color: #111; }
+.trace-btn-rec.is-recording {
+  background: rgba(220, 38, 38, 0.95);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  animation: traceRecBtnPulse 1.6s ease-in-out infinite;
+}
+
+/* Opacity slider gets a touch of breathing room above the action row. */
+.trace-slider-main { margin-bottom: 2px; }
+
+/* Inline pulse controls (Speed + Amount), shown in the dock when pulsing. */
+.trace-pulse-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+/* Pulse status pill — replaces the opacity slider while pulsing. */
+.trace-pulse-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  padding: 13px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 160ms ease, transform 120ms ease;
+}
+.trace-pulse-pill:active { transform: scale(0.98); }
+.trace-pulse-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ffd60a;
+  animation: traceRecPulse 1.3s ease-in-out infinite;
+}
+
+/* ----- More sheet (secondary controls, revealed on demand) ----- */
+.trace-more {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  animation: traceDockFade 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.trace-more-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.trace-more-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+}
+.trace-more-grid {
+  display: flex;
+  gap: 8px;
+}
+.trace-more-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 54px;
+  padding: 8px 4px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 160ms ease, border-color 160ms ease, transform 120ms ease;
+}
+.trace-more-btn svg { width: 20px; height: 20px; display: block; }
+.trace-more-btn:hover { background: rgba(255, 255, 255, 0.14); }
+.trace-more-btn:active { transform: scale(0.95); }
+.trace-more-btn.is-active { background: var(--coral); border-color: var(--coral); }
+
+/* ----- "Include overlay?" record prompt ----- */
+.trace-ask {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.trace-ask-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.trace-ask-card {
+  position: relative;
+  width: min(360px, 100%);
+  padding: 22px 22px 18px;
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  border-radius: 18px;
+  box-shadow: 6px 6px 0 var(--ink);
+  text-align: center;
+  animation: traceHelpPop 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.trace-ask-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.trace-ask-text {
+  margin: 0 0 18px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+.trace-ask-actions {
+  display: flex;
+  gap: 10px;
+}
+.trace-ask-btn {
+  flex: 1;
+  padding: 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--ink);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.trace-ask-btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink); }
+.trace-ask-btn-primary { background: var(--coral); color: #fff; }
+
+/* C2 — note field in the publish prompt */
+.trace-note-input {
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  resize: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.trace-note-input:focus { outline: 2px solid var(--coral); outline-offset: 1px; }
+.trace-note-input::placeholder { color: var(--ink-soft); }
+
+/* C2 — "also share the reference" opt-in. */
+.trace-share-ref {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.trace-share-ref input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--coral); cursor: pointer; }
+
+/* Option list inside a popup (e.g. the Camera menu). */
+.trace-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.trace-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.14s ease, color 0.14s ease, transform 0.1s ease;
+}
+.trace-menu-item:active { transform: scale(0.98); }
+.trace-menu-item.is-active { background: var(--coral); border-color: var(--coral); color: #fff; }
+
+/* Streak celebration popup */
+.trace-streak-card { padding-top: 26px; }
+.trace-streak-flame {
+  font-size: 44px;
+  line-height: 1;
+  margin-bottom: 8px;
+  animation: traceHelpPop 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .trace-icon-btn {
   flex: 1 1 0;

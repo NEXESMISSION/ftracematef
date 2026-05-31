@@ -14,6 +14,7 @@ import { isAdminUser } from '../lib/admin.js';
 import { canUseFreeTrial, freeSessionsLeft } from '../lib/freeTrial.js';
 import Alert from '../components/Alert.jsx';
 import { usePresence } from '../hooks/usePresence.js';
+import Community from '../components/Community.jsx';
 
 const STATUS_TONE = {
   active:    { label: 'Active',     tone: 'good'    },
@@ -657,6 +658,17 @@ export default function Account() {
           </h1>
           <p className="profile-hero-sub">{subLine}</p>
 
+          {/* B2 — daily tracing streak */}
+          {profile?.current_streak > 0 && (
+            <p className="profile-streak">
+              <span aria-hidden="true">🔥</span>{' '}
+              {profile.current_streak}-day streak
+              {profile.longest_streak > profile.current_streak
+                ? ` · best ${profile.longest_streak}`
+                : ''}
+            </p>
+          )}
+
           <div className="profile-cta-row">
             {/* Always route through /upload, even when the trial is used.
                 /trace's <RequirePaid> renders <Paywall trialUsed /> with the
@@ -667,7 +679,9 @@ export default function Account() {
             <Link to="/upload" className="profile-cta profile-cta-primary">
               {canEnterStudio ? '+ Upload new image' : 'Start tracing →'}
             </Link>
-            {isAdminUser(profile) && (
+            {/* Admin button hidden on purpose — reach the dashboard via the
+                /admin-me URL directly. Flip `false` to bring the button back. */}
+            {false && isAdminUser(profile) && (
               <Link to="/admin-me" className="profile-cta profile-cta-ghost" aria-label="Open admin dashboard">
                 Admin
               </Link>
@@ -678,8 +692,12 @@ export default function Account() {
         {/* ── Stats: scrapbook polaroids ── */}
         <StatsGrid stats={stats} memberSince={profile?.created_at} />
 
+        {/* ── C1/C2/C3 — community feed + leaderboard ── */}
+        <Community />
+
         {/* ── Live Preview: stream the camera between two devices on this account ── */}
-        <section className={`profile-live-card ${isPaid ? '' : 'is-locked'}`} aria-labelledby="live-card-title">
+        {/* Live Preview hidden for now — not needed. Remove the inline style to restore. */}
+        <section className={`profile-live-card ${isPaid ? '' : 'is-locked'}`} aria-labelledby="live-card-title" style={{ display: 'none' }}>
           <span className="profile-live-icon" aria-hidden="true">
             {isPaid ? (
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"

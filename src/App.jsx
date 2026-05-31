@@ -152,6 +152,9 @@ export default function App() {
           }
         />
 
+        {/* A1 library management now lives in the admin dashboard's "Library"
+            tab (/admin-me), so the standalone route was removed. */}
+
         {/* Catch-all — anything else gets a friendly Not Found rather than blank */}
         <Route path="*" element={<NotFound />} />
       </Routes>

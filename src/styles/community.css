@@ -1,0 +1,234 @@
+/* Daily streak chip in the account hero (B2). */
+.profile-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 clamp(18px, 2.2vw, 24px);
+  padding: 8px 16px;
+  background: #fff;
+  border: 2px solid var(--ink, #2b2118);
+  border-radius: 999px;
+  box-shadow: 3px 3px 0 var(--ink, #2b2118);
+  font-family: 'Nunito', sans-serif;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--ink, #2b2118);
+  letter-spacing: 0.01em;
+  transform: rotate(-1deg);
+}
+.profile-streak span[aria-hidden] { font-size: 16px; line-height: 1; }
+
+/* C2/C3 — community results gallery on the account page.
+   Matches the scrapbook aesthetic of .profile-card (2px ink border, offset
+   shadow). Built dense on purpose so it stays usable once it's packed. */
+.community-card {
+  margin-bottom: clamp(18px, 2vw, 22px);
+  padding: clamp(22px, 2.6vw, 28px);
+  background: var(--paper, #fff8ef);
+  border: 2px solid var(--ink, #2b2118);
+  border-radius: 18px;
+  box-shadow: 4px 4px 0 var(--ink, #2b2118);
+}
+.community-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.community-head h2 {
+  margin: 0;
+  font-family: 'Nunito', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink, #2b2118);
+}
+.community-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 8px;
+  background: var(--coral, #e87a7a);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.community-muted { color: var(--ink-soft, #6b5d4d); font-size: 14px; padding: 12px 2px; }
+
+/* "Load more" — paginates the feed so it never tries to load everything. */
+.community-more {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 11px;
+  border: 1.5px solid var(--ink, #2b2118);
+  border-radius: 12px;
+  background: var(--paper, #fff8ef);
+  color: var(--ink, #2b2118);
+  font-family: 'Nunito', sans-serif;
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--ink, #2b2118);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.community-more:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink, #2b2118); }
+.community-more:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--ink, #2b2118); }
+.community-more:disabled { opacity: 0.6; cursor: default; box-shadow: 2px 2px 0 var(--ink, #2b2118); }
+
+/* Signed-out like is a Link styled like the button — strip link defaults. */
+a.like-btn { text-decoration: none; }
+
+/* Dense tile grid — smaller min keeps many results readable without scrolling
+   forever; everything (author, like, reference peek) overlays the image so a
+   tile is exactly one square. */
+.community-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+@media (min-width: 560px) {
+  .community-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+}
+
+.creation {
+  position: relative;
+  margin: 0;
+  border: 2px solid var(--ink, #2b2118);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #faf6ef;
+  box-shadow: 2px 2px 0 var(--ink, #2b2118);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.creation:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink, #2b2118); }
+.creation img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+  background: #faf6ef;
+}
+
+/* Bottom overlay bar: author + like, on a gradient for legibility. */
+.creation-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 18px 8px 7px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0));
+}
+.creation-byline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.creation-note {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.25;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.creation-author {
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink, #2b2118);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s ease, background 0.14s ease, color 0.14s ease;
+}
+.like-btn:active { transform: scale(0.9); }
+.like-btn.is-liked { background: var(--coral, #e87a7a); color: #fff; }
+.like-btn:disabled { opacity: 0.7; cursor: default; }
+
+/* Reference peek (top-left pill) + owner delete (top-right). */
+.creation-ref {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  backdrop-filter: blur(3px);
+}
+.creation-ref.is-on { background: var(--coral, #e87a7a); }
+.creation-del {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.creation-del:hover { background: #c0392b; }
+.creation-report {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.creation-report:hover { background: #c0392b; }

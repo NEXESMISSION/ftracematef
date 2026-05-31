@@ -80,6 +80,11 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
+        // Return to whatever origin STARTED the sign-in. With PKCE the code
+        // verifier is stored in that origin's localStorage, so the OAuth
+        // round-trip must finish where it began — localhost in dev, the real
+        // domain in prod. Every origin used here must be listed under
+        // Supabase → Authentication → URL Configuration → Redirect URLs.
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });

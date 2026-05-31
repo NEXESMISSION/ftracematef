@@ -13,6 +13,9 @@ import {
 } from '../lib/pendingImage.js';
 import { beginTrialSession, canUseFreeTrial } from '../lib/freeTrial.js';
 import { removeBackground } from '../lib/removeBackground.js';
+import { optimizeImage } from '../lib/imageOptimize.js';
+import LibraryPicker from '../components/LibraryPicker.jsx';
+import CameraCapture from '../components/CameraCapture.jsx';
 import { usePresence } from '../hooks/usePresence.js';
 
 /**
@@ -36,6 +39,8 @@ export default function Upload() {
   usePresence('upload');
 
   const inputRef = useRef(null);
+  const [camOpen, setCamOpen] = useState(false);   // A2 — in-app camera capture
+  const [libOpen, setLibOpen] = useState(false);   // A1 — library picker modal
   const [preview, setPreview]       = useState(null);   // object URL for current preview
   const [fileName, setFileName]     = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -109,7 +114,7 @@ export default function Upload() {
     // useful as an AR overlay reference anyway. Same allowlist is enforced
     // in lib/pendingImage.js when reading back.
     if (!ALLOWED_IMAGE_MIME.has(file.type)) {
-      setError('Please pick a JPG, PNG, WebP, GIF, HEIC, or AVIF image (no SVG).');
+      setError('Please pick a JPG, PNG, WebP, GIF, or AVIF image.');
       return;
     }
     if (file.size > 25 * 1024 * 1024) {
@@ -126,22 +131,60 @@ export default function Upload() {
     originalRef.current = null;
     setBgRemoved(false);
 
-    // Show an instant blob preview while we save the persistent copy.
+    // Show an instant blob preview while we compress + persist in the background.
     const blobUrl = URL.createObjectURL(file);
     setPreview(blobUrl);
     setFileName(file.name);
     setSavedFile(file);
 
+    // D1 — image optimization: downscale + re-encode (WebP) so the overlay
+    // loads fast, fits the sessionStorage cap, and stays cheap to store/serve
+    // once publishing ships. Only keep the optimized copy if it saved bytes;
+    // fall back to the raw file on any failure.
+    let toStore = file;
+    try {
+      const opt = await optimizeImage(file, { maxDim: 2000, quality: 0.82 });
+      if (opt?.file && opt.file.size < file.size) {
+        URL.revokeObjectURL(blobUrl);
+        setPreview(opt.url);
+        setSavedFile(opt.file);
+        toStore = opt.file;
+      } else if (opt?.url) {
+        URL.revokeObjectURL(opt.url);
+      }
+    } catch (err) {
+      console.warn('[upload] optimize failed, using original:', err);
+    }
+
     // Persist to sessionStorage so the image survives the OAuth + payment
     // round-trips. If too big to persist, we still let them trace right
     // away (just won't survive a redirect).
-    const saved = await savePendingImage(file);
+    const saved = await savePendingImage(toStore);
     if (!saved) {
       console.warn('[upload] image too large to persist across redirects');
     }
   };
 
   const onPick = (e) => acceptFile(e.target.files?.[0]);
+
+  // A1 — picking a library image: fetch the public file, wrap it as a File, and
+  // run it through the SAME acceptFile pipeline (validation + D1 optimize +
+  // persist) as a normal upload, so everything downstream is identical.
+  const onPickLibrary = async (item) => {
+    setLibOpen(false);
+    try {
+      const res = await fetch(item.url);
+      if (!res.ok) throw new Error('fetch failed');
+      const blob = await res.blob();
+      const ext = (blob.type.split('/')[1] || 'webp').replace('jpeg', 'jpg');
+      const safe = (item.title || 'library').replace(/[^a-z0-9-_]+/gi, '-').slice(0, 40) || 'library';
+      const file = new File([blob], `${safe}.${ext}`, { type: blob.type || 'image/webp' });
+      await acceptFile(file);
+    } catch (err) {
+      console.warn('[upload] library pick failed:', err);
+      setError('Could not load that image. Please try another.');
+    }
+  };
 
   const onDrop = (e) => {
     e.preventDefault();
@@ -268,6 +311,7 @@ export default function Upload() {
           </p>
 
           {!preview ? (
+            <>
             <label
               className={`upload-drop ${isDragging ? 'is-dragging' : ''}`}
               onDragOver={onDragOver}
@@ -277,7 +321,7 @@ export default function Upload() {
               <input
                 ref={inputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,image/avif,image/bmp"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
                 onChange={onPick}
                 className="upload-input"
               />
@@ -292,6 +336,31 @@ export default function Upload() {
               <span className="upload-drop-or">or click to browse</span>
               <span className="upload-drop-meta">JPG · PNG · WebP — up to 25 MB</span>
             </label>
+
+            {/* Alternative image sources, side by side under the drop zone:
+                A2 — capture a photo with the device camera; A1 — pick from the
+                curated library. Both route through the same acceptFile → D1
+                optimize pipeline as a normal upload. */}
+            <div className="upload-sources">
+              <button type="button" className="upload-source-btn" onClick={() => setCamOpen(true)}>
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                     strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 6.5 H6 L7.5 5 H12.5 L14 6.5 H17 a1 1 0 0 1 1 1 V15 a1 1 0 0 1 -1 1 H3 a1 1 0 0 1 -1 -1 V7.5 a1 1 0 0 1 1 -1 Z" />
+                  <circle cx="10" cy="11" r="3" />
+                </svg>
+                Take a photo
+              </button>
+              <button type="button" className="upload-source-btn" onClick={() => setLibOpen(true)}>
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                     strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="4" width="14" height="12" rx="2" />
+                  <path d="M3 13 L7 9 L11 13 M13 11 L15.5 8.5 L17 10" />
+                  <circle cx="7.5" cy="8" r="1.1" fill="currentColor" stroke="none" />
+                </svg>
+                Browse library
+              </button>
+            </div>
+            </>
           ) : (
             <div className="upload-preview">
               <img
@@ -300,38 +369,6 @@ export default function Upload() {
                 className={bgRemoved ? 'is-transparent' : ''}
               />
               <div className="upload-preview-actions">
-                {!bgRemoved ? (
-                  <button
-                    type="button"
-                    className="upload-bg-btn"
-                    onClick={removeBg}
-                    disabled={processing}
-                  >
-                    {processing ? (
-                      <span className="upload-spinner" aria-hidden="true" />
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                           strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M2 2 L14 14 M14 2 L2 14" opacity="0.35" />
-                        <rect x="2" y="2" width="12" height="12" rx="2" />
-                      </svg>
-                    )}
-                    {processing ? 'Removing…' : 'Remove background'}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="upload-bg-btn is-active"
-                    onClick={restoreOriginal}
-                    disabled={processing}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M2.5 8 a5.5 5.5 0 1 0 1.7 -3.9 M2.5 2.5 V5.2 H5.2" />
-                    </svg>
-                    Restore original
-                  </button>
-                )}
                 <button type="button" className="upload-change-btn" onClick={clearImage}>
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
                        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -341,14 +378,6 @@ export default function Upload() {
                 </button>
               </div>
             </div>
-          )}
-
-          {bgError && <p className="upload-error">{bgError}</p>}
-          {bgRemoved && !bgError && (
-            <p className="upload-bg-hint">
-              Background removed on your device. Best on solid backgrounds — if
-              edges look rough, restore and trace the original.
-            </p>
           )}
 
           {error && <p className="upload-error">{error}</p>}
@@ -367,12 +396,21 @@ export default function Upload() {
           </button>
 
           <p className="upload-fineprint">
-            Your image stays on your device — we don't upload it.
+            Your image stays private — it's only shared if you choose to post your result.
           </p>
         </section>
 
         <img className="auth-side-cat" src="/images/popup/floating-cat.webp" alt="" aria-hidden="true" />
       </main>
+
+      <CameraCapture
+        open={camOpen}
+        title="Take a photo to trace"
+        onClose={() => setCamOpen(false)}
+        onCapture={(file) => { setCamOpen(false); acceptFile(file); }}
+      />
+
+      <LibraryPicker open={libOpen} onClose={() => setLibOpen(false)} onPick={onPickLibrary} />
 
       <LoginModal
         open={loginOpen}

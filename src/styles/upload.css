@@ -151,6 +151,40 @@
   background-position: 0 0, 0 8px, 8px -8px, -8px 0;
 }
 
+/* Alternative image sources (Take a photo · Browse library), side by side
+   under the drop zone. */
+.upload-sources {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+.upload-source-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px;
+  border: 1.5px solid var(--ink);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--ink);
+  transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.upload-source-btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
+.upload-source-btn:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--ink); }
+.upload-source-btn svg { flex-shrink: 0; }
+@media (max-width: 380px) {
+  .upload-sources { grid-template-columns: 1fr; }
+}
+
 /* Row of preview actions (Remove background / Restore + Choose different). */
 .upload-preview-actions {
   display: flex;

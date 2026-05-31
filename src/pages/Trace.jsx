@@ -6,10 +6,12 @@ import { loadPendingImage } from '../lib/pendingImage.js';
 import { consumeFreeSession, trialAlreadyConsumedThisVisit } from '../lib/freeTrial.js';
 import { setPresence, clearPresence } from '../lib/presence.js';
 import { setTracing } from '../lib/tracing-state.js';
+import { supabase } from '../lib/supabase.js';
+import { publishCreation } from '../lib/creations.js';
 import { startRecording, isRecordingSupported } from '../lib/recorder.js';
 import ExitSurvey from '../components/ExitSurvey.jsx';
-import TraceHelp from '../components/TraceHelp.jsx';
 import TraceSlider from '../components/TraceSlider.jsx';
+import CameraCapture from '../components/CameraCapture.jsx';
 import {
   cssMatrix3d,
   identityCorners,
@@ -22,7 +24,7 @@ const INITIAL_TRANSFORM = { x: 0, y: 0, scale: 1, rotation: 0, flip: false };
 export default function Trace() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile, session, refresh } = useAuth();
+  const { user, profile, session, refresh, isPaid } = useAuth();
 
   // Prefer the freshly-passed blob URL from /upload (instant).
   // Fall back to the persisted base64 from sessionStorage (post-OAuth + post-payment).
@@ -82,6 +84,31 @@ export default function Trace() {
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn]               = useState(false);
   const [controlsHidden, setControlsHidden] = useState(false);
+  // Bottom dock "More" sheet — secondary controls (pulse / warp / camera /
+  // flash / record-overlay) live here so the main dock stays simple and the
+  // primary actions can stay big. Closed on each fresh visit.
+  const [moreOpen, setMoreOpen] = useState(false);
+  // Camera options popup (back / front + flash), opened from the Camera button.
+  const [cameraMenu, setCameraMenu] = useState(false);
+  // Real list of the device's video inputs, filled in after camera permission
+  // is granted (labels are blank before that). selectedCameraId pins the stream
+  // to one exact device; activeCameraId mirrors whichever camera actually
+  // opened, so the menu can highlight the live one.
+  const [cameras, setCameras] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState(null);
+  const [activeCameraId, setActiveCameraId] = useState(null);
+  // B2 streak — celebration popup shown when today's first trace lands.
+  const [streakInfo, setStreakInfo] = useState(null);
+  const streakDoneRef = useRef(false);
+  // C2 publish — "show off your result" flow shown when ending a session.
+  const [exitPrompt, setExitPrompt] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishMsg, setPublishMsg] = useState('');
+  const [noteText, setNoteText] = useState('');    // C2 caption for the shared result
+  // C2 privacy: whether to ALSO share the reference image they traced. Default
+  // OFF — the source image is private unless they explicitly opt in.
+  const [shareReference, setShareReference] = useState(false);
+  const [camOpen, setCamOpen] = useState(false);   // C2 camera-capture modal
   // Help / onboarding overlay. Auto-shown the first time a user opens /trace
   // (gated by the 'tm:trace-tutorial-seen' localStorage flag, set on dismiss);
   // re-openable any time via the topbar "?" button.
@@ -120,6 +147,9 @@ export default function Trace() {
   const [recording, setRecording]   = useState(false);
   const [recordSecs, setRecordSecs] = useState(0);
   const [recordError, setRecordError] = useState('');
+  // Tapping Record opens this Yes/No popup asking whether to bake the
+  // reference overlay into the clip — replaces the old persistent checkbox.
+  const [recordPrompt, setRecordPrompt] = useState(false);
   const recordStopperRef = useRef(null);
   const recordSupported = isRecordingSupported();
 
@@ -155,6 +185,28 @@ export default function Trace() {
     return () => { cancelled = true; };
   }, [imageUrl, user?.id, refresh]);
 
+  // B2 — daily streak. Once per studio visit, tell the server we traced today
+  // (passing the LOCAL date so the streak respects the user's timezone). The
+  // server is idempotent per day; it only advances on the first trace of a new
+  // day, and returns { incremented } so we know when to celebrate. Updating
+  // profiles also flows back through AuthProvider's realtime sub for /account.
+  useEffect(() => {
+    if (!imageUrl || !user?.id || streakDoneRef.current) return;
+    streakDoneRef.current = true;
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    supabase.rpc('record_trace_day', { p_today: today }).then(
+      ({ data, error }) => {
+        if (error || !data) return;
+        if (data.incremented) {
+          setStreakInfo({ current: data.current_streak, longest: data.longest_streak });
+          refresh();
+        }
+      },
+      () => { /* streak is best-effort — never block tracing on it */ },
+    );
+  }, [imageUrl, user?.id, refresh]);
+
   // Revoke the object URL when leaving the trace page so we don't leak it.
   useEffect(() => {
     if (!imageUrl) return;
@@ -179,11 +231,19 @@ export default function Trace() {
       // prompt we silently fall back to video-only — /trace doesn't use
       // audio locally (the local <video> is muted) so losing it has zero
       // user-visible cost.
-      const videoConstraints = {
-        facingMode: { ideal: facingMode },
-        width:  { ideal: 1920 },
-        height: { ideal: 1080 },
-      };
+      // Pin to a specific camera when the user picked one from the menu;
+      // otherwise fall back to the front/back hint.
+      const videoConstraints = selectedCameraId
+        ? {
+            deviceId: { exact: selectedCameraId },
+            width:  { ideal: 1920 },
+            height: { ideal: 1080 },
+          }
+        : {
+            facingMode: { ideal: facingMode },
+            width:  { ideal: 1920 },
+            height: { ideal: 1080 },
+          };
       const audioConstraints = {
         echoCancellation: true,
         noiseSuppression: true,
@@ -243,6 +303,21 @@ export default function Trace() {
         const caps = track.getCapabilities();
         if (caps?.torch) setTorchSupported(true);
       }
+      // Record which camera actually opened so the menu can highlight it.
+      const settings = track && typeof track.getSettings === 'function' ? track.getSettings() : null;
+      if (settings?.deviceId && !cancelled) setActiveCameraId(settings.deviceId);
+      // Permission is granted now, so device labels are available — list the
+      // real cameras the user can switch between (best-effort).
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        if (!cancelled) {
+          setCameras(
+            devices
+              .filter((d) => d.kind === 'videoinput')
+              .map((d, i) => ({ deviceId: d.deviceId, label: d.label || `Camera ${i + 1}` })),
+          );
+        }
+      } catch { /* ignore — listing cameras is best-effort */ }
       setCameraError('');
     }
 
@@ -253,7 +328,7 @@ export default function Trace() {
       if (stream) stream.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
-  }, [facingMode]);
+  }, [facingMode, selectedCameraId]);
 
   // Auto-hide the gesture hint after a moment
   useEffect(() => {
@@ -268,20 +343,6 @@ export default function Trace() {
   useEffect(() => {
     if (panelTab !== 'opacity' && panelTab !== 'flicker') setPanelTab('opacity');
   }, [panelTab, setPanelTab]);
-
-  // First-time onboarding: pop the help overlay automatically the first time a
-  // user opens /trace. The flag is set when they dismiss it ("Got it").
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem('tm:trace-tutorial-seen')) setShowHelp(true);
-    } catch { /* ignore (private mode / storage disabled) */ }
-  }, []);
-
-  const dismissHelp = useCallback(() => {
-    try { localStorage.setItem('tm:trace-tutorial-seen', '1'); }
-    catch { /* ignore */ }
-    setShowHelp(false);
-  }, []);
 
   // ===== Warp: measure rendered overlay size + seed identity corners =====
   useEffect(() => {
@@ -839,6 +900,9 @@ export default function Trace() {
     return () => clearInterval(id);
   }, [recording]);
 
+  // Tapping Record while idle opens the overlay Yes/No popup; tapping while
+  // recording stops and saves. The capture itself starts in beginRecording,
+  // once the user has chosen whether to include the overlay.
   const toggleRecording = useCallback(async () => {
     if (recording) {
       const stopper = recordStopperRef.current;
@@ -853,6 +917,17 @@ export default function Trace() {
       setRecordError('Recording is not supported in this browser.');
       return;
     }
+    if (!streamRef.current) {
+      setRecordError('Camera is not ready yet.');
+      return;
+    }
+    setRecordError('');
+    setRecordPrompt(true);
+  }, [recording, recordSupported]);
+
+  // Start the capture with the overlay choice from the popup.
+  const beginRecording = useCallback((includeOverlay) => {
+    setRecordPrompt(false);
     const stream = streamRef.current;
     if (!stream) {
       setRecordError('Camera is not ready yet.');
@@ -860,11 +935,12 @@ export default function Trace() {
     }
     try {
       const handle = startRecording({
-        mode: recordIncludeOverlay ? 'composite' : 'camera',
+        mode: includeOverlay ? 'composite' : 'camera',
         sourceStream: stream,
         videoEl: videoRef.current,
         overlayEl: overlayRef.current,
         getOverlayState: () => overlayStateRef.current,
+        watermark: !isPaid, // A2 — free recordings carry the Trace Mate mark
         onSaved: () => { recordedRef.current = true; },
       });
       recordStopperRef.current = handle;
@@ -874,7 +950,7 @@ export default function Trace() {
       console.warn('[trace] start record failed:', err);
       setRecordError(err?.message || 'Could not start recording.');
     }
-  }, [recording, recordIncludeOverlay, recordSupported]);
+  }, [isPaid]);
 
   // Idle timer. Reset on pointerdown / wheel / keydown anywhere on the
   // page; fires after 10s of quiet to dim the chrome.
@@ -919,10 +995,48 @@ export default function Trace() {
   const flipHorizontal = () => setTransform((t) => ({ ...t, flip: !t.flip }));
   const switchCamera   = () => setFacingMode((m) => (m === 'environment' ? 'user' : 'environment'));
 
-  const exitTrace = () => {
+  // Actually tear down the camera and leave. Called after the publish prompt
+  // (either path) or directly from the camera-error screen.
+  const doExit = () => {
     const stream = streamRef.current;
     if (stream) stream.getTracks().forEach((t) => t.stop());
     navigate('/upload');
+  };
+
+  // Stop button → offer to publish the result first (C2). The actual exit
+  // happens via doExit() once they publish or skip.
+  const exitTrace = () => {
+    setPublishMsg('');
+    setExitPrompt(true);
+  };
+
+  // C2 — publish the captured photo of the finished drawing to the feed, along
+  // with a copy of the reference image (imageUrl) so viewers see what was
+  // traced. `file` comes from the in-app camera (CameraCapture).
+  const onPublishResult = async (file) => {
+    setCamOpen(false);
+    if (!file || !user?.id) return;
+    setExitPrompt(true);   // keep the prompt visible to show progress
+    setPublishing(true);
+    setPublishMsg('Publishing…');
+    try {
+      await publishCreation({
+        file,
+        // Only attach the traced reference if the user opted in (privacy).
+        reference: shareReference ? (imageUrl || null) : null,
+        note: noteText,
+        userId: user.id,
+        watermark: !isPaid,
+      });
+      // Mark this run as having produced a saved result, like a recording does.
+      recordedRef.current = true;
+      setPublishMsg('Published! 🎉');
+      setTimeout(doExit, 700);
+    } catch (err) {
+      console.warn('[trace] publish failed:', err);
+      setPublishMsg(err?.message || 'Could not publish. Try again.');
+      setPublishing(false);
+    }
   };
 
   // Warp suffix + ref mirrors for the imperative gesture pipeline. Computed
@@ -1024,20 +1138,6 @@ export default function Trace() {
               <span>REC {formatRecTime(recordSecs)}</span>
             </div>
           )}
-          <button
-            type="button"
-            className="trace-help-btn"
-            onClick={() => setShowHelp(true)}
-            aria-label="Help"
-            title="Help"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="9.5" />
-              <path d="M9.6 9a2.5 2.5 0 0 1 4.8.9c0 1.6-2.4 2-2.4 3.6" />
-              <circle cx="12" cy="17.4" r="1" fill="currentColor" stroke="none" />
-            </svg>
-          </button>
         </div>
       </header>
 
@@ -1113,230 +1213,160 @@ export default function Trace() {
               <div className="trace-rec-error" role="alert">{recordError}</div>
             )}
 
-            {/* Segmented tab control. Two modes; switching is instant. */}
-            <div className="trace-dock-tabs" role="tablist" aria-label="Overlay mode">
-              {[
-                { id: 'opacity', label: 'Opacity' },
-                { id: 'flicker', label: 'Flicker' },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={panelTab === t.id}
-                  className={`trace-dock-tab ${panelTab === t.id ? 'is-active' : ''}`}
-                  onClick={() => setPanelTab(t.id)}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Slider region — re-renders per tab, height adapts. */}
-            <div className="trace-dock-panel">
-              {panelTab === 'opacity' && (
-                <div className="trace-slider">
+            {/* Core control: opacity is the one knob you always reach for, so
+                it sits front and centre. When Pulse is on the slider is swapped
+                for a compact status pill (tune the pulse inside More). */}
+            {flickerOn ? (
+              <div className="trace-pulse-panel">
+                <div className="trace-slider trace-slider-compact">
+                  <span className="trace-slider-label" aria-hidden="true">Speed</span>
                   <TraceSlider
-                    value={opacity}
-                    min={0.05}
-                    max={1}
-                    step={0.01}
-                    disabled={flickerOn}
-                    ariaLabel="Opacity"
-                    onChange={setOpacity}
+                    value={flickerSpeed}
+                    min={1}
+                    max={10}
+                    step={0.5}
+                    ariaLabel="Pulse speed"
+                    onChange={(v) => setFlickerSpeed(v)}
                     className="trace-slider-input"
                   />
-                  <span className="trace-slider-value">{Math.round(opacity * 100)}%</span>
+                  <span className="trace-slider-value">{flickerSpeed.toFixed(1)}×</span>
                 </div>
-              )}
-
-              {panelTab === 'flicker' && (
-                <div className="trace-flicker-pane">
-                  {/* Flicker on/off lives here so the tab is fully self-
-                      contained — toggle the mode where you tune it. */}
-                  <label className="trace-switch">
-                    <input
-                      type="checkbox"
-                      checked={flickerOn}
-                      onChange={(e) => setFlickerOn(e.target.checked)}
-                    />
-                    <span className="trace-switch-track" aria-hidden="true">
-                      <span className="trace-switch-thumb" />
-                    </span>
-                    <span className="trace-switch-label">{flickerOn ? 'Pulsing' : 'Off'}</span>
-                  </label>
-
-                  {flickerOn && (
-                    <>
-                      <div className="trace-slider trace-slider-compact">
-                        <span className="trace-slider-label" aria-hidden="true">Speed</span>
-                        <TraceSlider
-                          value={flickerSpeed}
-                          min={1}
-                          max={10}
-                          step={0.5}
-                          ariaLabel="Flicker speed"
-                          onChange={(v) => setFlickerSpeed(v)}
-                          className="trace-slider-input"
-                        />
-                        <span className="trace-slider-value">{flickerSpeed.toFixed(1)}×</span>
-                      </div>
-                      <div className="trace-slider trace-slider-compact">
-                        <span className="trace-slider-label" aria-hidden="true">Min</span>
-                        <TraceSlider
-                          value={flickerMin}
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          ariaLabel="Flicker minimum opacity"
-                          onChange={(v) => {
-                            setFlickerMin(v);
-                            if (v >= flickerMax - 0.05) setFlickerMax(Math.min(1, v + 0.05));
-                          }}
-                          className="trace-slider-input"
-                        />
-                        <span className="trace-slider-value">{Math.round(flickerMin * 100)}%</span>
-                      </div>
-                      <div className="trace-slider trace-slider-compact">
-                        <span className="trace-slider-label" aria-hidden="true">Max</span>
-                        <TraceSlider
-                          value={flickerMax}
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          ariaLabel="Flicker maximum opacity"
-                          onChange={(v) => {
-                            setFlickerMax(v);
-                            if (v <= flickerMin + 0.05) setFlickerMin(Math.max(0, v - 0.05));
-                          }}
-                          className="trace-slider-input"
-                        />
-                        <span className="trace-slider-value">{Math.round(flickerMax * 100)}%</span>
-                      </div>
-                    </>
-                  )}
+                <div className="trace-slider trace-slider-compact">
+                  <span className="trace-slider-label" aria-hidden="true">Amount</span>
+                  <TraceSlider
+                    value={flickerMax > 0 ? Math.min(1, Math.max(0, 1 - flickerMin / flickerMax)) : 0.5}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    ariaLabel="Pulse amount"
+                    onChange={(a) => setFlickerMin(Math.max(0, Math.min(flickerMax - 0.01, flickerMax * (1 - a))))}
+                    className="trace-slider-input"
+                  />
+                  <span className="trace-slider-value">{flickerMax > 0 ? Math.round((1 - flickerMin / flickerMax) * 100) : 0}%</span>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="trace-slider trace-slider-main">
+                <TraceSlider
+                  value={opacity}
+                  min={0.05}
+                  max={1}
+                  step={0.01}
+                  ariaLabel="Opacity"
+                  onChange={setOpacity}
+                  className="trace-slider-input"
+                />
+                <span className="trace-slider-value">{Math.round(opacity * 100)}%</span>
+              </div>
+            )}
 
-            {/* Compact actions row. These buttons (recenter / flip / warp /
-                camera / flash / record) plus the touch gestures cover
-                everything the X/Y/Zoom/Rotate sliders did. Flicker lives in
-                the Flicker tab. */}
+            {/* Primary actions — only the few things you reach for mid-trace,
+                as big targets. Everything secondary lives behind More. */}
             <div className="trace-dock-actions">
               <button
                 type="button"
-                className="trace-icon-btn"
-                onClick={recenter}
-                aria-label="Recenter overlay"
-                title="Center"
+                className="trace-btn"
+                onClick={() => setCameraMenu(true)}
+                aria-label="Camera options"
               >
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-                     strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="10" cy="10" r="6.5" />
-                  <circle cx="10" cy="10" r="1.4" fill="currentColor" />
-                  <path d="M10 1.5 V4 M10 16 V18.5 M1.5 10 H4 M16 10 H18.5" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="trace-icon-btn"
-                onClick={flipHorizontal}
-                aria-label="Flip horizontally"
-                title="Flip"
-              >
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-                     strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M10 3 V17" strokeDasharray="2 2" />
-                  <path d="M3 6 L8 6 L8 14 L3 14 Z" />
-                  <path d="M17 6 L12 6 L12 14 L17 14 Z" fill="currentColor" fillOpacity="0.25" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className={`trace-icon-btn ${warpMode ? 'is-active' : ''}`}
-                onClick={() => setWarpMode((v) => !v)}
-                aria-pressed={warpMode}
-                aria-label={warpMode ? 'Exit warp mode' : 'Enter warp mode'}
-                title="Warp"
-              >
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-                     strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M3.5 4 L16 5 L17 16 L4.5 14.5 Z" />
-                  <circle cx="3.5" cy="4"   r="1.4" fill="currentColor" />
-                  <circle cx="16"  cy="5"   r="1.4" fill="currentColor" />
-                  <circle cx="17"  cy="16"  r="1.4" fill="currentColor" />
-                  <circle cx="4.5" cy="14.5" r="1.4" fill="currentColor" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="trace-icon-btn"
-                onClick={switchCamera}
-                aria-label="Switch camera"
-                title="Camera"
-              >
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"
                      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M3 6.5 H6 L7.5 5 H12.5 L14 6.5 H17 a1 1 0 0 1 1 1 V15 a1 1 0 0 1 -1 1 H3 a1 1 0 0 1 -1 -1 V7.5 a1 1 0 0 1 1 -1 Z" />
                   <path d="M10 9.5 a2 2 0 1 0 2 2" />
                   <path d="M12 9.5 V8 H10.5" />
                 </svg>
+                <span>Camera</span>
               </button>
-              {torchSupported && (
-                <button
-                  type="button"
-                  className={`trace-icon-btn ${torchOn ? 'is-active' : ''}`}
-                  onClick={toggleTorch}
-                  aria-pressed={torchOn}
-                  aria-label={torchOn ? 'Turn flash off' : 'Turn flash on'}
-                  title="Flash"
-                >
-                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-                       strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M12 2 L4.5 11 H9.5 L8 18 L15.5 9 H10.5 L12 2 Z" />
-                  </svg>
-                </button>
-              )}
+              <button
+                type="button"
+                className={`trace-btn ${flickerOn ? 'is-active' : ''}`}
+                onClick={() => setFlickerOn(!flickerOn)}
+                aria-pressed={flickerOn}
+                aria-label={flickerOn ? 'Turn pulse off' : 'Turn pulse on'}
+              >
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                     strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M2 10 H6 L8 5 L12 15 L14 10 H18" />
+                </svg>
+                <span>Pulse</span>
+              </button>
               {recordSupported && (
                 <button
                   type="button"
-                  className={`trace-icon-btn trace-rec-btn ${recording ? 'is-recording' : ''}`}
+                  className={`trace-btn trace-btn-rec ${recording ? 'is-recording' : ''}`}
                   onClick={toggleRecording}
                   aria-pressed={recording}
                   aria-label={recording ? 'Stop recording' : 'Start recording'}
-                  title={recording ? 'Stop' : 'Record'}
                 >
                   {recording ? (
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                       <rect x="5" y="5" width="10" height="10" rx="1.5" />
                     </svg>
                   ) : (
-                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"
                          strokeWidth="1.7" aria-hidden="true">
                       <circle cx="10" cy="10" r="7" />
                       <circle cx="10" cy="10" r="3.4" fill="currentColor" stroke="none" />
                     </svg>
                   )}
+                  <span>{recording ? formatRecTime(recordSecs) : 'Record'}</span>
                 </button>
               )}
+              <button
+                type="button"
+                className={`trace-btn ${moreOpen ? 'is-active' : ''}`}
+                onClick={() => setMoreOpen((v) => !v)}
+                aria-expanded={moreOpen}
+                aria-label="More controls"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <circle cx="4" cy="10" r="1.6" />
+                  <circle cx="10" cy="10" r="1.6" />
+                  <circle cx="16" cy="10" r="1.6" />
+                </svg>
+                <span>More</span>
+              </button>
             </div>
 
-            {recordSupported && !recording && (
-              <label className="trace-checkbox trace-checkbox-mini">
-                <input
-                  type="checkbox"
-                  checked={recordIncludeOverlay}
-                  onChange={(e) => setRecordIncludeOverlay(e.target.checked)}
-                />
-                <span className="trace-checkbox-box" aria-hidden="true">
-                  <svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor"
-                       strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2.5 7.5 L6 11 L11.5 3.5" />
-                  </svg>
-                </span>
-                <span className="trace-checkbox-label">Record overlay</span>
-              </label>
+            {/* ── More sheet: secondary controls, revealed on demand ── */}
+            {moreOpen && (
+              <div className="trace-more">
+                {/* Tool toggles */}
+                <div className="trace-more-grid">
+                  <button
+                    type="button"
+                    className={`trace-more-btn ${warpMode ? 'is-active' : ''}`}
+                    onClick={() => setWarpMode((v) => !v)}
+                    aria-pressed={warpMode}
+                    aria-label={warpMode ? 'Exit warp mode' : 'Enter warp mode'}
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                         strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M3.5 4 L16 5 L17 16 L4.5 14.5 Z" />
+                      <circle cx="3.5" cy="4"   r="1.4" fill="currentColor" />
+                      <circle cx="16"  cy="5"   r="1.4" fill="currentColor" />
+                      <circle cx="17"  cy="16"  r="1.4" fill="currentColor" />
+                      <circle cx="4.5" cy="14.5" r="1.4" fill="currentColor" />
+                    </svg>
+                    <span>Warp</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="trace-more-btn"
+                    onClick={flipHorizontal}
+                    aria-label="Flip horizontally"
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                         strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M10 3 V17" strokeDasharray="2 2" />
+                      <path d="M3 6 L8 6 L8 14 L3 14 Z" />
+                      <path d="M17 6 L12 6 L12 14 L17 14 Z" fill="currentColor" fillOpacity="0.25" />
+                    </svg>
+                    <span>Flip</span>
+                  </button>
+                </div>
+
+              </div>
             )}
           </div>
         )}
@@ -1353,8 +1383,164 @@ export default function Trace() {
         </div>
       )}
 
-      {/* Help / onboarding overlay — auto on first visit, re-openable via "?" */}
-      {showHelp && <TraceHelp onClose={dismissHelp} />}
+      {/* Record overlay choice — asked each time you tap Record. */}
+      {recordPrompt && (
+        <div className="trace-ask" role="dialog" aria-modal="true" aria-labelledby="rec-ask-title">
+          <div className="trace-ask-backdrop" onClick={() => setRecordPrompt(false)} />
+          <div className="trace-ask-card">
+            <h3 id="rec-ask-title" className="trace-ask-title">Include the reference overlay?</h3>
+            <p className="trace-ask-text">
+              Record just the camera, or the camera with the traced image on top?
+            </p>
+            <div className="trace-ask-actions">
+              <button type="button" className="trace-ask-btn" onClick={() => beginRecording(false)}>
+                Camera only
+              </button>
+              <button type="button" className="trace-ask-btn trace-ask-btn-primary" onClick={() => beginRecording(true)}>
+                With overlay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Camera options — pick the lens or toggle the flash. */}
+      {cameraMenu && (
+        <div className="trace-ask" role="dialog" aria-modal="true" aria-labelledby="cam-menu-title">
+          <div className="trace-ask-backdrop" onClick={() => setCameraMenu(false)} />
+          <div className="trace-ask-card">
+            <h3 id="cam-menu-title" className="trace-ask-title">Camera</h3>
+            <div className="trace-menu-list">
+              {cameras.length > 0 ? (
+                cameras.map((cam, i) => (
+                  <button
+                    key={cam.deviceId || i}
+                    type="button"
+                    className={`trace-menu-item ${cam.deviceId === activeCameraId ? 'is-active' : ''}`}
+                    onClick={() => { setSelectedCameraId(cam.deviceId); setCameraMenu(false); }}
+                  >
+                    {cam.label}
+                  </button>
+                ))
+              ) : (
+                <>
+                  {/* Fallback before the device list is known (no permission yet). */}
+                  <button
+                    type="button"
+                    className={`trace-menu-item ${facingMode === 'environment' ? 'is-active' : ''}`}
+                    onClick={() => { setSelectedCameraId(null); setFacingMode('environment'); setCameraMenu(false); }}
+                  >
+                    Back camera
+                  </button>
+                  <button
+                    type="button"
+                    className={`trace-menu-item ${facingMode === 'user' ? 'is-active' : ''}`}
+                    onClick={() => { setSelectedCameraId(null); setFacingMode('user'); setCameraMenu(false); }}
+                  >
+                    Front camera
+                  </button>
+                </>
+              )}
+              {torchSupported && (
+                <button
+                  type="button"
+                  className={`trace-menu-item ${torchOn ? 'is-active' : ''}`}
+                  onClick={toggleTorch}
+                >
+                  Flash {torchOn ? 'On' : 'Off'}
+                </button>
+              )}
+            </div>
+            <div className="trace-ask-actions">
+              <button type="button" className="trace-ask-btn" onClick={() => setCameraMenu(false)}>
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* C2 — publish-your-result prompt, shown when ending a session. */}
+      {exitPrompt && (
+        <div className="trace-ask" role="dialog" aria-modal="true" aria-labelledby="exit-title">
+          <div className="trace-ask-backdrop" onClick={() => !publishing && setExitPrompt(false)} />
+          <div className="trace-ask-card">
+            <div className="trace-streak-flame" aria-hidden="true">🎨</div>
+            <h3 id="exit-title" className="trace-ask-title">Show off your work?</h3>
+            <p className="trace-ask-text">
+              Snap a photo of your finished drawing to share it on the community feed.
+            </p>
+            {/* C2 — optional note that travels with the shared result. */}
+            <textarea
+              className="trace-note-input"
+              placeholder="Add a note (optional) — e.g. my first try!"
+              value={noteText}
+              maxLength={200}
+              rows={2}
+              onChange={(e) => setNoteText(e.target.value)}
+              disabled={publishing}
+            />
+            {/* C2 privacy — opt in to also share the image they traced. */}
+            <label className="trace-share-ref">
+              <input
+                type="checkbox"
+                checked={shareReference}
+                onChange={(e) => setShareReference(e.target.checked)}
+                disabled={publishing}
+              />
+              <span>Also show the image I traced</span>
+            </label>
+            {publishMsg && <p className="trace-ask-text" style={{ fontWeight: 800 }}>{publishMsg}</p>}
+            <div className="trace-ask-actions">
+              <button type="button" className="trace-ask-btn" onClick={doExit} disabled={publishing}>
+                Skip
+              </button>
+              <button
+                type="button"
+                className="trace-ask-btn trace-ask-btn-primary"
+                onClick={() => { setExitPrompt(false); setCamOpen(true); }}
+                disabled={publishing}
+              >
+                {publishing ? 'Publishing…' : 'Take a photo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* C2 — real in-app camera to capture the finished drawing. */}
+      <CameraCapture
+        open={camOpen}
+        title="Photo of your drawing"
+        onClose={() => { setCamOpen(false); setExitPrompt(true); }}
+        onCapture={onPublishResult}
+      />
+
+      {/* B2 — daily streak celebration (today's first trace). */}
+      {streakInfo && (
+        <div className="trace-ask" role="dialog" aria-modal="true" aria-labelledby="streak-title">
+          <div className="trace-ask-backdrop" onClick={() => setStreakInfo(null)} />
+          <div className="trace-ask-card trace-streak-card">
+            <div className="trace-streak-flame" aria-hidden="true">🔥</div>
+            <h3 id="streak-title" className="trace-ask-title">
+              {streakInfo.current <= 1 ? 'Streak started!' : `${streakInfo.current}-day streak!`}
+            </h3>
+            <p className="trace-ask-text">
+              {streakInfo.current <= 1
+                ? 'Come back and trace tomorrow to keep it alive.'
+                : streakInfo.longest > streakInfo.current
+                  ? `${streakInfo.current} days in a row — your best is ${streakInfo.longest}.`
+                  : `${streakInfo.current} days in a row — a new personal best!`}
+            </p>
+            <div className="trace-ask-actions">
+              <button type="button" className="trace-ask-btn trace-ask-btn-primary" onClick={() => setStreakInfo(null)}>
+                Let's go
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

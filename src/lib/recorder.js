@@ -18,6 +18,8 @@
 // Safari/iOS only encodes mp4, while Chrome/Firefox prefer webm/vp9. We
 // probe MediaRecorder.isTypeSupported and pick the best match.
 
+import { drawWatermark as drawSharedWatermark } from './watermark.js';
+
 const MIME_PRIORITIES = [
   'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
   'video/webm;codecs=vp9,opus',
@@ -40,33 +42,13 @@ export function isRecordingSupported() {
   return pickMimeType() != null;
 }
 
-// Burn a "tracemate" wordmark into the bottom-right corner of every frame.
-// Sized off the canvas width so it scales with resolution, drawn with a soft
-// shadow so it stays legible over both light and dark camera feeds. Cheap
-// enough to run per-frame (one fillText + a dot).
-function drawWatermark(ctx, w, h, dpr) {
-  const fontPx = Math.max(14 * dpr, Math.round(w * 0.028));
-  const pad = Math.round(12 * dpr);
-  ctx.save();
-  ctx.font = `700 ${fontPx}px Nunito, system-ui, -apple-system, sans-serif`;
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'bottom';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-  ctx.shadowBlur = Math.round(4 * dpr);
-  ctx.shadowOffsetY = Math.round(1 * dpr);
-  ctx.globalAlpha = 0.92;
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText('tracemate.art', w - pad, h - pad);
-  // Small coral accent dot before the wordmark, matching the brand mark.
-  const textW = ctx.measureText('tracemate.art').width;
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
-  ctx.fillStyle = '#e87a7a';
-  const dotR = Math.max(2 * dpr, fontPx * 0.12);
-  ctx.beginPath();
-  ctx.arc(w - pad - textW - dotR * 2.2, h - pad - fontPx * 0.32, dotR, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+// Burn the shared "Trace Mate · tracemate.art" wordmark into the bottom-right
+// of every frame, so recorded clips and published still images carry the
+// SAME mark. The shared helper scales off the canvas size, so it reads the
+// same on a phone clip or a big canvas. (dpr param kept for call-site
+// compatibility; the shared mark sizes itself off the pixel dimensions.)
+function drawWatermark(ctx, w, h) {
+  drawSharedWatermark(ctx, w, h);
 }
 
 function triggerDownload(blob, filename) {
@@ -104,7 +86,7 @@ export function startRecording(opts) {
   let recordStream = null;
 
   {
-    const { videoEl, overlayEl, getOverlayState, sourceStream } = opts;
+    const { videoEl, overlayEl, getOverlayState, sourceStream, watermark = true } = opts;
     if (!videoEl) throw new Error('Recording needs a video element.');
     const drawOverlay = opts.mode !== 'camera';
 
@@ -151,7 +133,8 @@ export function startRecording(opts) {
         ctx.restore();
       }
 
-      drawWatermark(ctx, w, h, dpr);
+      // A2 — paid users can opt out of the burned-in watermark.
+      if (watermark !== false) drawWatermark(ctx, w, h, dpr);
 
       rafId = requestAnimationFrame(tick);
     };

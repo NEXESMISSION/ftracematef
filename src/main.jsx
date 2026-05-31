@@ -14,6 +14,9 @@ import './styles/auth-app.css';
 import './styles/live.css';
 import './styles/admin.css';
 import './styles/partner.css';
+import './styles/library.css';
+import './styles/community.css';
+import './styles/camera.css';
 
 // Native-only bootstrap. Both functions short-circuit on the web — no
 // network, no plugin import, no perf cost.

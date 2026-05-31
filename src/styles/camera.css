@@ -1,0 +1,143 @@
+/* A2 — in-app camera capture modal */
+.cam-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.cam-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.cam-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: 100%;
+  background: #14140f;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.cam-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  color: #fff;
+}
+.cam-title { font-weight: 800; font-size: 15px; }
+.cam-x {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.cam-x:active { transform: scale(0.94); }
+
+.cam-stage {
+  position: relative;
+  background: #000;
+  aspect-ratio: 3 / 4;
+  max-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.cam-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.cam-video.is-mirrored { transform: scaleX(-1); }
+.cam-error { color: #fff; padding: 24px 24px 12px; text-align: center; font-weight: 600; line-height: 1.5; }
+.cam-fallback { display: flex; flex-direction: column; align-items: center; padding: 8px 16px 24px; }
+.cam-fallback-btn {
+  padding: 11px 18px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.cam-fallback-btn:hover { background: rgba(255, 255, 255, 0.18); }
+
+/* Review step (Use this photo? / Retake) */
+.cam-controls-review { gap: 12px; justify-content: center; }
+.cam-controls-review .cam-fallback-btn { flex: 1; max-width: 200px; padding: 13px; }
+.cam-use-btn { background: var(--coral, #e87a7a); border-color: var(--coral, #e87a7a); }
+.cam-use-btn:hover { background: #ec8585; }
+
+.cam-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px max(16px, env(safe-area-inset-bottom));
+  background: #14140f;
+}
+.cam-flip, .cam-spacer {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+.cam-flip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.16s ease, transform 0.1s ease;
+}
+.cam-flip:hover { background: rgba(255, 255, 255, 0.16); }
+.cam-flip:active { transform: scale(0.92); }
+
+.cam-shutter {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 255, 255, 0.9);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s ease;
+}
+.cam-shutter:active { transform: scale(0.92); }
+.cam-shutter:disabled { opacity: 0.4; cursor: default; }
+.cam-shutter-ring {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #fff;
+  transition: background 0.16s ease;
+}
+.cam-shutter:hover .cam-shutter-ring { background: #f0f0f0; }

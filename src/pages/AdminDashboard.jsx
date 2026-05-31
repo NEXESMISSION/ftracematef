@@ -6,6 +6,11 @@ import {
   listReferrers, createReferrer, updateReferrer, rotateReferrerToken, markCommissionsPaid,
   listAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement,
 } from '../lib/admin.js';
+import { listCreations, deleteCreation, setCreationHidden } from '../lib/creations.js';
+import {
+  LIBRARY_CATEGORIES, libraryCategoryLabel,
+  listLibraryImages, addLibraryImage, deleteLibraryImage,
+} from '../lib/library.js';
 import { friendlyError } from '../lib/errors.js';
 import { usePresence } from '../hooks/usePresence.js';
 import { PLAN_LABEL, PLAN_BY_ID } from '../lib/plans.js';
@@ -1757,6 +1762,167 @@ function ActivityDrawer({ user, onClose }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
+/* Gallery panel — moderate the community creations feed (C1/C2/C3). Admins   */
+/* can delete any creation (DB policy added in the note+admin migration).      */
+function GalleryPanel() {
+  const [items, setItems] = useState(null);
+  const [cursor, setCursor] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [err, setErr] = useState('');
+
+  // Admins see hidden posts too (includeHidden) so they can audit/unhide.
+  const load = () => {
+    setItems(null);
+    listCreations({ limit: 60, includeHidden: true })
+      .then(({ items: rows, nextCursor }) => { setItems(rows); setCursor(nextCursor); })
+      .catch(() => { setErr('Could not load creations.'); setItems([]); });
+  };
+  useEffect(() => { load(); }, []);
+
+  const more = async () => {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const { items: rows, nextCursor } = await listCreations({ limit: 60, before: cursor, includeHidden: true });
+      setItems((c) => [...(c || []), ...rows]);
+      setCursor(nextCursor);
+    } catch { /* keep what we have */ }
+    finally { setLoadingMore(false); }
+  };
+
+  const remove = async (it) => {
+    if (!window.confirm('Permanently delete this creation?')) return;
+    try { await deleteCreation(it); setItems((c) => c?.filter((x) => x.id !== it.id)); }
+    catch (e) { setErr(e?.message || 'Delete failed.'); }
+  };
+
+  const toggleHidden = async (it) => {
+    try {
+      await setCreationHidden(it.id, !it.hidden);
+      setItems((c) => c?.map((x) => x.id === it.id ? { ...x, hidden: !x.hidden } : x));
+    } catch (e) { setErr(e?.message || 'Update failed.'); }
+  };
+
+  const btn = (color) => ({ marginTop: 4, fontSize: 11, color, background: 'transparent', border: `1px solid ${color}55`, borderRadius: 6, padding: '3px 8px', cursor: 'pointer' });
+
+  return (
+    <section className="admin-stats">
+      <header className="admin-stats-head">
+        <h2>Community gallery</h2>
+        <span className="admin-stats-when">{items ? `${items.length}${cursor ? '+' : ''} published` : 'Loading…'}</span>
+      </header>
+      {err && <p className="admin-error" style={{ margin: 12 }}>{err}</p>}
+      {items && items.length === 0 && <p className="admin-ref-muted" style={{ padding: 12 }}>No creations published yet.</p>}
+      {items && items.length > 0 && (
+        <>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12, padding: 12 }}>
+          {items.map((it) => (
+            <div key={it.id} style={{ border: '1px solid rgba(0,0,0,0.12)', borderRadius: 12, overflow: 'hidden', background: '#fff', opacity: it.hidden ? 0.55 : 1 }}>
+              <img src={it.thumbUrl || it.url} alt="" loading="lazy" style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block', background: '#f3efe7' }} />
+              <div style={{ padding: '8px 10px', display: 'grid', gap: 3 }}>
+                <strong style={{ fontSize: 13 }}>{it.author}{it.hidden ? ' · hidden' : ''}</strong>
+                {it.note && <span style={{ fontSize: 12, color: '#6b5d4d' }}>{it.note}</span>}
+                <span style={{ fontSize: 11, color: '#8a7d6b' }}>
+                  ♥ {it.likeCount} · {formatTraceRelative(it.createdAt)}{it.referenceUrl ? ' · has reference' : ''}
+                </span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button type="button" onClick={() => toggleHidden(it)} style={btn('#8a6d1a')}>
+                    {it.hidden ? 'Unhide' : 'Hide'}
+                  </button>
+                  <button type="button" onClick={() => remove(it)} style={btn('#c0392b')}>Delete</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {cursor && (
+          <div style={{ padding: 12 }}>
+            <button type="button" className="admin-ref-btn" onClick={more} disabled={loadingMore}>
+              {loadingMore ? 'Loading…' : 'Load more'}
+            </button>
+          </div>
+        )}
+        </>
+      )}
+    </section>
+  );
+}
+
+/* Library panel — manage the pre-uploaded tracing image library (A1).        */
+function LibraryPanel() {
+  const [items, setItems] = useState([]);
+  const [category, setCategory] = useState(LIBRARY_CATEGORIES[0].id);
+  const [title, setTitle] = useState('');
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const load = () => listLibraryImages().then(setItems).catch(() => setMsg('Could not load the library.'));
+  useEffect(() => { load(); }, []);
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    if (!file) { setMsg('Pick an image file first.'); return; }
+    setBusy(true); setMsg('');
+    try {
+      await addLibraryImage({ file, category, title });
+      setTitle(''); setFile(null); if (e.target.reset) e.target.reset();
+      await load(); setMsg('Added to the library.');
+    } catch (err) { setMsg(err?.message || 'Upload failed.'); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async (row) => {
+    if (!window.confirm('Delete this image from the library?')) return;
+    try { await deleteLibraryImage(row); await load(); } catch (err) { setMsg(err?.message || 'Delete failed.'); }
+  };
+
+  const inp = { padding: 8, borderRadius: 8, border: '1px solid #cbbfa9', fontFamily: 'inherit' };
+
+  return (
+    <section className="admin-stats">
+      <header className="admin-stats-head">
+        <h2>Image library</h2>
+        <span className="admin-stats-when">{items.length} image{items.length === 1 ? '' : 's'}</span>
+      </header>
+
+      <form onSubmit={onSubmit} style={{ display: 'grid', gap: 10, padding: 12, maxWidth: 420 }}>
+        <label style={{ display: 'grid', gap: 4, fontWeight: 700, fontSize: 13 }}>
+          Category
+          <select value={category} onChange={(e) => setCategory(e.target.value)} style={inp}>
+            {LIBRARY_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+          </select>
+        </label>
+        <label style={{ display: 'grid', gap: 4, fontWeight: 700, fontSize: 13 }}>
+          Title (optional)
+          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Naruto bust" style={inp} />
+        </label>
+        <label style={{ display: 'grid', gap: 4, fontWeight: 700, fontSize: 13 }}>
+          Image (clean line-art)
+          <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+        </label>
+        <button type="submit" className="admin-ref-btn" disabled={busy}>{busy ? 'Uploading…' : 'Add to library'}</button>
+        {msg && <p style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>{msg}</p>}
+      </form>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10, padding: 12 }}>
+        {items.map((it) => (
+          <div key={it.id} style={{ border: '1px solid rgba(0,0,0,0.12)', borderRadius: 10, padding: 6, background: '#fff' }}>
+            <img src={it.url} alt="" loading="lazy" style={{ width: '100%', height: 110, objectFit: 'contain', background: '#faf6ef', borderRadius: 6 }} />
+            <div style={{ fontSize: 11, opacity: 0.7 }}>{libraryCategoryLabel(it.category)}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title || '—'}</div>
+            <button type="button" onClick={() => remove(it)}
+                    style={{ fontSize: 11, marginTop: 4, cursor: 'pointer', border: '1px solid #c0392b', color: '#c0392b', background: 'transparent', borderRadius: 6, padding: '3px 8px' }}>
+              Delete
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
 
 export default function AdminDashboard() {
   const { user, signOut } = useAuth();
@@ -1992,6 +2158,8 @@ export default function AdminDashboard() {
             { id: 'referrals', label: 'Referrals' },
             { id: 'survey',    label: 'Survey' },
             { id: 'traffic',   label: 'Traffic' },
+            { id: 'gallery',   label: 'Gallery' },
+            { id: 'library',   label: 'Library' },
           ].map((v) => (
             <button
               key={v.id}
@@ -2018,6 +2186,8 @@ export default function AdminDashboard() {
           />
         )}
         {view === 'traffic' && <TrafficPanel />}
+        {view === 'gallery' && <GalleryPanel />}
+        {view === 'library' && <LibraryPanel />}
 
         {view === 'users' && (
           <>
