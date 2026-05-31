@@ -46,7 +46,7 @@ async function processImage(input, { watermark = false } = {}) {
     catch { /* fall back */ }
   }
   try {
-    const opt = await optimizeImage(work, { maxDim: 1600, quality: 0.85 });
+    const opt = await optimizeImage(work, { maxDim: 2048, quality: 0.9 });
     if (opt?.file) { if (opt.url) URL.revokeObjectURL(opt.url); work = opt.file; }
   } catch { /* fall back */ }
   return work;
@@ -70,7 +70,7 @@ export async function publishCreation({ file, reference, title, note, userId, wa
     // Thumbnail for the feed grid (best-effort).
     let thumbPath = null;
     try {
-      const thumb = await makeThumbnail(processed, { maxDim: 400, quality: 0.72 });
+      const thumb = await makeThumbnail(processed, { maxDim: 512, quality: 0.82 });
       if (thumb?.file) {
         thumbPath = await uploadBlob(thumb.file, userId);
         if (thumb.url) URL.revokeObjectURL(thumb.url);

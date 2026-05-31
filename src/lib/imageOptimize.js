@@ -12,10 +12,10 @@
  * the original back rather than an exception breaking the flow.
  */
 
-const FULL_MAX_DIM = 2000;   // longest edge for a full-size image
-const FULL_QUALITY = 0.82;
-const THUMB_MAX_DIM = 400;   // longest edge for grid/feed thumbnails
-const THUMB_QUALITY = 0.7;
+const FULL_MAX_DIM = 2048;   // longest edge for a full-size image
+const FULL_QUALITY = 0.9;    // higher quality so traced line-art stays crisp
+const THUMB_MAX_DIM = 512;   // longest edge for grid/feed thumbnails
+const THUMB_QUALITY = 0.82;
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -94,13 +94,39 @@ export async function optimizeImage(input, opts = {}) {
     const tw = Math.max(1, Math.round(w * scale));
     const th = Math.max(1, Math.round(h * scale));
 
+    // Sharpness-preserving downscale: a single big canvas.drawImage step
+    // aliases hard edges (the worst case for line-art). Instead halve the
+    // image repeatedly (each ≤2x step is what the browser resamples best),
+    // then do the final exact step. Keeps thin outlines clean at small sizes.
+    let srcCanvas = document.createElement('canvas');
+    srcCanvas.width = w;
+    srcCanvas.height = h;
+    let sctx = srcCanvas.getContext('2d');
+    sctx.drawImage(img, 0, 0);
+
+    let cw = w, ch = h;
+    while (cw > tw * 2 && ch > th * 2) {
+      const nw = Math.max(tw, Math.round(cw / 2));
+      const nh = Math.max(th, Math.round(ch / 2));
+      const step = document.createElement('canvas');
+      step.width = nw;
+      step.height = nh;
+      const stepCtx = step.getContext('2d');
+      stepCtx.imageSmoothingEnabled = true;
+      stepCtx.imageSmoothingQuality = 'high';
+      stepCtx.drawImage(srcCanvas, 0, 0, cw, ch, 0, 0, nw, nh);
+      srcCanvas = step;
+      sctx = stepCtx;
+      cw = nw; ch = nh;
+    }
+
     const canvas = document.createElement('canvas');
     canvas.width = tw;
     canvas.height = th;
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, 0, 0, tw, th);
+    ctx.drawImage(srcCanvas, 0, 0, cw, ch, 0, 0, tw, th);
 
     let type;
     if (supportsWebp()) type = 'image/webp';

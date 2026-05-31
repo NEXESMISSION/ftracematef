@@ -45,7 +45,7 @@ export async function listLibraryImages() {
 export async function addLibraryImage({ file, category, title }) {
   let toUpload = file;
   try {
-    const opt = await optimizeImage(file, { maxDim: 1600, quality: 0.85 });
+    const opt = await optimizeImage(file, { maxDim: 2048, quality: 0.9 });
     if (opt?.file) {
       toUpload = opt.file;
       if (opt.url) URL.revokeObjectURL(opt.url);
@@ -67,7 +67,7 @@ export async function addLibraryImage({ file, category, title }) {
   // Small thumbnail for the picker grid (best-effort).
   let thumbPath = null;
   try {
-    const thumb = await makeThumbnail(toUpload, { maxDim: 400, quality: 0.72 });
+    const thumb = await makeThumbnail(toUpload, { maxDim: 512, quality: 0.82 });
     if (thumb?.file) {
       const text = `${category}/thumb-${rand}.${(thumb.file.type.split('/')[1] || 'webp').replace('jpeg', 'jpg')}`;
       const tup = await supabase.storage.from(BUCKET).upload(text, thumb.file, {

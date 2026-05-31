@@ -107,7 +107,7 @@ export default function Trace() {
   const [noteText, setNoteText] = useState('');    // C2 caption for the shared result
   // C2 privacy: whether to ALSO share the reference image they traced. Default
   // OFF — the source image is private unless they explicitly opt in.
-  const [shareReference, setShareReference] = useState(false);
+  const [shareReference, setShareReference] = useState(true);
   const [camOpen, setCamOpen] = useState(false);   // C2 camera-capture modal
   // After a photo is captured, hold it for a compact compose step (preview +
   // note + share) before it actually posts — { file, url } | null.

@@ -1,0 +1,142 @@
+/* Before/after compare lightbox (gallery tile → popup). */
+.cmp-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.cmp-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.cmp-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: 100%;
+  background: #14140f;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.cmp-close {
+  position: absolute;
+  top: 10px; right: 10px;
+  z-index: 3;
+  width: 36px; height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.cmp-close:active { transform: scale(0.94); }
+
+.cmp-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 72vh;
+  background: #000;
+  overflow: hidden;
+  touch-action: none;          /* we own the drag */
+  cursor: ew-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cmp-frame-single { cursor: default; }
+.cmp-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  display: block;
+  pointer-events: none;
+}
+/* Reference layer is clipped to the left of the handle. The inner wrapper is
+   pinned to the frame width so the image doesn't squash as the clip narrows. */
+.cmp-clip {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 50%;
+  overflow: hidden;
+  z-index: 1;
+}
+.cmp-clip-inner {
+  position: absolute;
+  top: 0; left: 0;
+  height: 100%;
+  width: min(560px, 100vw);    /* matches .cmp-card width cap */
+}
+@media (min-width: 592px) { .cmp-clip-inner { width: 560px; } }
+
+.cmp-tag {
+  position: absolute;
+  bottom: 10px;
+  z-index: 2;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-family: 'Nunito', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.cmp-tag-l { left: 10px; }
+.cmp-tag-r { right: 10px; }
+
+.cmp-handle {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.cmp-handle-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #fff;
+  color: #2b2118;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.cmp-meta {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px 14px;
+  color: #fff;
+}
+.cmp-meta strong { font-size: 14px; font-weight: 800; }
+.cmp-note { font-size: 13px; color: rgba(255, 255, 255, 0.82); line-height: 1.4; }

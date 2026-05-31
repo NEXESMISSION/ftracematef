@@ -179,25 +179,35 @@ a.like-btn { text-decoration: none; }
 .like-btn.is-liked { background: var(--coral, #e87a7a); color: #fff; }
 .like-btn:disabled { opacity: 0.7; cursor: default; }
 
-/* Reference peek (top-left pill) + owner delete (top-right). */
+/* Image button that opens the compare popup — wraps the tile <img>. */
+.creation-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* "Has a reference to compare" badge (top-left). Non-interactive. */
 .creation-ref {
   position: absolute;
   top: 7px;
   left: 7px;
-  padding: 4px 9px;
-  border: 0;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
-  font-family: inherit;
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 800;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
+  pointer-events: none;
   backdrop-filter: blur(3px);
 }
-.creation-ref.is-on { background: var(--coral, #e87a7a); }
 .creation-del {
   position: absolute;
   top: 7px;

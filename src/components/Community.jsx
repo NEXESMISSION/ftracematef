@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { listCreations, toggleLike, deleteCreation, reportCreation, getStreakLeaderboard } from '../lib/creations.js';
+import CompareLightbox from './CompareLightbox.jsx';
 
 const PAGE = 30;
 
@@ -20,7 +21,7 @@ export default function Community({ tab: tabProp, onTabChange }) {
   const [cursor, setCursor] = useState(null);  // ISO ts of last row, or null = no more
   const [loadingMore, setLoadingMore] = useState(false);
   const [busyId, setBusyId] = useState(null);
-  const [flipped, setFlipped] = useState(() => new Set()); // ids showing reference
+  const [lightbox, setLightbox] = useState(null); // creation shown in compare popup
   // Tab can be controlled by a parent (the mobile bottom-bar drives it) or
   // managed locally (desktop). Controlled when `tabProp` is provided.
   const [tabLocal, setTabLocal] = useState('gallery'); // 'gallery' | 'streaks'
@@ -93,12 +94,6 @@ export default function Community({ tab: tabProp, onTabChange }) {
     } catch { /* ignore */ }
   };
 
-  const toggleFlip = (id) => setFlipped((cur) => {
-    const next = new Set(cur);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-
   // Lazy-load the streak leaderboard the first time the tab is opened.
   useEffect(() => {
     if (tab === 'streaks' && board === null) {
@@ -164,30 +159,29 @@ export default function Community({ tab: tabProp, onTabChange }) {
         <>
           <div className="community-grid">
             {items.map((it) => {
-              const showRef = flipped.has(it.id) && it.referenceUrl;
               return (
                 <figure key={it.id} className="creation">
-                  <img
-                    src={showRef ? it.referenceUrl : it.thumbUrl}
-                    alt={showRef ? `Reference for ${it.author}'s trace` : (it.title || `Art by ${it.author}`)}
-                    loading="lazy"
-                    decoding="async"
-                    // Fade in on load; if already cached (complete at mount), show now.
-                    ref={(n) => { if (n?.complete) n.classList.add('is-loaded'); }}
-                    onLoad={(e) => e.currentTarget.classList.add('is-loaded')}
-                  />
+                  {/* Tap the image → open the before/after compare popup. */}
+                  <button
+                    type="button"
+                    className="creation-open"
+                    onClick={() => setLightbox(it)}
+                    aria-label={`Open ${it.author}'s creation`}
+                  >
+                    <img
+                      src={it.thumbUrl}
+                      alt={it.title || `Art by ${it.author}`}
+                      loading="lazy"
+                      decoding="async"
+                      // Fade in on load; if already cached (complete at mount), show now.
+                      ref={(n) => { if (n?.complete) n.classList.add('is-loaded'); }}
+                      onLoad={(e) => e.currentTarget.classList.add('is-loaded')}
+                    />
+                  </button>
 
-                  {/* Peek the traced reference image (top-left), if we have one. */}
+                  {/* Badge: this creation has a reference to compare against. */}
                   {it.referenceUrl && (
-                    <button
-                      type="button"
-                      className={`creation-ref ${showRef ? 'is-on' : ''}`}
-                      onClick={() => toggleFlip(it.id)}
-                      aria-pressed={showRef}
-                      title={showRef ? 'Show result' : 'Show what they traced'}
-                    >
-                      {showRef ? 'Result' : 'Reference'}
-                    </button>
+                    <span className="creation-ref" aria-hidden="true">⇄</span>
                   )}
 
                   {/* Top-right: owner deletes their own; others can report. */}
@@ -248,6 +242,9 @@ export default function Community({ tab: tabProp, onTabChange }) {
           )}
         </>
       )}
+
+      {/* Before/after compare popup — opened by tapping a tile. */}
+      <CompareLightbox item={lightbox} onClose={() => setLightbox(null)} />
     </section>
   );
 }
