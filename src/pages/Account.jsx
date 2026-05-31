@@ -608,7 +608,6 @@ export default function Account() {
   // Compute it once per render — localStorage reads are cheap and the answer
   // can change between renders (e.g. trial just expired in the background).
   const trialAvailable = !isPaid && canUseFreeTrial(profile);
-  const canEnterStudio = isPaid || trialAvailable;
   const sessionsLeft   = !isPaid ? freeSessionsLeft(profile) : null;
 
   // Friendly contextual sub-line under the greeting.
@@ -677,7 +676,7 @@ export default function Account() {
                 to /pricing here used to skip it — see the matching note in
                 Upload.jsx. */}
             <Link to="/upload" className="profile-cta profile-cta-primary">
-              {canEnterStudio ? '+ Upload new image' : 'Start tracing →'}
+              Start tracing →
             </Link>
             {/* Admin button hidden on purpose — reach the dashboard via the
                 /admin-me URL directly. Flip `false` to bring the button back. */}
