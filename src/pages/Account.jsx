@@ -555,6 +555,10 @@ export default function Account() {
   const { user, profile, subscription, signOut, refresh, isPaid, loading } = useAuth();
   usePresence('account');
   const [showChange, setShowChange] = useState(false);
+  // Mobile-only bottom-nav tab. Desktop ignores this (CSS shows both panes);
+  // on phones it swaps between the account info and the community gallery so
+  // the page isn't one long scroll. 'account' | 'gallery'.
+  const [mobileTab, setMobileTab] = useState('account');
   // Single source of truth for action/portal/change-plan errors. SubscriptionCard
   // and ChangePlanModal both write here; one Alert at page level renders it.
   const [alert, setAlert] = useState(null); // { title, message } | null
@@ -637,7 +641,9 @@ export default function Account() {
         </div>
       </header>
 
-      <main className="profile-page">
+      <main className={`profile-page acct-tab-${mobileTab}`}>
+       {/* ── Account pane (default mobile tab) ── */}
+       <div className={`acct-pane acct-pane-account ${mobileTab === 'account' ? 'is-active' : ''}`}>
         {/* ── Hero: the main action lives here ── */}
         <section className="profile-hero">
           <span className="profile-hero-tape" aria-hidden="true" />
@@ -690,9 +696,6 @@ export default function Account() {
 
         {/* ── Stats: scrapbook polaroids ── */}
         <StatsGrid stats={stats} memberSince={profile?.created_at} />
-
-        {/* ── C1/C2/C3 — community feed + leaderboard ── */}
-        <Community />
 
         {/* ── Live Preview: stream the camera between two devices on this account ── */}
         {/* Live Preview hidden for now — not needed. Remove the inline style to restore. */}
@@ -749,7 +752,52 @@ export default function Account() {
             Sign out
           </button>
         </div>
+       </div>{/* /acct-pane-account */}
+
+       {/* ── Gallery pane (second mobile tab; on desktop it just stacks below) ── */}
+       <div className={`acct-pane acct-pane-gallery ${mobileTab === 'gallery' ? 'is-active' : ''}`}>
+         <Community />
+       </div>
       </main>
+
+      {/* ── Mobile bottom nav: Account · (Start) · Gallery. Hidden on desktop. ── */}
+      <nav className="acct-tabbar" aria-label="Account sections">
+        <button
+          type="button"
+          className={`acct-tabbar-btn ${mobileTab === 'account' ? 'is-active' : ''}`}
+          onClick={() => setMobileTab('account')}
+          aria-current={mobileTab === 'account'}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="8" r="3.6" />
+            <path d="M4.5 19.5 a7.5 7.5 0 0 1 15 0" />
+          </svg>
+          <span>Account</span>
+        </button>
+
+        <Link to="/upload" className="acct-tabbar-start" aria-label="Start tracing">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 5 V19 M5 12 H19" />
+          </svg>
+        </Link>
+
+        <button
+          type="button"
+          className={`acct-tabbar-btn ${mobileTab === 'gallery' ? 'is-active' : ''}`}
+          onClick={() => setMobileTab('gallery')}
+          aria-current={mobileTab === 'gallery'}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+            <path d="M3.5 15 L8 10.5 L12 14.5 M14 12.5 L16.5 10 L20.5 14" />
+            <circle cx="8.5" cy="9" r="1.3" fill="currentColor" stroke="none" />
+          </svg>
+          <span>Gallery</span>
+        </button>
+      </nav>
 
       {showChange && (
         <ChangePlanModal
