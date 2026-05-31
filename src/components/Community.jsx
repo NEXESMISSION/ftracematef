@@ -14,14 +14,18 @@ const PAGE = 30;
  * traced reference revealed only on tap (a "Reference" peek) instead of a
  * second permanent tile.
  */
-export default function Community() {
+export default function Community({ tab: tabProp, onTabChange }) {
   const { user } = useAuth();
   const [items, setItems] = useState(null);    // null = loading first page
   const [cursor, setCursor] = useState(null);  // ISO ts of last row, or null = no more
   const [loadingMore, setLoadingMore] = useState(false);
   const [busyId, setBusyId] = useState(null);
   const [flipped, setFlipped] = useState(() => new Set()); // ids showing reference
-  const [tab, setTab] = useState('gallery');   // 'gallery' | 'streaks'
+  // Tab can be controlled by a parent (the mobile bottom-bar drives it) or
+  // managed locally (desktop). Controlled when `tabProp` is provided.
+  const [tabLocal, setTabLocal] = useState('gallery'); // 'gallery' | 'streaks'
+  const tab = tabProp ?? tabLocal;
+  const setTab = (t) => { if (onTabChange) onTabChange(t); else setTabLocal(t); };
   const [board, setBoard] = useState(null);    // streak leaderboard rows
 
   // First page (and reload when the signed-in user changes).

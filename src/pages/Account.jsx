@@ -556,9 +556,12 @@ export default function Account() {
   usePresence('account');
   const [showChange, setShowChange] = useState(false);
   // Mobile-only bottom-nav tab. Desktop ignores this (CSS shows both panes);
-  // on phones it swaps between the account info and the community gallery so
-  // the page isn't one long scroll. 'account' | 'gallery'.
+  // on phones it swaps between account info, the streak board, and the
+  // community gallery. 'account' | 'streaks' | 'gallery'. Streaks + gallery
+  // both live in the <Community> pane — the tab also picks Community's inner
+  // view via communityTab.
   const [mobileTab, setMobileTab] = useState('account');
+  const communityTab = mobileTab === 'streaks' ? 'streaks' : 'gallery';
   // Single source of truth for action/portal/change-plan errors. SubscriptionCard
   // and ChangePlanModal both write here; one Alert at page level renders it.
   const [alert, setAlert] = useState(null); // { title, message } | null
@@ -754,13 +757,16 @@ export default function Account() {
         </div>
        </div>{/* /acct-pane-account */}
 
-       {/* ── Gallery pane (second mobile tab; on desktop it just stacks below) ── */}
-       <div className={`acct-pane acct-pane-gallery ${mobileTab === 'gallery' ? 'is-active' : ''}`}>
-         <Community />
+       {/* ── Community pane: Gallery + Streaks. On mobile it's shown for both
+            the 'gallery' and 'streaks' tabs (the inner view follows). On
+            desktop it just stacks below as usual. ── */}
+       <div className={`acct-pane acct-pane-gallery ${mobileTab === 'gallery' || mobileTab === 'streaks' ? 'is-active' : ''}`}>
+         <Community tab={communityTab} onTabChange={(t) => setMobileTab(t === 'streaks' ? 'streaks' : 'gallery')} />
        </div>
       </main>
 
-      {/* ── Mobile bottom nav: Account · (Start) · Gallery. Hidden on desktop. ── */}
+      {/* ── Mobile bottom nav: Account · Streaks · (Trace) · Gallery.
+          Hidden on desktop. ── */}
       <nav className="acct-tabbar" aria-label="Account sections">
         <button
           type="button"
@@ -768,7 +774,7 @@ export default function Account() {
           onClick={() => setMobileTab('account')}
           aria-current={mobileTab === 'account'}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="8" r="3.6" />
             <path d="M4.5 19.5 a7.5 7.5 0 0 1 15 0" />
@@ -776,11 +782,23 @@ export default function Account() {
           <span>Account</span>
         </button>
 
+        <button
+          type="button"
+          className={`acct-tabbar-btn ${mobileTab === 'streaks' ? 'is-active' : ''}`}
+          onClick={() => setMobileTab('streaks')}
+          aria-current={mobileTab === 'streaks'}
+        >
+          <span className="acct-tabbar-emoji" aria-hidden="true">🔥</span>
+          <span>Streaks</span>
+        </button>
+
         <Link to="/upload" className="acct-tabbar-start" aria-label="Start tracing">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 5 V19 M5 12 H19" />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 7 H6.5 L8 5 H16 L17.5 7 H20 a1.5 1.5 0 0 1 1.5 1.5 V18 a1.5 1.5 0 0 1 -1.5 1.5 H4 a1.5 1.5 0 0 1 -1.5 -1.5 V8.5 A1.5 1.5 0 0 1 4 7 Z" />
+            <circle cx="12" cy="13" r="3.6" />
           </svg>
+          <span className="acct-tabbar-start-label">Trace</span>
         </Link>
 
         <button
@@ -789,7 +807,7 @@ export default function Account() {
           onClick={() => setMobileTab('gallery')}
           aria-current={mobileTab === 'gallery'}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
             <path d="M3.5 15 L8 10.5 L12 14.5 M14 12.5 L16.5 10 L20.5 14" />
