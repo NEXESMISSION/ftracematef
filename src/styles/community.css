@@ -114,7 +114,11 @@ a.like-btn { text-decoration: none; }
   object-fit: cover;
   display: block;
   background: #faf6ef;
+  /* Fade in once decoded so the grid never flashes broken/janky tiles. */
+  opacity: 0;
+  transition: opacity 0.25s ease;
 }
+.creation img.is-loaded { opacity: 1; }
 
 /* Bottom overlay bar: author + like, on a gradient for legibility. */
 .creation-bar {

@@ -167,6 +167,10 @@ export default function Community() {
                     src={showRef ? it.referenceUrl : it.thumbUrl}
                     alt={showRef ? `Reference for ${it.author}'s trace` : (it.title || `Art by ${it.author}`)}
                     loading="lazy"
+                    decoding="async"
+                    // Fade in on load; if already cached (complete at mount), show now.
+                    ref={(n) => { if (n?.complete) n.classList.add('is-loaded'); }}
+                    onLoad={(e) => e.currentTarget.classList.add('is-loaded')}
                   />
 
                   {/* Peek the traced reference image (top-left), if we have one. */}

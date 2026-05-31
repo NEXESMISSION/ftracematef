@@ -1908,7 +1908,7 @@ function LibraryPanel() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10, padding: 12 }}>
         {items.map((it) => (
           <div key={it.id} style={{ border: '1px solid rgba(0,0,0,0.12)', borderRadius: 10, padding: 6, background: '#fff' }}>
-            <img src={it.url} alt="" loading="lazy" style={{ width: '100%', height: 110, objectFit: 'contain', background: '#faf6ef', borderRadius: 6 }} />
+            <img src={it.thumbUrl || it.url} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: 110, objectFit: 'contain', background: '#faf6ef', borderRadius: 6 }} />
             <div style={{ fontSize: 11, opacity: 0.7 }}>{libraryCategoryLabel(it.category)}</div>
             <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title || '—'}</div>
             <button type="button" onClick={() => remove(it)}

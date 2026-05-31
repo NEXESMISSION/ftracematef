@@ -120,7 +120,11 @@
   object-fit: contain;
   background: #faf6ef;
   display: block;
+  /* Fade in once decoded so the grid doesn't flash as thumbnails arrive. */
+  opacity: 0;
+  transition: opacity 0.25s ease;
 }
+.lib-item img.is-loaded { opacity: 1; }
 .lib-item-title {
   padding: 6px 8px;
   font-size: 11.5px;

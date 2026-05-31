@@ -71,7 +71,15 @@ export default function LibraryPicker({ open, onClose, onPick }) {
                   onClick={() => onPick(it)}
                   title={it.title || ''}
                 >
-                  <img src={it.url} alt={it.title || 'Library image'} loading="lazy" />
+                  <img
+                    src={it.thumbUrl || it.url}
+                    alt={it.title || 'Library image'}
+                    loading="lazy"
+                    decoding="async"
+                    // Fade in on load; if already cached (complete at mount), show now.
+                    ref={(n) => { if (n?.complete) n.classList.add('is-loaded'); }}
+                    onLoad={(e) => e.currentTarget.classList.add('is-loaded')}
+                  />
                   {it.title && <span className="lib-item-title">{it.title}</span>}
                 </button>
               ))}
