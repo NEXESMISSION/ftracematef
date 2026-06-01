@@ -27,6 +27,21 @@ const RANGES = [
 const fmt = (n) => (typeof n === 'number' ? n.toLocaleString() : '0');
 const pct = (num, den) => (den > 0 ? `${((num / den) * 100).toFixed(1)}%` : '—');
 
+// Icon per named channel (from analytics_channel() in the DB). Anything not
+// listed falls back to a neutral dot, so adding a channel server-side doesn't
+// require a client change.
+const CHANNEL_ICON = {
+  ChatGPT: '🤖', Perplexity: '🤖', Gemini: '🤖', Claude: '🤖', Copilot: '🤖',
+  Google: '🔍', Bing: '🔍', DuckDuckGo: '🔍', Yahoo: '🔍', Ecosia: '🔍',
+  'Brave Search': '🔍', Yandex: '🔍',
+  YouTube: '▶️', TikTok: '🎵', Instagram: '📸', Facebook: '👥',
+  'X (Twitter)': '✖️', Reddit: '👽', Pinterest: '📌', LinkedIn: '💼',
+  Threads: '🧵', Telegram: '✈️', WhatsApp: '💬', Discord: '🎮',
+  GitHub: '🐙', 'Product Hunt': '🐱', Gmail: '✉️', Outlook: '✉️',
+  Newsletter: '📰', Direct: '🔗',
+};
+const channelIcon = (name) => CHANNEL_ICON[name] || '•';
+
 /* ── rotating globe ───────────────────────────────────────────────────────── */
 function Globe({ countries }) {
   const canvasRef = useRef(null);
@@ -284,6 +299,32 @@ export default function AnalyticsPulse() {
               <FunnelStep label="Signed up" value={funnel.signups} base={funnel.visitors} />
               <FunnelStep label="Paid" value={funnel.paid} base={funnel.visitors} />
             </div>
+          </div>
+
+          {/* Channels — the headline "where did they come from" view. */}
+          <div className="pulse-card pulse-channels">
+            <h4 className="pulse-card-title">Channels — where visitors came from</h4>
+            {(!data.by_channel || data.by_channel.length === 0) ? (
+              <p className="pulse-empty">No data yet.</p>
+            ) : (
+              <ul className="pulse-bars">
+                {(() => {
+                  const max = data.by_channel.reduce((m, r) => Math.max(m, r.visitors || 0), 1);
+                  return data.by_channel.map((r, i) => (
+                    <li key={i} className="pulse-bar-row pulse-channel-row">
+                      <span className="pulse-bar-label">
+                        <span className="pulse-channel-icon" aria-hidden="true">{channelIcon(r.channel)}</span>
+                        {r.channel}
+                      </span>
+                      <span className="pulse-bar-track">
+                        <span className="pulse-bar-fill" style={{ width: `${((r.visitors || 0) / max) * 100}%` }} />
+                      </span>
+                      <span className="pulse-bar-value">{fmt(r.visitors)}</span>
+                    </li>
+                  ));
+                })()}
+              </ul>
+            )}
           </div>
 
           {/* Breakdowns */}
