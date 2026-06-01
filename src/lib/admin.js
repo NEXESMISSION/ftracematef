@@ -70,6 +70,33 @@ export async function getAdminStats() {
   };
 }
 
+/**
+ * Super-analytics rollup for the /admin-me "Pulse" tab. One call returns the
+ * overview (totals, geo for the globe, source/device/os/browser/page
+ * breakdowns, timeseries, funnel). Pass a `path` to ALSO get that page's
+ * heatmap payload (click points, scroll funnel, rage hotspots, top elements).
+ *
+ *   range ∈ '24h' | '7d' | '30d' | '90d' | 'all'  (default '7d' server-side)
+ *
+ * Returns { range, overview, heatmap }. Server-side triple-gated, same as
+ * getAdminStats().
+ */
+export async function getAnalytics(range = '7d', path = null) {
+  const body = { range };
+  if (path) body.path = path;
+  const { data, error } = await supabase.functions.invoke('admin-analytics', {
+    method: 'POST',
+    body,
+  });
+  if (error) throw new Error(await unwrapFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return {
+    range:    data?.range ?? range,
+    overview: data?.overview ?? null,
+    heatmap:  data?.heatmap ?? null,
+  };
+}
+
 /* ── Referral / affiliate program ──────────────────────────────────────────
  * All operator-side referral CRUD + payout actions route through the single
  * admin-referrals Edge Function (server-side triple-gated, same as the other

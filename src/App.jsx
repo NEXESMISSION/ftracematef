@@ -6,6 +6,8 @@ import RequirePaid from './auth/RequirePaid.jsx';
 import RequireAdmin from './auth/RequireAdmin.jsx';
 import { endTrialSession } from './lib/freeTrial.js';
 import { trackPageview } from './lib/analytics.js';
+import { initTracking, trackPageview as trackPulsePageview } from './lib/track.js';
+import HeatmapTracker from './components/HeatmapTracker.jsx';
 
 import Home from './pages/Home.jsx';
 import Landing from './pages/Landing.jsx';
@@ -91,8 +93,12 @@ function TrialSessionTracker() {
 // GoatCounter, which only counts the initial load otherwise.
 function AnalyticsRouteTracker() {
   const { pathname, search } = useLocation();
+  // Boot our first-party tracker once (sets up the flush timer + lifecycle
+  // hooks). Idempotent, so calling it from the route tracker is safe.
+  useEffect(() => { initTracking(); }, []);
   useEffect(() => {
-    trackPageview();
+    trackPageview();              // optional 3rd-party shim (Plausible/Umami/…)
+    trackPulsePageview(pathname); // first-party Pulse dashboard
   }, [pathname, search]);
   return null;
 }
@@ -124,6 +130,7 @@ export default function App() {
     <AuthProvider>
       <TrialSessionTracker />
       <AnalyticsRouteTracker />
+      <HeatmapTracker />
       <DeepLinkRouter />
       <Routes>
         {/* Traffic-source attribution — /r/:source plus a hand-picked set of

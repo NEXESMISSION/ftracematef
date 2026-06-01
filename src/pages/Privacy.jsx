@@ -66,8 +66,26 @@ export default function Privacy() {
             <li>The reference images you upload — they stay in your browser.</li>
             <li>The drawings you produce — they exist only on real paper.</li>
             <li>Your camera feed — it never leaves your device.</li>
-            <li>Analytics tracking, advertising IDs, or third-party trackers.</li>
+            <li>Advertising IDs, cross-site ad trackers, or third-party analytics
+                trackers (no Google Analytics, Meta Pixel, etc.).</li>
           </ul>
+
+          <h3>Anonymous usage analytics</h3>
+          <p>
+            To understand how people find and use Trace Mate, we collect{' '}
+            <strong>first-party, anonymous</strong> usage analytics — even before
+            you create an account. This includes the pages you view, your coarse
+            device type / operating system / browser, the referring link or
+            campaign that sent you, and basic interactions (clicks, scroll depth)
+            used to improve the landing experience. We also derive an{' '}
+            <strong>approximate location</strong> (country/region/city) from your
+            IP address — but we <strong>never store the raw IP</strong>: it is
+            one-way hashed on our server the moment it arrives, and only the
+            resulting region is kept. This data is not linked to advertising, is
+            never sold, and is processed only by us on our own Supabase backend.
+            If you later sign in, this anonymous history is associated with your
+            account so we can see your full journey.
+          </p>
 
           <h2>Why we collect it</h2>
           <ul>
@@ -99,8 +117,10 @@ export default function Privacy() {
             We use <strong>localStorage</strong> and <strong>sessionStorage</strong>{' '}
             (not cookies) to keep you signed in, remember your studio
             preferences (overlay opacity, camera choice), and stash your
-            uploaded image across redirects. No tracking cookies. No third-party
-            cookies.
+            uploaded image across redirects. We also set a first-party cookie /
+            localStorage value to remember which link referred you and an
+            anonymous visitor ID for the usage analytics described above. No
+            third-party cookies, and no cross-site advertising trackers.
           </p>
 
           <h2>Your rights</h2>

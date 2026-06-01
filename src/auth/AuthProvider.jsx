@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js';
 import { endTrialSession } from '../lib/freeTrial.js';
 import { currentPresence, onPresenceChange } from '../lib/presence.js';
 import { readSource, readAffiliate } from '../lib/attribution.js';
+import { identify } from '../lib/track.js';
 
 /**
  * AuthProvider exposes `{ user, profile, subscription, isPaid, loading, signOut, refresh }`
@@ -688,6 +689,14 @@ export function AuthProvider({ children }) {
       } catch { /* ignore quota / private mode */ }
       endTrialSession();
     }
+  }, [session?.user?.id]);
+
+  // Stitch the anonymous visitor to this account. identify() is idempotent
+  // (server only writes analytics_visitors.user_id if still null) and no-ops on
+  // repeat ids, so firing it on every session-id change is safe.
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (uid) identify(uid);
   }, [session?.user?.id]);
 
   // Presence heartbeat: stamp profiles.last_seen_at + current_page +

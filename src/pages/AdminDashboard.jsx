@@ -16,6 +16,7 @@ import { PLAN_LABEL, PLAN_BY_ID } from '../lib/plans.js';
 import { ANALYTICS_PROVIDER, ANALYTICS_EMBED_URL } from '../lib/analytics.js';
 import { formatDuration, formatRelative as formatTraceRelative } from '../lib/traceStats.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
+import AnalyticsPulse from '../components/AnalyticsPulse.jsx';
 
 // Anyone seen pinging the heartbeat within this window is treated as "in the
 // app right now". Tab visibility throttles the heartbeat to 60s, so 2 minutes
@@ -2260,6 +2261,7 @@ export default function AdminDashboard() {
         <nav className="admin-views" role="tablist" aria-label="Dashboard view">
           {[
             { id: 'users',     label: 'Users' },
+            { id: 'pulse',     label: 'Pulse' },
             { id: 'stats',     label: 'Acquisition' },
             { id: 'referrals', label: 'Referrals' },
             { id: 'survey',    label: 'Survey' },
@@ -2282,6 +2284,7 @@ export default function AdminDashboard() {
           ))}
         </nav>
 
+        {view === 'pulse' && <AnalyticsPulse />}
         {view === 'stats' && <AcquisitionPanel users={users} />}
         {view === 'referrals' && <ReferralsPanel />}
         {view === 'announce' && <AnnouncementsPanel />}

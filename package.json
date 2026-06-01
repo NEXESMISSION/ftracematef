@@ -15,6 +15,7 @@
     "sb:secrets": "node scripts/setup-supabase-secrets.mjs",
     "sb:deploy": "supabase functions deploy create-checkout && supabase functions deploy create-portal-session && supabase functions deploy subscription-action && supabase functions deploy list-payments && supabase functions deploy dodo-webhook --no-verify-jwt",
     "sb:deploy:referrals": "supabase functions deploy admin-referrals && supabase functions deploy referral-stats --no-verify-jwt",
+    "sb:deploy:analytics": "supabase functions deploy ingest-events --no-verify-jwt && supabase functions deploy admin-analytics",
     "sb:deploy:announcements": "supabase functions deploy admin-announcements",
     "sb:deploy:dev-mutate": "supabase functions deploy dev-mutate-subscription",
     "cap:assets": "node scripts/gen-cap-assets.mjs && capacitor-assets generate --android",
@@ -32,6 +33,7 @@
     "@capacitor/splash-screen": "^8.0.1",
     "@capgo/capacitor-social-login": "^8.3.20",
     "@supabase/supabase-js": "^2.105.1",
+    "cobe": "^0.6.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2"

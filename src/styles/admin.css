@@ -1928,3 +1928,91 @@
   margin-top: 6px;
   font-weight: 600;
 }
+
+/* =============================================================================
+   Pulse — super-analytics tab (globe, KPIs, breakdowns, heatmap viewer).
+   Scoped under .admin-shell .pulse so it inherits the quiet operator palette.
+   ============================================================================= */
+.admin-shell .pulse { display: block; }
+
+.admin-shell .pulse-range { display: flex; gap: 6px; flex-wrap: wrap; }
+.admin-shell .pulse-range-btn {
+  padding: 5px 12px; border: 1.5px solid var(--line); background: var(--paper);
+  color: var(--ink-muted); border-radius: 999px; font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all .12s;
+}
+.admin-shell .pulse-range-btn:hover { border-color: var(--ink); color: var(--ink); }
+.admin-shell .pulse-range-btn.is-active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+/* KPI tiles */
+.admin-shell .pulse-kpis {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px; margin: 18px 0;
+}
+.admin-shell .pulse-kpi {
+  background: var(--paper); border: 2px solid var(--ink); border-radius: 12px;
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 2px;
+}
+.admin-shell .pulse-kpi-accent { background: var(--yellow); }
+.admin-shell .pulse-kpi-label { font-size: 12px; font-weight: 700; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .06em; }
+.admin-shell .pulse-kpi-value { font-size: 28px; font-weight: 800; line-height: 1.1; }
+.admin-shell .pulse-kpi-sub { font-size: 12px; color: var(--ink-soft); }
+
+/* Generic card */
+.admin-shell .pulse-card {
+  background: var(--paper); border: 2px solid var(--ink); border-radius: 12px;
+  padding: 16px; margin-bottom: 16px;
+}
+.admin-shell .pulse-card-title { margin: 0 0 12px; font-size: 14px; font-weight: 800; letter-spacing: .02em; }
+.admin-shell .pulse-empty { color: var(--ink-soft); font-size: 13px; margin: 4px 0; }
+
+/* Globe + countries */
+.admin-shell .pulse-geo {
+  display: grid; grid-template-columns: minmax(280px, 1.2fr) minmax(220px, 1fr);
+  gap: 16px;
+}
+@media (max-width: 720px) { .admin-shell .pulse-geo { grid-template-columns: 1fr; } }
+.admin-shell .pulse-globe-card { background: #0d0f12; border-color: #0d0f12; }
+.admin-shell .pulse-globe-card .pulse-card-title { color: #f2f2f2; }
+.admin-shell .pulse-globe-canvas { display: block; margin: 0 auto; max-width: 480px; }
+.admin-shell .pulse-country-list { list-style: none; margin: 0; padding: 0; }
+.admin-shell .pulse-country-row {
+  display: flex; justify-content: space-between; padding: 7px 0;
+  border-bottom: 1px solid var(--line); font-size: 14px;
+}
+.admin-shell .pulse-country-row:last-child { border-bottom: none; }
+.admin-shell .pulse-country-name { font-weight: 600; }
+.admin-shell .pulse-country-count { font-weight: 800; color: var(--coral); }
+
+/* Funnel */
+.admin-shell .pulse-funnel-row { display: flex; gap: 10px; }
+.admin-shell .pulse-funnel-step {
+  flex: 1; text-align: center; padding: 14px 8px; border-radius: 10px;
+  background: var(--cream); border: 1.5px solid var(--line);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.admin-shell .pulse-funnel-value { font-size: 24px; font-weight: 800; }
+.admin-shell .pulse-funnel-label { font-size: 12px; font-weight: 700; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .05em; }
+.admin-shell .pulse-funnel-pct { font-size: 13px; color: var(--coral); font-weight: 700; }
+
+/* Breakdown grid + bars */
+.admin-shell .pulse-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;
+}
+.admin-shell .pulse-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.admin-shell .pulse-bar-row { display: grid; grid-template-columns: 1fr 90px auto; align-items: center; gap: 10px; font-size: 13px; }
+.admin-shell .pulse-bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.admin-shell .pulse-bar-track { height: 8px; background: var(--cream-deep); border-radius: 999px; overflow: hidden; }
+.admin-shell .pulse-bar-fill { display: block; height: 100%; background: var(--coral); border-radius: 999px; }
+.admin-shell .pulse-bar-fill-blue { background: #3b82f6; }
+.admin-shell .pulse-bar-value { font-weight: 800; text-align: right; min-width: 36px; }
+
+/* Heatmap viewer */
+.admin-shell .pulse-heat-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.admin-shell .pulse-heat-head .pulse-card-title { margin: 0; }
+.admin-shell .pulse-heat-select { padding: 6px 10px; border: 1.5px solid var(--ink); border-radius: 8px; font-weight: 700; background: var(--paper); }
+.admin-shell .pulse-heat-body { display: grid; grid-template-columns: minmax(220px, 360px) 1fr; gap: 16px; }
+@media (max-width: 720px) { .admin-shell .pulse-heat-body { grid-template-columns: 1fr; } }
+.admin-shell .pulse-heat-stat { font-size: 13px; font-weight: 700; color: var(--ink-muted); margin: 0 0 8px; }
+.admin-shell .pulse-heatcanvas { border-radius: 10px; border: 2px solid var(--ink); display: block; }
+.admin-shell .pulse-heat-right .pulse-card { margin-bottom: 12px; }

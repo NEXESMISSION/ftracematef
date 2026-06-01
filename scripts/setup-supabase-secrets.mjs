@@ -47,6 +47,12 @@ const OPTIONAL = [
   'ADMIN_EMAILS',
   'ENABLE_DEV_MUTATE',
   'APP_URL_EXTRA_ORIGINS',
+  // Random string used by the ingest-events function to salt+hash visitor IPs
+  // (the raw IP is never stored). Generate once, e.g.
+  //   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  // Required for the super-analytics geo pipeline; rotating it resets the
+  // IP→geo cache mapping.
+  'ANALYTICS_IP_SALT',
 ];
 
 // Any env var matching this pattern is treated as a per-currency price floor
