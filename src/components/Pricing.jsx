@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { VISIBLE_PLANS } from '../lib/plans.js';
 import { usePlanCheckout } from '../hooks/usePlanCheckout.js';
 
@@ -27,6 +28,14 @@ function PlanCard({ plan, onChoose, busy, lifetimeLeft }) {
 
   return (
     <article className={`pricing-plan${plan.gold ? ' pricing-plan-gold' : ''}`}>
+      {/* Free-trial CTA on the Monthly card — on top of the box on mobile,
+          on the side on desktop. */}
+      {plan.id === 'monthly' && (
+        <Link to="/upload" className="pricing-free-cta" aria-label="Try it for free">
+          Try it for free
+        </Link>
+      )}
+
       {limitedText && (
         <div className="pricing-plan-limited">
           <span className="pulse-dot" aria-hidden="true"></span>
