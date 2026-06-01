@@ -35,13 +35,38 @@ import AnnouncementPopup from './components/AnnouncementPopup.jsx';
 // instead of grabbing a new top-level path.
 const REF_ALIASES = ['tiktok', 'tt', 'reddit', 'yt', 'ig', 'x', 'threads'];
 
+// Lazy import that survives a stale-chunk 404. After a deploy, the old hashed
+// chunk filenames are gone; a tab still running the previous build that then
+// navigates to a lazy route would fail the dynamic import and crash to the
+// ErrorBoundary (which users read as "logged out / broken"). On the first such
+// failure we reload ONCE to pull the fresh build, guarded by a sessionStorage
+// flag so a genuinely missing chunk can't loop. The flag clears on success.
+function lazyWithReload(factory, key) {
+  const flag = `tm:chunk-reload:${key}`;
+  return lazy(() =>
+    factory().then(
+      (mod) => { try { sessionStorage.removeItem(flag); } catch { /* ignore */ } return mod; },
+      (err) => {
+        let already = false;
+        try { already = sessionStorage.getItem(flag) === '1'; } catch { /* ignore */ }
+        if (!already) {
+          try { sessionStorage.setItem(flag, '1'); } catch { /* ignore */ }
+          window.location.reload();
+          return new Promise(() => {}); // hold render until the reload happens
+        }
+        throw err; // already retried once → let the ErrorBoundary surface it
+      },
+    ),
+  );
+}
+
 // Admin dashboard is operator-only and ships its own bundle of UI + data
 // fetching helpers. Lazy-loaded so non-admins never download the chunk.
-const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
+const AdminDashboard = lazyWithReload(() => import('./pages/AdminDashboard.jsx'), 'admin');
 
 // Affiliate self-view — niche, no account needed, only opened by partners
 // who have a token link. Lazy so it never weighs on the main bundle.
-const Partner = lazy(() => import('./pages/Partner.jsx'));
+const Partner = lazyWithReload(() => import('./pages/Partner.jsx'), 'partner');
 
 // One-shot free trial: the moment a free user navigates AWAY from /trace,
 // their single session is consumed for good. Doing this at the route layer

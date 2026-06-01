@@ -44,6 +44,14 @@ export function AuthProvider({ children }) {
   // after a refresh. localStorage layout: { uid, sid }.
   const localSessionIdRef = useRef(null);
   const supersededRef     = useRef(false); // guards re-entry when we sign out
+  // We self-heal the FIRST session-id mismatch by re-stamping the DB with our
+  // own sid (covers the sign-in claim race: getSession + onAuthStateChange can
+  // both call claim_session, leaving the DB sid != this device's local sid and
+  // false-triggering a "superseded" kick on the next reload). Only the first
+  // mismatch is self-reclaimed; a genuine second device re-claims again, and
+  // that second mismatch falls through to confirm-and-sign-out. Reset on every
+  // fresh sign-in so later real takeovers are still detected.
+  const reclaimedRef      = useRef(false);
 
   const forceSignOutSuperseded = useCallback(async () => {
     if (supersededRef.current) return;
@@ -253,10 +261,21 @@ export function AuthProvider({ children }) {
       const remoteSid = profileRes.data?.current_session_id ?? null;
       const localSid  = localSessionIdRef.current;
       if (remoteSid && localSid && remoteSid !== localSid) {
-        // Don't kick immediately — confirm the takeover is real (see helper).
-        // Keep the session usable meanwhile; a true takeover signs out in ~2.5s,
-        // a transient race resolves with no interruption.
-        confirmSupersededThenSignOut(userId);
+        if (!reclaimedRef.current) {
+          // First mismatch. Most often this is our OWN device: the sign-in
+          // claim race (two claim_session calls) or a stale read left the DB
+          // holding a sid that isn't the one we minted. Re-stamp the DB with
+          // our sid ONCE and don't kick — the realtime UPDATE this produces
+          // re-runs loadUserData, which should now match (race healed). If it
+          // was instead a genuine takeover, the other device re-claims and the
+          // NEXT mismatch (reclaimedRef already true) signs us out below.
+          reclaimedRef.current = true;
+          supabase.rpc('claim_session', { p_session_id: localSid }).then(() => {}, () => {});
+        } else {
+          // Second mismatch after we already reclaimed → a real other device
+          // is fighting for the account. Confirm (re-read in ~2.5s) then kick.
+          confirmSupersededThenSignOut(userId);
+        }
       }
 
       setProfile(profileRes.data ?? null);
@@ -367,6 +386,7 @@ export function AuthProvider({ children }) {
       //     fires and signs it out.
       if (!newUid) {
         localSessionIdRef.current = null;
+        reclaimedRef.current = false;
         try { window.localStorage.removeItem('tm:session-id'); } catch { /* ignore */ }
       } else {
         // Hydrate first. If localStorage already has a sid for this uid,
@@ -398,6 +418,9 @@ export function AuthProvider({ children }) {
             ? crypto.randomUUID()
             : (Math.random().toString(36).slice(2) + Date.now().toString(36));
           localSessionIdRef.current = sid;
+          // Fresh owner on this device — allow one self-heal again, and let a
+          // genuinely later takeover still be detected.
+          reclaimedRef.current = false;
           try {
             window.localStorage.setItem('tm:session-id', JSON.stringify({ uid: newUid, sid }));
           } catch { /* ignore */ }
