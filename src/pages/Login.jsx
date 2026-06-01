@@ -68,16 +68,20 @@ export default function Login() {
       return;
     }
 
-    // Failsafe: if Supabase silently fails to redirect (popup blockers, some
-    // mobile browsers blocking 3rd-party redirects), the button would otherwise
-    // sit on "Redirecting…" forever. Reset state and surface a hint after 6s.
+    // Failsafe: if navigation somehow never happens, reset the button and
+    // surface a hint instead of leaving it stuck on "Redirecting…".
     if (stuckTimerRef.current) clearTimeout(stuckTimerRef.current);
     stuckTimerRef.current = setTimeout(() => {
       setBusy(false);
-      setError("If a new tab didn't open, allow popups for this site and try again.");
-    }, 6000);
+      setError('Could not reach Google. Check your connection and try again.');
+    }, 8000);
 
-    const { error } = await supabase.auth.signInWithOAuth({
+    // We drive the redirect ourselves (skipBrowserRedirect) rather than relying
+    // on supabase-js's implicit window.location side-effect — that proved
+    // unreliable across browsers (the page would sit on "Redirecting…" and the
+    // OAuth tab never opened). We get the authorize URL back and navigate to it
+    // explicitly, which is deterministic.
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         // Return to whatever origin STARTED the sign-in. With PKCE the code
@@ -86,16 +90,19 @@ export default function Login() {
         // domain in prod. Every origin used here must be listed under
         // Supabase → Authentication → URL Configuration → Redirect URLs.
         redirectTo: `${window.location.origin}/auth/callback`,
+        skipBrowserRedirect: true,
       },
     });
-    if (error) {
+    if (error || !data?.url) {
       clearTimeout(stuckTimerRef.current);
       stuckTimerRef.current = null;
       setBusy(false);
-      setError(error.message || 'Could not start sign-in. Please try again.');
+      setError(error?.message || 'Could not start sign-in. Please try again.');
+      return;
     }
-    // On success, the browser navigates to Google — no further code runs here.
-    // The stuck-timer fires only if that navigation never happens.
+    // Navigate the current tab to Google's consent screen. The stuck-timer
+    // fires only if this navigation somehow doesn't unload the page.
+    window.location.assign(data.url);
   };
 
   // Only show the loader when we actually have a signed-in user about to be
