@@ -76,7 +76,7 @@ export default function Hero({ onPlayClick }) {
         <div className="hero-phone">
           <span className="hero-spark hero-spark-l" aria-hidden="true">✦</span>
           <div className="phone-frame">
-            <Img src="/images/hero/phone-preview.webp" alt="Trace Mate app preview" priority />
+            <Img src="/images/hero/phone-preview-v2.webp" alt="Trace Mate app preview" priority />
           </div>
           <span className="hero-spark hero-spark-r" aria-hidden="true">✧</span>
         </div>
