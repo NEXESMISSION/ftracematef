@@ -288,7 +288,8 @@ export default function AnalyticsPulse() {
 
           {/* Breakdowns */}
           <div className="pulse-grid">
-            <Breakdown title="Traffic source" rows={data.by_source} labelKey="source" />
+            <Breakdown title="Traffic source (tagged links)" rows={data.by_source} labelKey="source" />
+            <Breakdown title="Came from (referrer)" rows={data.by_referrer} labelKey="referrer" />
             <Breakdown title="Device" rows={data.by_device} labelKey="device_type" />
             <Breakdown title="Operating system" rows={data.by_os} labelKey="os" />
             <Breakdown title="Browser" rows={data.by_browser} labelKey="browser" />

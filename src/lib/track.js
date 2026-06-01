@@ -18,7 +18,7 @@
 // This is intentionally separate from lib/analytics.js (the optional 3rd-party
 // Plausible/Umami shim). They can coexist; this one feeds OUR dashboard.
 
-import { readSource, readAffiliate } from './attribution.js';
+import { readSource, readAffiliate, stampSource } from './attribution.js';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const INGEST_URL = SUPABASE_URL
@@ -208,6 +208,17 @@ function flush() {
 export function initTracking() {
   if (started || !INGEST_URL || typeof window === 'undefined') return;
   started = true;
+
+  // First-touch UTM capture: a link like tracemate.art/?utm_source=newsletter
+  // &utm_campaign=jan never hits the /r/:source route, so stamp it here. Uses
+  // the same first-touch store as tagged links (no-op if a source is already
+  // stamped), so utm traffic shows up in BOTH Pulse's source breakdown and the
+  // signup_source attribution on any account they create.
+  try {
+    const q = new URLSearchParams(location.search);
+    const utmSource = q.get('utm_source');
+    if (utmSource) stampSource(utmSource, q.get('utm_campaign') || q.get('utm_medium'));
+  } catch { /* ignore */ }
 
   timer = setInterval(flush, FLUSH_MS);
 
