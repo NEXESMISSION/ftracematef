@@ -453,6 +453,7 @@ const modal = {
   padding: 20, width: '100%', maxWidth: 720, boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
 };
 const badge = (bg) => ({ padding: '1px 6px', borderRadius: 6, fontSize: 11, background: bg, color: '#fff', whiteSpace: 'nowrap' });
+const chip = { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, fontSize: 12, background: '#1b1f25', border: '1px solid #262b33', whiteSpace: 'nowrap' };
 
 const shortRef = (ref) => {
   if (!ref) return '(direct)';
@@ -465,14 +466,6 @@ const fmtTime = (s) => {
     return new Date(s).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   } catch { return '—'; }
 };
-function eventDetail(e) {
-  const p = e.props || {};
-  if (e.type === 'click' && (p.txt || p.sel)) return `  → ${p.txt || p.sel}`;
-  if (e.type === 'scroll' && p.depth != null) return `  → ${p.depth}%`;
-  if (e.type === 'rage' && p.count != null) return `  → ${p.count}× ${p.sel || ''}`;
-  if (e.type === 'custom' && p.name) return `  → ${p.name}`;
-  return '';
-}
 function accountCell(r) {
   if (!r.signed_up) return <span style={{ opacity: 0.5 }}>anonymous</span>;
   const who = r.email || r.display_name || 'account';
@@ -592,10 +585,90 @@ function VisitorsPanel({ range }) {
 function Field({ label, value }) {
   return (
     <div>
-      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4, opacity: 0.5 }}>{label}</div>
-      <div style={{ fontSize: 13, marginTop: 2, wordBreak: 'break-word' }}>{value}</div>
+      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.45 }}>{label}</div>
+      <div style={{ fontSize: 13, marginTop: 3, wordBreak: 'break-word' }}>{value}</div>
     </div>
   );
+}
+
+/* Collapse the raw firehose into one node per page-visit: a `pageview` starts a
+   step; scrolls fold into a single max-depth; clicks/identify/rage/custom nest
+   under the step as actions. Turns ~90 noisy rows into a readable journey. */
+function groupTimeline(events) {
+  const groups = [];
+  let cur = null;
+  for (const e of events || []) {
+    const t = e.created_at;
+    if (e.type === 'pageview') {
+      cur = { path: e.path || '/', start: t, end: t, maxScroll: 0, actions: [] };
+      groups.push(cur);
+    } else {
+      if (!cur) { cur = { path: e.path || '/', start: t, end: t, maxScroll: 0, actions: [] }; groups.push(cur); }
+      cur.end = t;
+      if (e.type === 'scroll') {
+        const d = Number(e.props?.depth) || 0;
+        if (d > cur.maxScroll) cur.maxScroll = d;
+      } else {
+        cur.actions.push(e);
+      }
+    }
+  }
+  return groups;
+}
+
+const ACTION_META = {
+  click:    { icon: '👆', color: '#f0a83a' },
+  identify: { icon: '🔑', color: '#27ae60' },
+  rage:     { icon: '😡', color: '#e0524b' },
+  custom:   { icon: '✨', color: '#9b7bd4' },
+};
+const clip = (s, n = 56) => (s && s.length > n ? `${s.slice(0, n)}…` : s);
+// A label like "div.trace-overlay-wrap" / "button.lib-close" is a CSS selector,
+// not human text — show it muted/monospace rather than as a quoted action.
+const isSelectorLabel = (s) => !!s && /^(div|button|input|span|a|svg|img|ul|li|p|section|label|form)[.#]/i.test(s);
+
+function ActionRow({ e }) {
+  const meta = ACTION_META[e.type] || ACTION_META.custom;
+  let label;
+  if (e.type === 'identify') {
+    label = <em style={{ color: '#27ae60' }}>Signed in</em>;
+  } else if (e.type === 'rage') {
+    label = <>Rage click <span style={{ fontFamily: 'monospace', opacity: 0.55 }}>{clip(e.props?.sel, 32)}</span></>;
+  } else if (e.type === 'custom') {
+    label = clip(e.props?.name || 'event');
+  } else { // click
+    const raw = e.props?.txt || e.props?.sel || '';
+    label = (!e.props?.txt && isSelectorLabel(raw))
+      ? <span style={{ fontFamily: 'monospace', opacity: 0.5 }}>{clip(raw, 40)}</span>
+      : <span>“{clip(raw)}”</span>;
+  }
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '2px 0', fontSize: 13 }}>
+      <span style={{ width: 16, textAlign: 'center', flexShrink: 0 }} aria-hidden="true">{meta.icon}</span>
+      <span style={{ minWidth: 0 }}>{label}</span>
+      <span style={{ marginLeft: 'auto', fontSize: 11, opacity: 0.35, flexShrink: 0 }}>{fmtTime(e.created_at)}</span>
+    </div>
+  );
+}
+
+function ScrollChip({ depth }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.7 }}>
+      <span style={{ position: 'relative', width: 42, height: 5, borderRadius: 3, background: '#2a2e35', overflow: 'hidden' }}>
+        <span style={{ position: 'absolute', inset: 0, width: `${depth}%`, background: '#4a8cff' }} />
+      </span>
+      scrolled {depth}%
+    </span>
+  );
+}
+
+function durationStr(a, b) {
+  const ms = new Date(b).getTime() - new Date(a).getTime();
+  if (!isFinite(ms) || ms < 1000) return '—';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  return `${m}m ${s % 60}s`;
 }
 
 function VisitorProfile({ visitorId, onClose }) {
@@ -616,11 +689,20 @@ function VisitorProfile({ visitorId, onClose }) {
 
   const v = profile?.visitor || null;
   const events = profile?.events || [];
+  const steps = useMemo(() => groupTimeline(events), [events]);
+
+  const signedUp = !!(v && v.user_id);
+  const name = v ? (v.display_name || v.email || (signedUp ? 'Account' : 'Anonymous visitor')) : '';
+  const initial = (v?.display_name || v?.email || '?').trim().charAt(0).toUpperCase() || '🌐';
+  const conv = !v ? null
+    : v.paid ? { label: 'PAID', bg: '#1f7a3d' }
+    : signedUp ? { label: 'MEMBER', bg: '#2d6cdf' }
+    : { label: 'ANONYMOUS', bg: '#3a3f47' };
 
   return (
     <div onClick={onClose} style={overlay} role="dialog" aria-modal="true">
       <div onClick={(e) => e.stopPropagation()} style={modal}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h4 className="pulse-card-title" style={{ margin: 0 }}>Visitor journey</h4>
           <button type="button" className="pulse-range-btn" onClick={onClose}>Close</button>
         </div>
@@ -630,29 +712,69 @@ function VisitorProfile({ visitorId, onClose }) {
 
         {v && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10, marginBottom: 16 }}>
-              <Field label="Channel" value={`${channelIcon(v.channel)} ${v.channel || '—'}`} />
+            {/* Identity header */}
+            <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 16 }}>
+              <div style={{
+                width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 20, fontWeight: 700, color: '#fff',
+                background: signedUp ? 'linear-gradient(135deg,#3a6df0,#7b4dd4)' : '#3a3f47',
+              }}>{initial}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                  <span style={chip}>{channelIcon(v.channel)} {v.channel || '—'}</span>
+                  {(v.city || v.country) && <span style={chip}>📍 {[v.city, v.country].filter(Boolean).join(', ')}</span>}
+                  <span style={chip}>🖥 {[v.device_type, v.os].filter(Boolean).join(' · ') || '—'}</span>
+                </div>
+              </div>
+              {conv && <span style={{ ...badge(conv.bg), fontSize: 12, padding: '4px 10px', letterSpacing: 0.5 }}>{conv.label}</span>}
+            </div>
+
+            {/* Compact facts */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 12,
+              padding: 14, marginBottom: 18, borderRadius: 10, background: '#0f1216', border: '1px solid #20242b',
+            }}>
               <Field label="Came from" value={shortRef(v.referrer)} />
               <Field label="Landing page" value={v.landing_path || '—'} />
               <Field label="Source / campaign" value={[v.source, v.campaign].filter(Boolean).join(' · ') || '—'} />
-              <Field label="Location" value={[v.city, v.region, v.country].filter(Boolean).join(', ') || '—'} />
-              <Field label="Device" value={[v.device_type, v.os, v.browser].filter(Boolean).join(' · ') || '—'} />
-              <Field label="Language / TZ" value={[v.lang, v.tz].filter(Boolean).join(' · ') || '—'} />
-              <Field label="Account" value={v.user_id ? (v.email || v.display_name || 'account') : 'anonymous'} />
-              <Field label="Plan" value={v.user_id ? `${v.plan || 'free'}${v.paid ? ' (paid)' : ''}` : '—'} />
-              <Field label="Sessions · events" value={`${fmt(v.sessions)} · ${fmt(v.events)}`} />
+              <Field label="Account" value={signedUp ? (v.email || v.display_name || 'account') : 'anonymous'} />
+              <Field label="Plan" value={signedUp ? `${v.plan || 'free'}${v.paid ? ' · paid' : ''}` : '—'} />
+              <Field label="Language · TZ" value={[v.lang, v.tz].filter(Boolean).join(' · ') || '—'} />
               <Field label="First seen" value={fmtDate(v.first_seen_at)} />
-              <Field label="Last seen" value={fmtDate(v.last_seen_at)} />
+              <Field label="Time on site" value={durationStr(v.first_seen_at, v.last_seen_at)} />
+              <Field label="Sessions · pageviews" value={`${fmt(v.sessions)} · ${fmt(v.pageviews)}`} />
             </div>
 
-            <h4 className="pulse-card-title">Timeline ({events.length})</h4>
-            {events.length === 0 ? <p className="pulse-empty">No events recorded.</p> : (
-              <ol style={{ listStyle: 'none', margin: 0, padding: 0, maxHeight: 320, overflowY: 'auto' }}>
-                {events.map((e, i) => (
-                  <li key={i} style={{ display: 'flex', gap: 10, padding: '6px 0', borderTop: i ? '1px solid #1d2127' : 'none', fontSize: 13 }}>
-                    <span style={{ opacity: 0.5, whiteSpace: 'nowrap' }}>{fmtTime(e.created_at)}</span>
-                    <span style={badge('#2a2e35')}>{e.type}</span>
-                    <span style={{ opacity: 0.85, wordBreak: 'break-word' }}>{`${e.path || ''}${eventDetail(e)}`}</span>
+            {/* Step-by-step page journey */}
+            <h4 className="pulse-card-title">Journey — {steps.length} {steps.length === 1 ? 'page' : 'pages'}</h4>
+            {steps.length === 0 ? <p className="pulse-empty">No events recorded.</p> : (
+              <ol style={{ listStyle: 'none', margin: 0, padding: 0, maxHeight: 360, overflowY: 'auto', position: 'relative' }}>
+                {steps.map((g, i) => (
+                  <li key={i} style={{ position: 'relative', paddingLeft: 30, paddingBottom: i === steps.length - 1 ? 0 : 16 }}>
+                    {/* connector line */}
+                    {i !== steps.length - 1 && (
+                      <span style={{ position: 'absolute', left: 9, top: 20, bottom: 0, width: 2, background: '#262b33' }} />
+                    )}
+                    {/* step number dot */}
+                    <span style={{
+                      position: 'absolute', left: 0, top: 1, width: 20, height: 20, borderRadius: '50%',
+                      background: '#2d6cdf', color: '#fff', fontSize: 11, fontWeight: 600,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>{i + 1}</span>
+                    {/* step header */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <strong style={{ fontSize: 14 }}>{g.path}</strong>
+                      <span style={{ fontSize: 11, opacity: 0.45 }}>{fmtTime(g.start)}</span>
+                      {g.maxScroll > 0 && <ScrollChip depth={g.maxScroll} />}
+                    </div>
+                    {/* nested actions */}
+                    {g.actions.length > 0 && (
+                      <div style={{ marginTop: 4 }}>
+                        {g.actions.map((e, j) => <ActionRow key={j} e={e} />)}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ol>
