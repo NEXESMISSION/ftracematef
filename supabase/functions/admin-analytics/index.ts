@@ -81,6 +81,46 @@ Deno.serve(async (req) => {
   const to = new Date();
   const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
 
+  // ── per-visitor drill-down actions ─────────────────────────────────────────
+  // action: 'list_visitors' → paginated/searchable list of INDIVIDUAL visitors.
+  // action: 'visitor_profile' → one visitor's full attribution + event timeline.
+  // Anything else falls through to the default overview (+ optional heatmap).
+  const action = typeof body.action === 'string' ? body.action : null;
+
+  if (action === 'list_visitors') {
+    const limit  = Math.min(Math.max(Number(body.limit) || 50, 1), 200);
+    const offset = Math.max(Number(body.offset) || 0, 0);
+    const onlySignedUp = body.only_signedup === true;
+    const search = typeof body.search === 'string' && body.search.trim()
+      ? body.search.trim().slice(0, 120) : null;
+
+    const { data, error } = await admin.rpc('list_visitors', {
+      p_from: from.toISOString(), p_to: to.toISOString(),
+      p_limit: limit, p_offset: offset,
+      p_only_signedup: onlySignedUp, p_search: search,
+    });
+    if (error) {
+      console.error('[admin-analytics] list_visitors failed:', error);
+      return json({ error: error.message }, 500);
+    }
+    return json({ range: rangeKey, visitors: data ?? { total: 0, rows: [] } });
+  }
+
+  if (action === 'visitor_profile') {
+    const visitorId = typeof body.visitor_id === 'string' ? body.visitor_id : '';
+    if (!/^[0-9a-f-]{36}$/i.test(visitorId)) {
+      return json({ error: 'Invalid visitor_id' }, 400);
+    }
+    const { data, error } = await admin.rpc('get_visitor_profile', {
+      p_visitor_id: visitorId,
+    });
+    if (error) {
+      console.error('[admin-analytics] get_visitor_profile failed:', error);
+      return json({ error: error.message }, 500);
+    }
+    return json({ profile: data ?? null });
+  }
+
   // Heatmap is opt-in per request: only fetched when the operator has drilled
   // into a specific page, so the default overview call stays light.
   const heatmapPath = typeof body.path === 'string' && body.path

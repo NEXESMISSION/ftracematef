@@ -97,6 +97,49 @@ export async function getAnalytics(range = '7d', path = null) {
   };
 }
 
+/**
+ * Per-visitor drill-down list for the Pulse "Visitors" tab. One row per
+ * INDIVIDUAL visitor (not a stacked rollup): channel, referrer, geo, device,
+ * first/last seen, and whether they signed up / paid.
+ *
+ *   range ∈ '24h' | '7d' | '30d' | '90d' | 'all'
+ *   opts  = { limit, offset, onlySignedUp, search }
+ *
+ * Returns { total, rows }. Server-side triple-gated, same as getAnalytics().
+ */
+export async function listVisitors(range = '7d', opts = {}) {
+  const { limit = 50, offset = 0, onlySignedUp = false, search = '' } = opts;
+  const { data, error } = await supabase.functions.invoke('admin-analytics', {
+    method: 'POST',
+    body: {
+      action: 'list_visitors',
+      range,
+      limit,
+      offset,
+      only_signedup: !!onlySignedUp,
+      search: search || undefined,
+    },
+  });
+  if (error) throw new Error(await unwrapFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return data?.visitors ?? { total: 0, rows: [] };
+}
+
+/**
+ * One visitor's full story: first-touch acquisition, geo, device, linked
+ * account + subscription, and the complete ordered event timeline.
+ * Returns { visitor, events }.
+ */
+export async function getVisitorProfile(visitorId) {
+  const { data, error } = await supabase.functions.invoke('admin-analytics', {
+    method: 'POST',
+    body: { action: 'visitor_profile', visitor_id: visitorId },
+  });
+  if (error) throw new Error(await unwrapFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return data?.profile ?? null;
+}
+
 /* ── Referral / affiliate program ──────────────────────────────────────────
  * All operator-side referral CRUD + payout actions route through the single
  * admin-referrals Edge Function (server-side triple-gated, same as the other

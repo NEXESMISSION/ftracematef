@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import createGlobe from 'cobe';
-import { getAnalytics } from '../lib/admin.js';
+import { getAnalytics, listVisitors, getVisitorProfile } from '../lib/admin.js';
 import { friendlyError } from '../lib/errors.js';
 
 const RANGES = [
@@ -42,9 +42,19 @@ const CHANNEL_ICON = {
 };
 const channelIcon = (name) => CHANNEL_ICON[name] || '•';
 
-/* ── rotating globe ───────────────────────────────────────────────────────── */
+/* ── interactive globe ────────────────────────────────────────────────────── */
+// Drag to spin: horizontal drag rotates longitude (phi), vertical drag tilts
+// (theta). While the pointer is down, the idle auto-rotation pauses; on release
+// it resumes from wherever you left it. Works with mouse and touch (Pointer
+// Events). `r` (the dragged phi offset) and `theta` live in refs so the cobe
+// onRender loop reads the latest values without re-creating the globe.
 function Globe({ countries }) {
   const canvasRef = useRef(null);
+  // Drag state shared with the render loop (refs → no re-render, no re-init).
+  const pointerDrag = useRef(null);   // { x, y, r, theta } while dragging, else null
+  const rRef = useRef(0);             // accumulated horizontal rotation offset
+  const thetaRef = useRef(0.25);      // current tilt
+
   const markers = useMemo(() => {
     const valid = (countries || []).filter(
       (c) => typeof c.lat === 'number' && typeof c.lon === 'number',
@@ -64,6 +74,31 @@ function Globe({ countries }) {
     const onResize = () => { width = canvas.offsetWidth || 400; };
     window.addEventListener('resize', onResize);
 
+    // ── drag handlers ────────────────────────────────────────────────────────
+    const onPointerDown = (e) => {
+      pointerDrag.current = { x: e.clientX, y: e.clientY, r: rRef.current, theta: thetaRef.current };
+      canvas.style.cursor = 'grabbing';
+      canvas.setPointerCapture?.(e.pointerId);
+    };
+    const onPointerMove = (e) => {
+      const p = pointerDrag.current;
+      if (!p) return;
+      const dx = e.clientX - p.x;
+      const dy = e.clientY - p.y;
+      rRef.current = p.r + dx / 150;
+      // Clamp tilt so the globe can't flip past the poles.
+      thetaRef.current = Math.max(-0.6, Math.min(0.8, p.theta + dy / 250));
+    };
+    const onPointerUp = (e) => {
+      pointerDrag.current = null;
+      canvas.style.cursor = 'grab';
+      canvas.releasePointerCapture?.(e.pointerId);
+    };
+    canvas.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    canvas.style.cursor = 'grab';
+
     const globe = createGlobe(canvas, {
       devicePixelRatio: 2,
       width: width * 2,
@@ -79,20 +114,28 @@ function Globe({ countries }) {
       glowColor: [0.18, 0.20, 0.24],
       markers,
       onRender: (state) => {
-        state.phi = phi;
-        phi += 0.0045;
+        // Idle auto-spin only when not actively dragging.
+        if (!pointerDrag.current) phi += 0.0045;
+        state.phi = phi + rRef.current;
+        state.theta = thetaRef.current;
         state.width = width * 2;
         state.height = width * 2;
       },
     });
-    return () => { globe.destroy(); window.removeEventListener('resize', onResize); };
+    return () => {
+      globe.destroy();
+      window.removeEventListener('resize', onResize);
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
   }, [markers]);
 
   return (
     <canvas
       ref={canvasRef}
       className="pulse-globe-canvas"
-      style={{ width: '100%', aspectRatio: '1 / 1' }}
+      style={{ width: '100%', aspectRatio: '1 / 1', touchAction: 'none', cursor: 'grab' }}
     />
   );
 }
@@ -199,6 +242,7 @@ function ScrollFunnel({ scroll, pageviews }) {
 /* ── main ─────────────────────────────────────────────────────────────────── */
 export default function AnalyticsPulse() {
   const [range, setRange] = useState('7d');
+  const [view, setView] = useState('overview'); // 'overview' | 'visitors'
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -256,10 +300,28 @@ export default function AnalyticsPulse() {
         </div>
       </header>
 
-      {error && <p className="admin-error" role="alert">{error}</p>}
-      {loading && !data && <p className="pulse-empty">Loading analytics…</p>}
+      {/* Overview (stacked rollups) ⇆ Visitors (per-individual drill-down). */}
+      <div className="pulse-range" role="tablist" aria-label="View" style={{ marginBottom: 12 }}>
+        {[{ id: 'overview', label: 'Overview' }, { id: 'visitors', label: 'Visitors' }].map((v) => (
+          <button
+            key={v.id}
+            type="button"
+            role="tab"
+            aria-selected={view === v.id}
+            className={`pulse-range-btn ${view === v.id ? 'is-active' : ''}`}
+            onClick={() => setView(v.id)}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
 
-      {data && (
+      {view === 'visitors' && <VisitorsPanel range={range} />}
+
+      {view === 'overview' && error && <p className="admin-error" role="alert">{error}</p>}
+      {view === 'overview' && loading && !data && <p className="pulse-empty">Loading analytics…</p>}
+
+      {view === 'overview' && data && (
         <>
           {/* KPI tiles */}
           <div className="pulse-kpis">
@@ -375,6 +437,230 @@ export default function AnalyticsPulse() {
         </>
       )}
     </section>
+  );
+}
+
+/* ── per-visitor drill-down ───────────────────────────────────────────────── */
+const thCell = { padding: '6px 8px', fontWeight: 600, whiteSpace: 'nowrap' };
+const tdCell = { padding: '6px 8px', verticalAlign: 'top' };
+const overlay = {
+  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000,
+  display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+  padding: '5vh 16px', overflowY: 'auto',
+};
+const modal = {
+  background: '#15181d', border: '1px solid #2a2e35', borderRadius: 12,
+  padding: 20, width: '100%', maxWidth: 720, boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+};
+const badge = (bg) => ({ padding: '1px 6px', borderRadius: 6, fontSize: 11, background: bg, color: '#fff', whiteSpace: 'nowrap' });
+
+const shortRef = (ref) => {
+  if (!ref) return '(direct)';
+  const s = String(ref).replace(/^https?:\/\//, '').replace(/^www\./, '');
+  return s.length > 42 ? `${s.slice(0, 42)}…` : s;
+};
+const fmtDate = (s) => { try { return new Date(s).toLocaleString(); } catch { return '—'; } };
+const fmtTime = (s) => {
+  try {
+    return new Date(s).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch { return '—'; }
+};
+function eventDetail(e) {
+  const p = e.props || {};
+  if (e.type === 'click' && (p.txt || p.sel)) return `  → ${p.txt || p.sel}`;
+  if (e.type === 'scroll' && p.depth != null) return `  → ${p.depth}%`;
+  if (e.type === 'rage' && p.count != null) return `  → ${p.count}× ${p.sel || ''}`;
+  if (e.type === 'custom' && p.name) return `  → ${p.name}`;
+  return '';
+}
+function accountCell(r) {
+  if (!r.signed_up) return <span style={{ opacity: 0.5 }}>anonymous</span>;
+  const who = r.email || r.display_name || 'account';
+  return (
+    <span>
+      {who}
+      {r.paid
+        ? <span style={{ ...badge('#1f7a3d'), marginLeft: 6 }}>{r.plan}</span>
+        : <span style={{ ...badge('#3a3f47'), marginLeft: 6 }}>free</span>}
+    </span>
+  );
+}
+
+function VisitorsPanel({ range }) {
+  const PAGE = 50;
+  const [list, setList] = useState({ total: 0, rows: [] });
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+  const [offset, setOffset] = useState(0);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [onlySignedUp, setOnlySignedUp] = useState(false);
+  const [selected, setSelected] = useState(null);
+
+  // Reset paging whenever the range or a filter changes.
+  useEffect(() => { setOffset(0); }, [range, search, onlySignedUp]);
+
+  // Debounce the search box so we don't fire a request per keystroke.
+  useEffect(() => {
+    const id = setTimeout(() => setSearch(searchInput.trim()), 350);
+    return () => clearTimeout(id);
+  }, [searchInput]);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setErr('');
+    listVisitors(range, { limit: PAGE, offset, onlySignedUp, search })
+      .then((res) => { if (alive) setList(res); })
+      .catch((e) => { if (alive) setErr(friendlyError(e)); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [range, offset, onlySignedUp, search]);
+
+  const rows = list.rows || [];
+  const total = list.total || 0;
+  const page = Math.floor(offset / PAGE) + 1;
+  const pages = Math.max(1, Math.ceil(total / PAGE));
+
+  return (
+    <div className="pulse-card">
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        <input
+          type="search"
+          placeholder="Search email, city, country, source, referrer…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          style={{ flex: '1 1 240px', padding: '8px 10px', borderRadius: 8, border: '1px solid #2a2e35', background: '#0d0f12', color: '#e8e8e8' }}
+        />
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, opacity: 0.85 }}>
+          <input type="checkbox" checked={onlySignedUp} onChange={(e) => setOnlySignedUp(e.target.checked)} />
+          Signed-up only
+        </label>
+        <span style={{ fontSize: 13, opacity: 0.7 }}>{fmt(total)} visitors</span>
+      </div>
+
+      {err && <p className="admin-error" role="alert">{err}</p>}
+      {loading && <p className="pulse-empty">Loading visitors…</p>}
+      {!loading && rows.length === 0 && !err && <p className="pulse-empty">No visitors match.</p>}
+
+      {!loading && rows.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ textAlign: 'left', opacity: 0.6 }}>
+                <th style={thCell}>Channel</th>
+                <th style={thCell}>Came from</th>
+                <th style={thCell}>Location</th>
+                <th style={thCell}>Device</th>
+                <th style={thCell}>Account</th>
+                <th style={thCell}>Last seen</th>
+                <th style={thCell} aria-label="actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.visitor_id} style={{ borderTop: '1px solid #1d2127' }}>
+                  <td style={tdCell}><span style={{ marginRight: 6 }} aria-hidden="true">{channelIcon(r.channel)}</span>{r.channel || '—'}</td>
+                  <td style={tdCell} title={r.referrer || ''}>{shortRef(r.referrer)}</td>
+                  <td style={tdCell}>{[r.city, r.country].filter(Boolean).join(', ') || '—'}</td>
+                  <td style={tdCell}>{[r.device_type, r.os].filter(Boolean).join(' · ') || '—'}</td>
+                  <td style={tdCell}>{accountCell(r)}</td>
+                  <td style={tdCell}>{fmtDate(r.last_seen_at)}</td>
+                  <td style={tdCell}>
+                    <button type="button" className="pulse-range-btn" onClick={() => setSelected(r.visitor_id)}>View</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {total > PAGE && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end', marginTop: 12 }}>
+          <button type="button" className="pulse-range-btn" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>Prev</button>
+          <span style={{ fontSize: 13, opacity: 0.7 }}>Page {page} / {pages}</span>
+          <button type="button" className="pulse-range-btn" disabled={offset + PAGE >= total} onClick={() => setOffset(offset + PAGE)}>Next</button>
+        </div>
+      )}
+
+      {selected && <VisitorProfile visitorId={selected} onClose={() => setSelected(null)} />}
+    </div>
+  );
+}
+
+function Field({ label, value }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4, opacity: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 13, marginTop: 2, wordBreak: 'break-word' }}>{value}</div>
+    </div>
+  );
+}
+
+function VisitorProfile({ visitorId, onClose }) {
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setErr('');
+    getVisitorProfile(visitorId)
+      .then((p) => { if (alive) setProfile(p); })
+      .catch((e) => { if (alive) setErr(friendlyError(e)); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [visitorId]);
+
+  const v = profile?.visitor || null;
+  const events = profile?.events || [];
+
+  return (
+    <div onClick={onClose} style={overlay} role="dialog" aria-modal="true">
+      <div onClick={(e) => e.stopPropagation()} style={modal}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h4 className="pulse-card-title" style={{ margin: 0 }}>Visitor journey</h4>
+          <button type="button" className="pulse-range-btn" onClick={onClose}>Close</button>
+        </div>
+
+        {err && <p className="admin-error" role="alert">{err}</p>}
+        {loading && <p className="pulse-empty">Loading…</p>}
+
+        {v && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10, marginBottom: 16 }}>
+              <Field label="Channel" value={`${channelIcon(v.channel)} ${v.channel || '—'}`} />
+              <Field label="Came from" value={shortRef(v.referrer)} />
+              <Field label="Landing page" value={v.landing_path || '—'} />
+              <Field label="Source / campaign" value={[v.source, v.campaign].filter(Boolean).join(' · ') || '—'} />
+              <Field label="Location" value={[v.city, v.region, v.country].filter(Boolean).join(', ') || '—'} />
+              <Field label="Device" value={[v.device_type, v.os, v.browser].filter(Boolean).join(' · ') || '—'} />
+              <Field label="Language / TZ" value={[v.lang, v.tz].filter(Boolean).join(' · ') || '—'} />
+              <Field label="Account" value={v.user_id ? (v.email || v.display_name || 'account') : 'anonymous'} />
+              <Field label="Plan" value={v.user_id ? `${v.plan || 'free'}${v.paid ? ' (paid)' : ''}` : '—'} />
+              <Field label="Sessions · events" value={`${fmt(v.sessions)} · ${fmt(v.events)}`} />
+              <Field label="First seen" value={fmtDate(v.first_seen_at)} />
+              <Field label="Last seen" value={fmtDate(v.last_seen_at)} />
+            </div>
+
+            <h4 className="pulse-card-title">Timeline ({events.length})</h4>
+            {events.length === 0 ? <p className="pulse-empty">No events recorded.</p> : (
+              <ol style={{ listStyle: 'none', margin: 0, padding: 0, maxHeight: 320, overflowY: 'auto' }}>
+                {events.map((e, i) => (
+                  <li key={i} style={{ display: 'flex', gap: 10, padding: '6px 0', borderTop: i ? '1px solid #1d2127' : 'none', fontSize: 13 }}>
+                    <span style={{ opacity: 0.5, whiteSpace: 'nowrap' }}>{fmtTime(e.created_at)}</span>
+                    <span style={badge('#2a2e35')}>{e.type}</span>
+                    <span style={{ opacity: 0.85, wordBreak: 'break-word' }}>{`${e.path || ''}${eventDetail(e)}`}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
