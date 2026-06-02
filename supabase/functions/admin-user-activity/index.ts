@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
     max_count:      120,
     window_seconds: 60,
   });
-  if (allowed === false) {
+  if (allowed !== true) {
     return json({ error: 'Too many requests. Slow down and try again in a minute.' }, 429);
   }
 

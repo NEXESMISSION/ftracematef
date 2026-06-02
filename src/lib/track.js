@@ -19,6 +19,7 @@
 // Plausible/Umami shim). They can coexist; this one feeds OUR dashboard.
 
 import { readSource, readAffiliate, stampSource } from './attribution.js';
+import { supabase } from './supabase.js';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const INGEST_URL = SUPABASE_URL
@@ -53,9 +54,33 @@ function uuid() {
 }
 
 /* ── identity ─────────────────────────────────────────────────────────────── */
+// Cookie helpers so the visitor_id survives a localStorage clear (it doesn't
+// survive incognito / a different browser — the server-side device_key handles
+// those). 1-year first-party cookie, Lax + Secure on https.
+function setVidCookie(v) {
+  try {
+    const secure = (typeof location !== 'undefined' && location.protocol === 'https:') ? '; Secure' : '';
+    document.cookie = `${K.vid}=${encodeURIComponent(v)}; Max-Age=${365 * 24 * 60 * 60}; Path=/; SameSite=Lax${secure}`;
+  } catch { /* ignore */ }
+}
+function getVidCookie() {
+  try {
+    const prefix = `${K.vid}=`;
+    for (const part of document.cookie.split(';')) {
+      const c = part.trim();
+      if (c.startsWith(prefix)) return decodeURIComponent(c.slice(prefix.length));
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 function visitorId() {
-  let v = lsGet(K.vid);
-  if (!v) { v = uuid(); lsSet(K.vid, v); }
+  // Prefer whichever store still has it (localStorage OR cookie), then write
+  // BOTH so a future clear of either one self-heals from the survivor.
+  let v = lsGet(K.vid) || getVidCookie();
+  if (!v) v = uuid();
+  lsSet(K.vid, v);
+  setVidCookie(v);
   return v;
 }
 
@@ -171,10 +196,12 @@ function flush() {
   const sid = batch[batch.length - 1]._sid;
   const events = batch.map(({ _sid, ...e }) => e);
 
+  // Note: we deliberately do NOT send user_id here. The anonymous→account
+  // stitch is done server-side via the authenticated link_visitor RPC (see
+  // identify), so the public ingest endpoint never trusts a client user id.
   const payload = JSON.stringify({
     visitor_id: visitorId(),
     session_id: sid,
-    user_id: currentUserId,
     device: device(),
     first_touch: firstTouch(),
     events,
@@ -241,14 +268,21 @@ export function trackEvent(type, props = {}, path) {
 }
 
 /**
- * Link the anonymous visitor to a signed-in user. Called once from
- * AuthProvider when a session appears. Sends an 'identify' event so the server
- * stamps analytics_visitors.user_id (idempotent server-side).
+ * Link the anonymous visitor to a signed-in user. Called from AuthProvider when
+ * a session appears. The authoritative stitch goes through the AUTHENTICATED
+ * link_visitor RPC (the user is derived from the JWT server-side via auth.uid()
+ * — we never send a spoofable user_id to the public ingest endpoint). We also
+ * enqueue a lightweight 'identify' marker for the event timeline.
  */
 export function identify(userId) {
   if (!userId || userId === currentUserId) return;
   currentUserId = userId;
   enqueue('identify', {});
-  // Flush promptly so the stitch lands even if they bounce right after auth.
   flush();
+  // Server-trusted stitch. supabase carries the user's JWT, so auth.uid() in
+  // link_visitor resolves to this user. Fire-and-forget; analytics must never
+  // break auth.
+  try {
+    supabase.rpc('link_visitor', { p_visitor_id: visitorId() }).then(() => {}, () => {});
+  } catch { /* ignore */ }
 }

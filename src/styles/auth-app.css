@@ -2735,3 +2735,14 @@
   font-style: italic;
   line-height: 1.5;
 }
+
+/* Auth gate: reassurance note shown when auth is slow (before any redirect). */
+.auth-loading-note { margin-top: 14px; font-size: 13px; color: var(--ink-soft, #888); text-align: center; }
+
+/* Exit survey: non-blocking "Maybe later" escape. */
+.exit-survey-skip {
+  display: block; margin: 10px auto 0; background: none; border: none;
+  color: var(--ink-soft, #888); font-size: 13px; font-weight: 600; cursor: pointer;
+  text-decoration: underline; padding: 6px;
+}
+.exit-survey-skip:hover { color: var(--ink, #222); }

@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase.js';
 import { publishCreation, captureTracedImage } from '../lib/creations.js';
 import { startRecording, isRecordingSupported } from '../lib/recorder.js';
 import ExitSurvey from '../components/ExitSurvey.jsx';
+import TraceHelp from '../components/TraceHelp.jsx';
 import TraceSlider from '../components/TraceSlider.jsx';
 import CameraCapture from '../components/CameraCapture.jsx';
 import {
@@ -116,6 +117,18 @@ export default function Trace() {
   // (gated by the 'tm:trace-tutorial-seen' localStorage flag, set on dismiss);
   // re-openable any time via the topbar "?" button.
   const [showHelp, setShowHelp]             = useState(false);
+  // Auto-open the tutorial the first time this browser ever opens /trace.
+  // Gated by a localStorage flag so it shows exactly once; the "?" button in
+  // the topbar re-opens it any time.
+  useEffect(() => {
+    try {
+      if (!window.localStorage.getItem('tm:trace-tutorial-seen')) setShowHelp(true);
+    } catch { /* private mode — just skip the auto-open */ }
+  }, []);
+  const closeHelp = () => {
+    setShowHelp(false);
+    try { window.localStorage.setItem('tm:trace-tutorial-seen', '1'); } catch { /* ignore */ }
+  };
   const [flickerOn, setFlickerOn]           = useLocalState('tm:flickerOn', false);
   const [flickerSpeed, setFlickerSpeed]     = useLocalState('tm:flickerSpeed', 3);
   // Bounds for the flicker oscillation. Defaults give a clearly-visible
@@ -1159,8 +1172,24 @@ export default function Trace() {
               <span>REC {formatRecTime(recordSecs)}</span>
             </div>
           )}
+          <button
+            type="button"
+            className="trace-help-btn"
+            onClick={() => setShowHelp(true)}
+            aria-label="How tracing works"
+            title="How it works"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M9.5 9a2.5 2.5 0 0 1 4.5 1.5c0 1.5-2 2-2 3" />
+              <path d="M12 17h.01" />
+            </svg>
+          </button>
         </div>
       </header>
+
+      {showHelp && <TraceHelp onClose={closeHelp} />}
 
       {/* Hint */}
       {showHint && !cameraError && (
@@ -1395,11 +1424,15 @@ export default function Trace() {
 
       {showSurveyModal && (
         <div className="profile-modal trace-survey-modal" role="dialog" aria-modal="true" aria-labelledby="survey-q">
-          {/* Backdrop is intentionally not click-to-close — survey is required:
-              the only way out is to answer both questions and submit. */}
-          <div className="profile-modal-backdrop" />
+          {/* Dismissible: a returning user shouldn't be hard-blocked from the
+              studio. Backdrop click and the "Maybe later" button both defer the
+              survey for this session (it re-asks next visit until completed). */}
+          <div className="profile-modal-backdrop" onClick={() => setSurveyDismissed(true)} />
           <div className="profile-modal-card trace-survey-modal-card">
-            <ExitSurvey onDone={() => setSurveyDismissed(true)} />
+            <ExitSurvey
+              onDone={() => setSurveyDismissed(true)}
+              onSkip={() => setSurveyDismissed(true)}
+            />
           </div>
         </div>
       )}

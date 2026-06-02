@@ -1278,3 +1278,12 @@ body:has(.trace-stage) {
 .trace-slider .tm-slider:focus-visible .tm-slider-thumb {
   box-shadow: 0 0 0 3px rgba(232,122,122,0.5), 0 1px 4px rgba(0,0,0,0.35);
 }
+
+/* Topbar "?" help button — re-opens the tracing tutorial. */
+.trace-help-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(0,0,0,0.35); color: #fff; border: 1px solid rgba(255,255,255,0.25);
+  cursor: pointer; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.trace-help-btn:hover { background: rgba(0,0,0,0.55); }

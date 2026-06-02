@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
     max_count:      5,
     window_seconds: 300,
   });
-  if (allowed === false) {
+  if (allowed !== true) {
     return json({ error: 'Too many checkout attempts. Try again in a few minutes.' }, 429);
   }
 

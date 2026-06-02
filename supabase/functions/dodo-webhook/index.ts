@@ -276,7 +276,7 @@ Deno.serve(async (req) => {
     }
     const { data: existing } = await supabase
       .from('webhook_events')
-      .select('id, processed, attempts')
+      .select('id, processed, attempts, created_at')
       .eq('webhook_id', id)
       .maybeSingle();
     if (existing?.processed) {
@@ -298,7 +298,20 @@ Deno.serve(async (req) => {
     //       the rare overlap of (a) and (b) we can't double-charge or
     //       double-grant — at worst we do the same idempotent work twice.
     if ((existing?.attempts ?? 0) === 0) {
-      return new Response('In-flight, retry later', { status: 409 });
+      // We can't perfectly tell a truly-concurrent invocation (b) from a prior
+      // attempt that crashed BEFORE it could bump `attempts` (a) — e.g. a
+      // function timeout/OOM mid-process. Use row age as the tiebreaker: a
+      // fresh row (<90s) is almost certainly a live concurrent worker → 409 so
+      // we don't double-process. An OLDER unprocessed/attempts=0 row is a
+      // crashed prior attempt we MUST re-process, or it sits stuck forever
+      // returning 409 to every Dodo retry until Dodo gives up.
+      const ageMs = existing?.created_at
+        ? Date.now() - new Date(existing.created_at).getTime()
+        : Number.POSITIVE_INFINITY;
+      if (ageMs < 90_000) {
+        return new Response('In-flight, retry later', { status: 409 });
+      }
+      // else: fall through and re-claim the crashed row below.
     }
     // Re-claim by re-using the existing row. Treat it as "logged" for the
     // post-process write so we update `processed` / `attempts` correctly.
@@ -665,6 +678,21 @@ async function upsertActiveSubscription(
     }
   }
 
+  // subscription.updated represents a change to an EXISTING subscription, not
+  // a first-time activation. If we have no local row for this subId, refuse to
+  // CREATE an active row from an 'updated' event — only genuine charge/
+  // activation events (active / renewed / plan_changed) may first-time-
+  // activate. This closes the "a signed subscription.updated carrying a paid
+  // product_id + amount silently activates a free user" gap: 'updated' can
+  // only ever patch a row that a real activation already created.
+  if (eventType === 'subscription.updated') {
+    console.warn(
+      `Ignoring subscription.updated for untracked sub ${subId}: ` +
+      `not a first-time activation (no existing row to update)`,
+    );
+    return;
+  }
+
   // New subscription_id we've never seen before — most often a `change-plan`
   // that issued a fresh id. Cancel any prior active row first to keep the
   // unique-active index satisfied, then insert.
@@ -764,8 +792,19 @@ async function markSubscriptionInactive(
     });
     return;
   }
-  // No subscription_id at all on the event — fall back to flipping whatever
-  // active row exists. (Pre-payment-flow legacy events; rare in practice.)
+  // No subscription_id at all on the event. Only act if the event was at least
+  // customer-bound (the customer_id was verified against this user's profile by
+  // bindAndCheckCustomer above). A fully context-free event — no subId AND no
+  // customer_id — must NOT blanket-flip the user's active rows: that would let
+  // a stray/legacy event downgrade a paying user. Record-and-skip instead.
+  const eventCustomerId = data.customer?.customer_id ?? data.customer_id ?? null;
+  if (!eventCustomerId) {
+    console.warn(
+      `Skipping ${eventType} for user ${userId}: no subscription_id and no ` +
+      `customer_id — refusing to blanket-flip active rows.`,
+    );
+    return;
+  }
   await supabase
     .from('subscriptions')
     .update(update)

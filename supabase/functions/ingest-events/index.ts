@@ -54,6 +54,29 @@ function clampInt(v: unknown, lo: number, hi: number): number | null {
   return Math.max(lo, Math.min(hi, Math.round(n)));
 }
 
+// Whitelist + clamp the per-event `props`. The public endpoint must never store
+// arbitrary client JSON (size/DoS + junk), so we keep only the known keys with
+// bounded types. Unknown keys are dropped.
+const PROP_STR_KEYS = new Set(['sel', 'txt', 'name', 'id']);
+const PROP_NUM_KEYS = new Set(['xpct', 'ypct', 'ypage', 'vw', 'depth', 'count']);
+function sanitizeProps(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (PROP_STR_KEYS.has(k)) {
+      const s = clampStr(v, 200);
+      if (s) out[k] = s;
+    } else if (PROP_NUM_KEYS.has(k)) {
+      const n = typeof v === 'number' ? v : Number(v);
+      if (Number.isFinite(n)) out[k] = n;
+    } else if (k === 'session_start') {
+      if (v === true) out[k] = true;
+    }
+    // anything else: dropped
+  }
+  return out;
+}
+
 // First public IP from the proxy chain. x-forwarded-for is a comma list
 // (client, proxy1, proxy2…); the leftmost is the real client on Supabase's
 // edge. Falls back to x-real-ip.
@@ -156,7 +179,12 @@ Deno.serve(async (req) => {
   const visitorId = body.visitor_id;
   const sessionId = body.session_id;
   if (!isUuid(visitorId) || !isUuid(sessionId)) return bad(400);
-  const userId = isUuid(body.user_id) ? body.user_id : null;
+  // We deliberately IGNORE any client-supplied user_id: the public endpoint has
+  // no JWT, so trusting it would let anyone attribute forged traffic to a
+  // victim's account. The anonymous→account stitch is done by the AUTHENTICATED
+  // link_visitor RPC (called from the client after sign-in), where the user is
+  // derived from auth.uid() server-side.
+  const userId = null;
 
   const rawEvents = Array.isArray(body.events) ? body.events : [];
   if (rawEvents.length === 0) return ok(); // nothing to do — not an error
@@ -171,18 +199,28 @@ Deno.serve(async (req) => {
   const rawIp = clientIp(req);
   const ipHash = salt && rawIp ? await hashIp(rawIp, salt) : 'unknown';
 
+  // Device key for dedup: hash(ip_hash + user-agent). Deterministic for a given
+  // machine+network so incognito / cleared storage / a second browser on the
+  // SAME device collapse to one visitor. Null when we couldn't derive an IP
+  // hash (private/LAN/dev) so those aren't all merged together.
+  const deviceKey = (ipHash !== 'unknown' && ua)
+    ? await hashIp(`${ipHash}|${ua}`, salt)
+    : null;
+
   const admin = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     { auth: { persistSession: false } },
   );
 
-  // Per-IP rate limit. 120 batches/min is generous (the client flushes at most
-  // every ~5s + on page hide) but caps a single host hammering the endpoint.
+  // Per-IP rate limit. 60 batches/min is plenty (the client flushes at most
+  // every ~5s + on page hide ≈ 12-15/min) but caps a host hammering the
+  // endpoint. Fail CLOSED: a null/errored result (not an explicit `true`) is
+  // treated as over-limit so a transient DB hiccup can't open the floodgates.
   const { data: allowed } = await admin.rpc('check_rate_limit', {
-    bucket_key: `ingest:${ipHash}`, max_count: 120, window_seconds: 60,
+    bucket_key: `ingest:${ipHash}`, max_count: 60, window_seconds: 60,
   });
-  if (allowed === false) return bad(429);
+  if (allowed !== true) return bad(429);
 
   const geo = await resolveGeo(admin, ipHash, rawIp);
 
@@ -195,12 +233,11 @@ Deno.serve(async (req) => {
       const e = (raw ?? {}) as Record<string, unknown>;
       const type = clampStr(e.type, 24);
       if (!type || !ALLOWED_TYPES.has(type)) return null;
-      const props = (e.props && typeof e.props === 'object') ? e.props : {};
       return {
         type,
         path: clampStr(e.path, 120),
         referrer: clampStr(e.referrer, 500),
-        props,
+        props: sanitizeProps(e.props),
       };
     })
     .filter((e): e is Record<string, unknown> => e !== null);
@@ -233,6 +270,7 @@ Deno.serve(async (req) => {
     p_visitor_id: visitorId,
     p_session_id: sessionId,
     p_user_id: userId,
+    p_device_key: deviceKey,
     p_geo: geo,
     p_device: deviceClean,
     p_first_touch: firstTouch,

@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
   const { data: allowed } = await supabaseAuth.rpc('check_rate_limit', {
     bucket_key: `admin-analytics:${user.id}`, max_count: 60, window_seconds: 60,
   });
-  if (allowed === false) {
+  if (allowed !== true) {
     return json({ error: 'Too many requests. Slow down and try again in a minute.' }, 429);
   }
 

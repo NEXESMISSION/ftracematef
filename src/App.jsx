@@ -9,19 +9,13 @@ import { trackPageview } from './lib/analytics.js';
 import { initTracking, trackPageview as trackPulsePageview } from './lib/track.js';
 import HeatmapTracker from './components/HeatmapTracker.jsx';
 
+// Eager: the public entry points users hit first (landing/home/auth/redirects).
+// Keeping these in the main chunk avoids a Suspense flash on the most common
+// cold-start paths.
 import Home from './pages/Home.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
 import AuthCallback from './pages/AuthCallback.jsx';
-import Upload from './pages/Upload.jsx';
-import Trace from './pages/Trace.jsx';
-import LivePreview from './pages/LivePreview.jsx';
-import Account from './pages/Account.jsx';
-import CheckoutSuccess from './pages/CheckoutSuccess.jsx';
-import PricingPage from './pages/PricingPage.jsx';
-import Terms from './pages/Terms.jsx';
-import Privacy from './pages/Privacy.jsx';
-import HowToUse from './pages/HowToUse.jsx';
 import RefRedirect from './pages/RefRedirect.jsx';
 import AffiliateRedirect from './pages/AffiliateRedirect.jsx';
 import NotFound from './pages/NotFound.jsx';
@@ -69,6 +63,21 @@ const AdminDashboard = lazyWithReload(() => import('./pages/AdminDashboard.jsx')
 // Affiliate self-view — niche, no account needed, only opened by partners
 // who have a token link. Lazy so it never weighs on the main bundle.
 const Partner = lazyWithReload(() => import('./pages/Partner.jsx'), 'partner');
+
+// Heavy / behind-a-tap routes — lazy-split so a first-time landing visitor
+// doesn't download the trace studio, perspective-warp math, recorder, pricing,
+// and account screens before seeing the hero. Each is reachable only after a
+// click or sign-in, so a brief Suspense fallback is invisible in practice and
+// the top-of-funnel first paint gets dramatically lighter.
+const Upload          = lazyWithReload(() => import('./pages/Upload.jsx'), 'upload');
+const Trace           = lazyWithReload(() => import('./pages/Trace.jsx'), 'trace');
+const LivePreview     = lazyWithReload(() => import('./pages/LivePreview.jsx'), 'live');
+const Account         = lazyWithReload(() => import('./pages/Account.jsx'), 'account');
+const CheckoutSuccess = lazyWithReload(() => import('./pages/CheckoutSuccess.jsx'), 'checkout');
+const PricingPage     = lazyWithReload(() => import('./pages/PricingPage.jsx'), 'pricing');
+const Terms           = lazyWithReload(() => import('./pages/Terms.jsx'), 'terms');
+const Privacy         = lazyWithReload(() => import('./pages/Privacy.jsx'), 'privacy');
+const HowToUse        = lazyWithReload(() => import('./pages/HowToUse.jsx'), 'howto');
 
 // One-shot free trial: the moment a free user navigates AWAY from /trace,
 // their single session is consumed for good. Doing this at the route layer
@@ -132,6 +141,7 @@ export default function App() {
       <AnalyticsRouteTracker />
       <HeatmapTracker />
       <DeepLinkRouter />
+      <Suspense fallback={null}>
       <Routes>
         {/* Traffic-source attribution — /r/:source plus a hand-picked set of
             pretty aliases (tracemate.art/tiktok, /reddit, etc.) for the
@@ -195,6 +205,7 @@ export default function App() {
         {/* Catch-all — anything else gets a friendly Not Found rather than blank */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </Suspense>
 
       {/* Global broadcast popup. Renders null unless a signed-in user has an
           announcement to see; lives inside AuthProvider (for useAuth) and the

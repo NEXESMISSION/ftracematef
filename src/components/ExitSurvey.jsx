@@ -41,7 +41,7 @@ const NOTE_MAX = 280;
  * onward (see Trace.jsx). Both questions are required; the note is optional.
  * Idempotent server-side, so it only ever records once.
  */
-export default function ExitSurvey({ onDone }) {
+export default function ExitSurvey({ onDone, onSkip }) {
   const { profile, refresh } = useAuth();
 
   const [age, setAge]       = useState('');
@@ -218,6 +218,16 @@ export default function ExitSurvey({ onDone }) {
               ? 'Answer the quick questions →'
               : 'Save & back to tracing →'}
         </button>
+        {onSkip && (
+          <button
+            type="button"
+            className="exit-survey-skip"
+            onClick={onSkip}
+            disabled={busy}
+          >
+            Maybe later
+          </button>
+        )}
       </div>
     </section>
   );

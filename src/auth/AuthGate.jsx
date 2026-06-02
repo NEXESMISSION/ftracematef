@@ -23,15 +23,21 @@ import { useAuth } from './AuthProvider.jsx';
 export function useAuthGate() {
   const { loading } = useAuth();
   const location = useLocation();
-  const [stuck, setStuck] = useState(false);
+  const [slow, setSlow] = useState(false);   // ~9s: show a reassurance message
+  const [stuck, setStuck] = useState(false); // ~20s: give up and bounce to /login
 
   useEffect(() => {
     if (!loading) {
+      setSlow(false);
       setStuck(false);
       return;
     }
-    const t = setTimeout(() => setStuck(true), 12000);
-    return () => clearTimeout(t);
+    // Two-stage: a slow network shouldn't eject a user mid-flow. We first show
+    // a "taking longer than usual" note (so the screen isn't a silent spinner),
+    // and only redirect to /login after a generous 20s — matching AuthCallback.
+    const slowT = setTimeout(() => setSlow(true), 9000);
+    const stuckT = setTimeout(() => setStuck(true), 20000);
+    return () => { clearTimeout(slowT); clearTimeout(stuckT); };
   }, [loading]);
 
   if (loading && !stuck) {
@@ -39,6 +45,11 @@ export function useAuthGate() {
       element: (
         <div className="auth-loading-screen">
           <span className="auth-loading-dot" />
+          {slow && (
+            <p className="auth-loading-note" role="status">
+              Taking longer than usual — hang tight…
+            </p>
+          )}
         </div>
       ),
     };
