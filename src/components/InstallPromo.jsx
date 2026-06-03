@@ -1,23 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import InstallModal from './InstallModal.jsx';
 import Img from './Img.jsx';
-import {
-  isStandalone,
-  isInstallPromptAvailable,
-  onInstallAvailability,
-  promptInstall,
-  trackInstall,
-} from '../lib/track.js';
+import { isStandalone, trackInstall } from '../lib/track.js';
 
 /**
  * Account-page install promo. A floating "Install app" button that opens a
  * popup mirroring the landing page's "Get Trace Mate on your phone" section —
  * the iOS / Android store buttons that lead into the step-by-step InstallModal.
- *
- * When the browser has offered a native install prompt (Android / desktop
- * Chrome), the popup also surfaces a one-tap "Install now" button that fires it
- * directly. Every step feeds the PWA funnel in Pulse (see lib/track.trackInstall).
+ * Every step feeds the PWA funnel in Pulse (see lib/track.trackInstall).
  *
  * Hidden entirely when the app is already running installed (standalone), since
  * there's nothing left to install.
@@ -25,11 +16,6 @@ import {
 export default function InstallPromo() {
   const [open, setOpen] = useState(false);
   const [platform, setPlatform] = useState(null); // 'ios' | 'android' for InstallModal
-  const [canPrompt, setCanPrompt] = useState(isInstallPromptAvailable());
-
-  // The native-prompt availability can flip after mount (beforeinstallprompt
-  // often fires a beat after load), so subscribe and re-read.
-  useEffect(() => onInstallAvailability(() => setCanPrompt(isInstallPromptAvailable())), []);
 
   // Don't pester users who already installed.
   if (isStandalone()) return null;
@@ -43,13 +29,6 @@ export default function InstallPromo() {
   const pick = (p) => {
     trackInstall(p === 'ios' ? 'pwa_pick_ios' : 'pwa_pick_android');
     setPlatform(p);
-  };
-
-  const installNative = async () => {
-    const outcome = await promptInstall();
-    // Accepted → appinstalled will fire and the standalone guard hides us next
-    // load; either way close the popup so we don't dangle over the chrome.
-    if (outcome) closePromo();
   };
 
   return (
@@ -85,12 +64,6 @@ export default function InstallPromo() {
             <p className="install-promo-sub">
               Add it to your home screen — opens in one tap, no app store needed.
             </p>
-
-            {canPrompt && (
-              <button type="button" className="install-promo-native" onClick={installNative}>
-                <span aria-hidden="true">⚡</span> Install now
-              </button>
-            )}
 
             <div className="install-promo-buttons">
               <button

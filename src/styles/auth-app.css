@@ -2838,24 +2838,6 @@
   margin: 0 0 22px;
   line-height: 1.45;
 }
-.install-promo-native {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 auto 20px;
-  padding: 13px 26px;
-  border: 2px solid var(--ink, #2b2118);
-  border-radius: 12px;
-  background: var(--ink, #2b2118);
-  color: var(--cream, #fff8ef);
-  font-family: 'Nunito', sans-serif;
-  font-weight: 800;
-  font-size: 16px;
-  cursor: pointer;
-  box-shadow: 3px 3px 0 var(--coral, #e87a7a);
-  transition: transform 0.16s ease, box-shadow 0.16s ease;
-}
-.install-promo-native:hover { transform: translateY(-2px); box-shadow: 5px 5px 0 var(--coral, #e87a7a); }
 .install-promo-buttons {
   display: flex;
   gap: 16px;

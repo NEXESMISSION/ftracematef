@@ -261,9 +261,7 @@
   display: block;
   width: fit-content;
   margin: 0 auto clamp(14px, 2vw, 20px);
-  transition: transform 0.25s ease;
 }
-.auth-hero:hover { transform: translateY(-2px) rotate(-1deg); }
 .auth-hero img {
   width: clamp(190px, 24vw, 240px);
   height: auto;

@@ -131,7 +131,7 @@ export default function Login() {
 
       <main className="auth-shell">
         <section className="auth-card">
-          <Link to="/" className="auth-hero" aria-label="Welcome to Trace Mate — back to home">
+          <div className="auth-hero">
             <img
               src="/images/auth/welcome-480.webp"
               srcSet="/images/auth/welcome-480.webp 480w, /images/auth/welcome.webp 694w"
@@ -143,7 +143,7 @@ export default function Login() {
               decoding="async"
               loading="eager"
             />
-          </Link>
+          </div>
 
           <button type="button" className="google-btn" onClick={handleGoogle} disabled={busy}>
             <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">

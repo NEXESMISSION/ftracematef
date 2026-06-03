@@ -462,18 +462,25 @@ main, header, section, footer { position: relative; z-index: 1; }
   aspect-ratio: 1 / 1;
   border-radius: 28px;
   overflow: hidden;
+  /* Strictly frameless: no border, shadow, or outline of any kind. */
+  border: 0;
+  box-shadow: none;
+  outline: none;
+  background: transparent;
 }
 .hero-phone-reel {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border: 0;
+  box-shadow: none;
 }
 /* On phones the video fills the content width, centered (the flex parent keeps
-   it centered — no viewport-width / negative-margin tricks that drift off-axis). */
+   it centered), nudged a hair to the right for optical balance. */
 @media (max-width: 560px) {
   .hero-phone { width: 100%; }
-  .hero-phone-video { width: 100%; border-radius: 20px; }
+  .hero-phone-video { width: 100%; border-radius: 20px; transform: translateX(8px); }
 }
 
 .hero-spark {
@@ -1168,7 +1175,52 @@ main, header, section, footer { position: relative; z-index: 1; }
   outline: none;
   background: linear-gradient(135deg, #fff2f6 0%, #ffd7e6 100%);
   border-color: #e87a7a;
-  animation: lf-attract 3.2s ease-in-out infinite;
+  /* Pops into the grid on the staged reveal, then settles into the attract glow. */
+  animation: lf-enter 0.6s cubic-bezier(0.2, 1.1, 0.35, 1) both,
+             lf-attract 3.2s ease-in-out infinite 0.6s;
+}
+@keyframes lf-enter {
+  0%   { opacity: 0; transform: scale(0.8) translateY(18px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* "Secret deal" announce toast — a brief celebratory popup at the top of the
+   pricing section when the Lifetime card reveals. Pops in, holds, fades out. */
+.secret-announce {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 1200;
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  max-width: min(92vw, 460px);
+  padding: 16px 26px;
+  background: linear-gradient(180deg, #fff4f8, #ffe3ec);
+  border: 2px solid #b22f57;
+  border-radius: 999px;
+  color: #b22f57;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.3;
+  box-shadow: 0 24px 60px -12px rgba(178, 47, 87, 0.6);
+  pointer-events: none;
+  animation: secret-pop 2.8s ease forwards;
+}
+.secret-announce strong { font-weight: 900; }
+.secret-announce-icon { font-size: 22px; flex-shrink: 0; }
+/* Centred in the viewport — translate(-50%, -50%) is the resting position. */
+@keyframes secret-pop {
+  0%   { opacity: 0; transform: translate(-50%, calc(-50% + 14px)) scale(0.7); }
+  10%  { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  18%  { transform: translate(-50%, -50%) scale(1); }
+  82%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% - 10px)) scale(0.96); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .secret-announce { animation: none; opacity: 1; transform: translate(-50%, -50%); }
+  .lifetime-teaser { animation: none !important; opacity: 1; }
 }
 .lifetime-teaser:hover { transform: translateY(-4px); }
 .lifetime-teaser:focus-visible { box-shadow: 0 0 0 3px #e87a7a, 4px 4px 0 var(--ink); }
