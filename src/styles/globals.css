@@ -271,6 +271,22 @@ main, header, section, footer { position: relative; z-index: 1; }
 .nav-links a:hover { color: var(--coral); }
 .nav-links a:hover::after { transform: scaleX(1); }
 
+/* Header CTA group — a quiet "Log in" for returning users sits beside the
+   primary Try-it-Now button. */
+.nav-cta-group {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(12px, 1.6vw, 20px);
+}
+.nav-login-link {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+.nav-login-link:hover { color: var(--coral); }
+
 /* nav-level wc-btn — extra small */
 .nav .wc-btn.sm {
   padding: 12px 24px;
@@ -415,6 +431,23 @@ main, header, section, footer { position: relative; z-index: 1; }
   gap: clamp(18px, 2.5vw, 28px);
   flex-wrap: wrap;
 }
+
+/* "Already have an account? Log in" — quiet sign-in link under the hero CTA. */
+.hero-signin {
+  margin-top: 16px;
+  font-size: 15px;
+  color: var(--ink-soft);
+}
+.hero-signin a {
+  color: var(--coral);
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--coral-soft);
+  transition: text-decoration-color 0.2s ease;
+}
+.hero-signin a:hover { text-decoration-color: var(--coral); }
 
 .social {
   display: inline-flex;
@@ -2400,6 +2433,9 @@ main, header, section, footer { position: relative; z-index: 1; }
     gap: 18px;
     margin-top: 8px;
   }
+  /* Keep the sign-in link directly under the primary CTA (which is reordered
+     to the bottom on mobile), not floating up by the headline. */
+  .hero-signin { order: 3; margin-top: 10px; }
   .sub br { display: none; }
   .hero-phone .phone-frame img { max-height: 640px; }
 

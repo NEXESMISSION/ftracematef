@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import Img from './Img.jsx';
 
@@ -99,6 +100,14 @@ export default function Hero({ onPlayClick }) {
               </button>
             )}
           </div>
+
+          {/* Returning visitors who already have an account — quiet sign-in link
+              under the primary CTA so it doesn't compete with it. */}
+          {!isOrLikelySignedIn && (
+            <p className="hero-signin">
+              Already have an account? <Link to="/login">Log in</Link>
+            </p>
+          )}
         </div>
 
         <div className="hero-phone">

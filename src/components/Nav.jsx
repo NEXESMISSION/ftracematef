@@ -44,9 +44,13 @@ export default function Nav() {
           <span className="nav-account-cta-short">Profile →</span>
         </Link>
       ) : (
-        <a className="img-btn img-btn-sm" href="#pricing" aria-label="Try it Now">
-          <Img src="/images/ui/btn-try-now.webp" alt="Try it Now" priority />
-        </a>
+        <div className="nav-cta-group">
+          {/* Returning users who already have an account go straight to sign-in. */}
+          <Link className="nav-login-link" to="/login">Log in</Link>
+          <a className="img-btn img-btn-sm" href="#pricing" aria-label="Try it Now">
+            <Img src="/images/ui/btn-try-now.webp" alt="Try it Now" priority />
+          </a>
+        </div>
       )}
     </header>
   );
