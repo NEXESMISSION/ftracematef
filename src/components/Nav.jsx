@@ -47,9 +47,9 @@ export default function Nav() {
         <div className="nav-cta-group">
           {/* Returning users who already have an account go straight to sign-in. */}
           <Link className="nav-login-link" to="/login">Log in</Link>
-          <a className="img-btn img-btn-sm" href="#pricing" aria-label="Try it Now">
+          <Link className="img-btn img-btn-sm" to="/upload" aria-label="Try it Now">
             <Img src="/images/ui/btn-try-now.webp" alt="Try it Now" priority />
-          </a>
+          </Link>
         </div>
       )}
     </header>

@@ -81,9 +81,9 @@ export default function Hero({ onPlayClick }) {
             {/* Signed-in users get the 'See my profile' button via Nav.
                 The Hero CTA is reserved for the visitor's primary action. */}
             {!isOrLikelySignedIn && (
-              <a className="img-btn" href="#pricing" aria-label="Try it Now">
+              <Link className="img-btn" to="/upload" aria-label="Try it Now">
                 <Img src="/images/ui/btn-try-now.webp" alt="Try it Now" priority />
-              </a>
+              </Link>
             )}
 
             {DEMO_VIDEO_ID && (

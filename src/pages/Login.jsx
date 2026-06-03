@@ -31,15 +31,18 @@ export default function Login() {
     return () => document.body.classList.remove('auth-body');
   }, []);
 
-  // Already signed in? Honor any pre-stashed checkout intent first — if the
-  // user landed here from clicking a plan on the marketing site, route them
-  // to /pricing so the intent gets consumed there instead of getting lost
-  // on /account.
+  // Already signed in? Resume whatever the user was doing rather than dumping
+  // them somewhere generic: a chosen plan → /pricing (auto-checkout), a pending
+  // free-trial trace → /trace (loads their image and starts), else /account.
+  // Mirrors AuthCallback.postAuthDest so the in-tab and OAuth paths agree.
   useEffect(() => {
     if (loading || !user) return;
-    let intent = null;
-    try { intent = sessionStorage.getItem('tm:intent-plan'); } catch {}
-    navigate(intent ? '/pricing' : '/account', { replace: true });
+    let dest = '/account';
+    try {
+      if (sessionStorage.getItem('tm:intent-plan')) dest = '/pricing';
+      else if (sessionStorage.getItem('tm:pending-image')) dest = '/trace';
+    } catch { /* ignore — private mode / disabled storage */ }
+    navigate(dest, { replace: true });
   }, [loading, user, navigate]);
 
   // Clear any pending stuck-timer if we leave the page (cleanup on unmount).

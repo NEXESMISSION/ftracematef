@@ -58,14 +58,19 @@ async function purgeStalePkceState() {
   } catch { /* ignore — quota / private mode */ }
 }
 
-// Where to send a freshly-signed-in user. If they clicked a plan before
-// logging in, Login.jsx stashed it as `tm:intent-plan`; route them to /pricing
-// so it gets consumed and checkout resumes automatically. Otherwise /account.
-// Without this, the OAuth round-trip always landed on /account and the chosen
-// plan was silently lost — the user had to find and click it all over again.
+// Where to send a freshly-signed-in user — resume whatever they were doing
+// instead of dropping them somewhere generic:
+//   1. They clicked a plan before logging in (Login.jsx stashed it) →
+//      /pricing, which auto-resumes checkout.
+//   2. They were mid free-trial (picked an image on /upload, hit "Start
+//      tracing", then signed in) → /trace, which loads the pending image and
+//      starts the session. New users get to actually *use* the app right
+//      after signing up — never forced through the pricing page.
+//   3. Otherwise → /account.
 function postAuthDest() {
   try {
     if (sessionStorage.getItem('tm:intent-plan')) return '/pricing';
+    if (sessionStorage.getItem('tm:pending-image')) return '/trace';
   } catch { /* ignore — private mode / disabled storage */ }
   return '/account';
 }
