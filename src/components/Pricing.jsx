@@ -86,13 +86,9 @@ export default function Pricing() {
             CTA) plans. The header doubles as the headline benefit, so the
             feature list only carries what it doesn't already say. */}
         <article className="pricing-plan pricing-plan-free">
-          <div className="pricing-plan-name">Free</div>
-          <div className="pricing-plan-price pc-free-price">
-            <span className="num">{FREE_SESSION_LIMIT}</span>
-            <span className="pc-free-unit"><strong>free</strong><span>sessions</span></span>
-          </div>
-          <div className="pricing-plan-badge pc-free-badge">no card needed</div>
+          <div className="pricing-plan-name pc-free-name">Free</div>
           <ul className="pricing-plan-features">
+            <li><Check mint />{FREE_SESSION_LIMIT} free sessions</li>
             <li><Check mint />All tools unlocked</li>
             <li><Check mint />Works on any device</li>
           </ul>
