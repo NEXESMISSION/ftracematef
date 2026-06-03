@@ -19,6 +19,11 @@
 /images/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 
+# Demo reels (unhashed, large). Cache hard for fast repeat loads; SWR lets a
+# replaced reel of the same name self-heal without pinning a bad entry.
+/videos/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=2592000
+
 /robots.txt
   Content-Type: text/plain; charset=utf-8
   Cache-Control: public, max-age=3600

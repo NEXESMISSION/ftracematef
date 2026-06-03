@@ -2640,81 +2640,36 @@ main, header, section, footer { position: relative; z-index: 1; }
   .shorts-row .demo-reel-frame:nth-of-type(even) { transform: rotate(1deg); }
 }
 
-/* ── F1 — audience cards. One clean card per audience; optional reel strip. ─ */
-.aud-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: clamp(14px, 2vw, 20px);
-  margin-top: clamp(20px, 3vw, 30px);
-}
-.aud-card {
-  position: relative;
+/* ── F1 — "Made for you" demo reels. Three muted, looping video cards. ─────── */
+.aud-reels-grid {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: clamp(20px, 2.6vw, 28px);
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(14px, 2.5vw, 26px);
+  margin-top: clamp(20px, 3vw, 32px);
+}
+.aud-reel-card {
+  flex: 0 1 248px;
+  max-width: 270px;
+  aspect-ratio: 9 / 16;
   border-radius: 22px;
   border: 2px solid var(--ink);
-  background: var(--paper);
+  background: var(--ink);
   box-shadow: 4px 4px 0 var(--ink);
+  overflow: hidden;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
-.aud-card:hover {
+.aud-reel-card:hover {
   transform: translate(-2px, -2px);
   box-shadow: 7px 7px 0 var(--ink);
 }
-/* Soft per-audience tint so the row reads as three distinct, friendly cards. */
-.aud-card--anime     { background: #fff2e8; }
-.aud-card--aesthetic { background: #fdeef4; }
-.aud-card--kids      { background: #eef6ec; }
-
-.aud-card-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: clamp(46px, 5vw, 56px);
-  height: clamp(46px, 5vw, 56px);
-  border-radius: 16px;
-  border: 2px solid var(--ink);
-  background: #fff;
-  box-shadow: 2px 2px 0 var(--ink);
-  font-size: clamp(24px, 3vw, 30px);
-  line-height: 1;
-  margin-bottom: 2px;
-}
-.aud-card h3 {
-  font-family: 'Nunito', sans-serif;
-  font-size: clamp(18px, 2vw, 22px);
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  color: var(--ink);
-  margin: 0;
-}
-.aud-card p {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: clamp(14px, 1.1vw, 15.5px);
-  line-height: 1.5;
-}
-
-/* Optional reel strip inside a card (only renders when a card has videos). */
-.aud-reels {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 4px;
-  margin-top: 6px;
+.aud-reel-video {
+  display: block;
   width: 100%;
-  scrollbar-width: none;
+  height: 100%;
+  object-fit: cover;
 }
-.aud-reels::-webkit-scrollbar { display: none; }
-.aud-reel { flex: 0 0 auto; }
-.aud-reel .demo-reel-frame { width: 140px; transform: none; }
-.aud-slot-pending {
-  width: 140px;
-  aspect-ratio: 9 / 16;
-  border-radius: 14px;
-  background: var(--ink);
+@media (max-width: 560px) {
+  /* Two reels per row on phones so the section doesn't run very tall. */
+  .aud-reel-card { flex: 0 1 44%; max-width: 48%; }
 }
