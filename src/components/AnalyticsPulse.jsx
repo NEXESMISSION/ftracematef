@@ -514,6 +514,31 @@ function InstallFunnel({ pwa }) {
   );
 }
 
+/* ── Lifetime "secret deal" funnel ────────────────────────────────────────── */
+// teaser seen → unwrapped (boom + popup) → claim clicked. Reads overview.lifetime
+// (added by the lifetime_tracking migration); empty-states on older data.
+function LifetimeFunnel({ lifetime }) {
+  const l = lifetime || {};
+  const views = l.teaser_views || 0;
+  const unwraps = l.unwraps || 0;
+  const claims = l.claims || 0;
+  const any = views || unwraps || claims;
+  return (
+    <div className="pulse-card pulse-install">
+      <h4 className="pulse-card-title">Lifetime offer — the secret deal</h4>
+      {!any ? (
+        <p className="pulse-empty">No Lifetime activity in this range yet.</p>
+      ) : (
+        <div className="pulse-install-grid">
+          <InstallStat label="Teaser seen" value={views} hint="scrolled into view" />
+          <InstallStat label="Unwrapped" value={unwraps} hint={`${pct(unwraps, views)} of views`} accent />
+          <InstallStat label="Claim clicks" value={claims} hint={`${pct(claims, unwraps)} of unwraps`} accent />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── main ─────────────────────────────────────────────────────────────────── */
 export default function AnalyticsPulse() {
   const [range, setRange] = useState('7d');
@@ -592,8 +617,9 @@ export default function AnalyticsPulse() {
             <Kpi label="Live now" value={fmt(t.live)} accent />
           </div>
 
-          {/* App install funnel (PWA) */}
+          {/* App install funnel (PWA) + Lifetime "secret deal" funnel */}
           <InstallFunnel pwa={data.pwa} />
+          <LifetimeFunnel lifetime={data.lifetime} />
 
           {/* Globe + country ranking */}
           <div className="pulse-geo">

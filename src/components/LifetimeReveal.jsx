@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { trackEvent } from '../lib/track.js';
 
 /**
  * LifetimeReveal — the Lifetime plan as a "secret deal, just for you".
@@ -147,9 +148,8 @@ function LifetimeModal({ plan, lifetimeLeft, busy, onChoose, onClose }) {
         <p className="lf-sub">{spotsText} — pay once, trace forever.</p>
 
         <div className="lf-price">
-          <span className="lf-strike">${plan.wasPrice}</span>
           <span className="lf-amount"><span className="lf-cur">$</span>{plan.price}</span>
-          <span className="lf-badge">{plan.badge}</span>
+          <span className="lf-badge">once · forever</span>
         </div>
 
         {/* countdown */}
@@ -171,7 +171,7 @@ function LifetimeModal({ plan, lifetimeLeft, busy, onChoose, onClose }) {
         <button
           type="button"
           className="lf-claim"
-          onClick={() => onChoose(plan.id)}
+          onClick={() => { trackEvent('custom', { name: 'lifetime_claim' }); onChoose(plan.id); }}
           disabled={busy === plan.id || soldOut}
         >
           {soldOut ? 'Sold out' : busy === plan.id ? 'Opening checkout…' : `${plan.cta} →`}
@@ -188,8 +188,11 @@ export default function LifetimeReveal({ plan, lifetimeLeft, busy, onChoose }) {
   const [open, setOpen] = useState(false);
   const [booming, setBooming] = useState(false);
   const boomTimer = useRef(null);
+  const teaserRef = useRef(null);
+  const viewedRef = useRef(false);
 
   const reveal = () => {
+    trackEvent('custom', { name: 'lifetime_unwrap' });
     setOpen(true);
     setBooming(true);
     clearTimeout(boomTimer.current);
@@ -198,9 +201,26 @@ export default function LifetimeReveal({ plan, lifetimeLeft, busy, onChoose }) {
 
   useEffect(() => () => clearTimeout(boomTimer.current), []);
 
+  // Fire a one-time impression the first time the teaser scrolls into view, so
+  // the Lifetime funnel (view → unwrap → claim) has a real top.
+  useEffect(() => {
+    const el = teaserRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting && !viewedRef.current) {
+        viewedRef.current = true;
+        trackEvent('custom', { name: 'lifetime_teaser_view' });
+        io.disconnect();
+      }
+    }, { threshold: 0.4 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <>
       <article
+        ref={teaserRef}
         className="pricing-plan pricing-plan-gold lifetime-teaser"
         role="button"
         tabIndex={0}
@@ -212,7 +232,6 @@ export default function LifetimeReveal({ plan, lifetimeLeft, busy, onChoose }) {
         <div className="lifetime-teaser-blur" aria-hidden="true">
           <div className="pricing-plan-name">Lifetime</div>
           <div className="pricing-plan-price">
-            <span className="strike">${plan.wasPrice}</span>
             <span className="num"><span className="currency">$</span>{plan.price}</span>
           </div>
           <div className="pricing-plan-period">{plan.period}</div>
