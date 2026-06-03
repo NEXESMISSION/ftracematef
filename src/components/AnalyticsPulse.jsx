@@ -394,6 +394,10 @@ function SubScore({ label, value }) {
 
 function MetricRow({ m, weakest }) {
   const color = SCORE_COLOR(m.grade);
+  // Status vs the benchmark: grade ≥7 meets the "good" tier, 4–7 is close, <4 below.
+  const status = m.grade >= 7 ? { sym: '✓', cls: 'is-pass' }
+    : m.grade >= 4 ? { sym: '~', cls: 'is-near' }
+    : { sym: '✗', cls: 'is-below' };
   return (
     <li className={`pulse-metric-row ${weakest ? 'is-weakest' : ''}`}>
       <span className="pulse-metric-label">{m.label}</span>
@@ -403,7 +407,7 @@ function MetricRow({ m, weakest }) {
         <span className="pulse-metric-fill" style={{ width: `${m.grade * 10}%`, background: color }} />
       </span>
       <span className="pulse-metric-val">{m.display}</span>
-      <span className="pulse-metric-goal">goal {m.goal}</span>
+      <span className={`pulse-metric-goal ${status.cls}`}>{status.sym} target {m.goal}</span>
     </li>
   );
 }
@@ -442,6 +446,12 @@ function GrowthScore({ data, range }) {
           <MetricRow key={m.key} m={m} weakest={m.key === s.weakestKey} />
         ))}
       </ul>
+
+      <p className="pulse-score-legend">
+        Each bar fills to its 0–10 grade; the tick marks the benchmark (the
+        industry “good” tier). <b className="is-pass">✓</b> meets it,{' '}
+        <b className="is-near">~</b> is close, <b className="is-below">✗</b> is below.
+      </p>
 
       <p className="pulse-score-tip">
         <span className="pulse-score-tip-icon" aria-hidden="true">💡</span>

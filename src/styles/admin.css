@@ -2018,6 +2018,16 @@
 .admin-shell .pulse-metric-val { font-weight: 800; text-align: right; min-width: 52px; }
 .admin-shell .pulse-metric-goal { font-size: 11px; color: var(--ink-muted); font-weight: 700; text-align: right; white-space: nowrap; }
 .admin-shell .pulse-metric-row.is-weakest .pulse-metric-label { color: #c0392b; }
+/* Per-metric benchmark status colour. */
+.admin-shell .pulse-metric-goal.is-pass  { color: #3f9e6b; }
+.admin-shell .pulse-metric-goal.is-near  { color: #d99021; }
+.admin-shell .pulse-metric-goal.is-below { color: #e0524b; }
+/* Grading legend under the metrics. */
+.admin-shell .pulse-score-legend { margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
+.admin-shell .pulse-score-legend b { font-weight: 800; }
+.admin-shell .pulse-score-legend .is-pass  { color: #3f9e6b; }
+.admin-shell .pulse-score-legend .is-near  { color: #d99021; }
+.admin-shell .pulse-score-legend .is-below { color: #e0524b; }
 @media (max-width: 560px) {
   .admin-shell .pulse-metric-row { grid-template-columns: 1fr auto; row-gap: 4px; }
   .admin-shell .pulse-metric-track { grid-column: 1 / -1; order: 3; }
