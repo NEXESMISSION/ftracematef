@@ -441,20 +441,6 @@ export default function AnalyticsPulse() {
 }
 
 /* ── per-visitor drill-down ───────────────────────────────────────────────── */
-const thCell = { padding: '6px 8px', fontWeight: 600, whiteSpace: 'nowrap' };
-const tdCell = { padding: '6px 8px', verticalAlign: 'top' };
-const overlay = {
-  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000,
-  display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-  padding: '5vh 16px', overflowY: 'auto',
-};
-const modal = {
-  background: '#15181d', border: '1px solid #2a2e35', borderRadius: 12,
-  padding: 20, width: '100%', maxWidth: 720, boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-};
-const badge = (bg) => ({ padding: '1px 6px', borderRadius: 6, fontSize: 11, background: bg, color: '#fff', whiteSpace: 'nowrap' });
-const chip = { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, fontSize: 12, background: '#1b1f25', border: '1px solid #262b33', whiteSpace: 'nowrap' };
-
 const shortRef = (ref) => {
   if (!ref) return '(direct)';
   const s = String(ref).replace(/^https?:\/\//, '').replace(/^www\./, '');
@@ -466,15 +452,32 @@ const fmtTime = (s) => {
     return new Date(s).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   } catch { return '—'; }
 };
-function accountCell(r) {
-  if (!r.signed_up) return <span style={{ opacity: 0.5 }}>anonymous</span>;
+// "2m ago" / "3h ago" / "5d ago" — friendlier than a full timestamp in a dense
+// table. Falls back to a date for anything older than a month.
+const LIVE_WINDOW_MS = 5 * 60 * 1000;
+const relTime = (s) => {
+  try {
+    const diff = Date.now() - new Date(s).getTime();
+    if (!isFinite(diff) || diff < 0) return fmtTime(s);
+    const sec = Math.round(diff / 1000);
+    if (sec < 60) return 'just now';
+    const m = Math.round(sec / 60); if (m < 60) return `${m}m ago`;
+    const h = Math.round(m / 60);   if (h < 24) return `${h}h ago`;
+    const d = Math.round(h / 24);   if (d < 30) return `${d}d ago`;
+    return new Date(s).toLocaleDateString();
+  } catch { return '—'; }
+};
+const isLive = (s) => { try { return Date.now() - new Date(s).getTime() < LIVE_WINDOW_MS; } catch { return false; } };
+
+function AccountCell({ r }) {
+  if (!r.signed_up) return <span className="pulse-vis-anon">anonymous</span>;
   const who = r.email || r.display_name || 'account';
   return (
-    <span>
-      {who}
-      {r.paid
-        ? <span style={{ ...badge('#1f7a3d'), marginLeft: 6 }}>{r.plan}</span>
-        : <span style={{ ...badge('#3a3f47'), marginLeft: 6 }}>free</span>}
+    <span className="pulse-vis-account">
+      <span className="pulse-vis-email" title={who}>{who}</span>
+      <span className={`pulse-badge ${r.paid ? 'pulse-badge-paid' : 'pulse-badge-free'}`}>
+        {r.paid ? (r.plan || 'paid') : 'free'}
+      </span>
     </span>
   );
 }
@@ -517,19 +520,19 @@ function VisitorsPanel({ range }) {
 
   return (
     <div className="pulse-card">
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+      <div className="pulse-vis-toolbar">
         <input
           type="search"
+          className="pulse-vis-search"
           placeholder="Search email, city, country, source, referrer…"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          style={{ flex: '1 1 240px', padding: '8px 10px', borderRadius: 8, border: '1px solid #2a2e35', background: '#0d0f12', color: '#e8e8e8' }}
         />
-        <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, opacity: 0.85 }}>
+        <label className="pulse-vis-check">
           <input type="checkbox" checked={onlySignedUp} onChange={(e) => setOnlySignedUp(e.target.checked)} />
           Signed-up only
         </label>
-        <span style={{ fontSize: 13, opacity: 0.7 }}>{fmt(total)} visitors</span>
+        <span className="pulse-vis-count">{fmt(total)} visitors</span>
       </div>
 
       {err && <p className="admin-error" role="alert">{err}</p>}
@@ -537,30 +540,37 @@ function VisitorsPanel({ range }) {
       {!loading && rows.length === 0 && !err && <p className="pulse-empty">No visitors match.</p>}
 
       {!loading && rows.length > 0 && (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <div className="pulse-vis-tablewrap">
+          <table className="pulse-vis-table">
             <thead>
-              <tr style={{ textAlign: 'left', opacity: 0.6 }}>
-                <th style={thCell}>Channel</th>
-                <th style={thCell}>Came from</th>
-                <th style={thCell}>Location</th>
-                <th style={thCell}>Device</th>
-                <th style={thCell}>Account</th>
-                <th style={thCell}>Last seen</th>
-                <th style={thCell} aria-label="actions" />
+              <tr>
+                <th>Channel</th>
+                <th>Came from</th>
+                <th>Location</th>
+                <th>Device</th>
+                <th>Account</th>
+                <th>Last seen</th>
+                <th aria-label="actions" />
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.visitor_id} style={{ borderTop: '1px solid #1d2127' }}>
-                  <td style={tdCell}><span style={{ marginRight: 6 }} aria-hidden="true">{channelIcon(r.channel)}</span>{r.channel || '—'}</td>
-                  <td style={tdCell} title={r.referrer || ''}>{shortRef(r.referrer)}</td>
-                  <td style={tdCell}>{[r.city, r.country].filter(Boolean).join(', ') || '—'}</td>
-                  <td style={tdCell}>{[r.device_type, r.os].filter(Boolean).join(' · ') || '—'}</td>
-                  <td style={tdCell}>{accountCell(r)}</td>
-                  <td style={tdCell}>{fmtDate(r.last_seen_at)}</td>
-                  <td style={tdCell}>
-                    <button type="button" className="pulse-range-btn" onClick={() => setSelected(r.visitor_id)}>View</button>
+                <tr key={r.visitor_id} onClick={() => setSelected(r.visitor_id)}>
+                  <td className="pulse-vis-channel"><span aria-hidden="true">{channelIcon(r.channel)}</span>{r.channel || '—'}</td>
+                  <td title={r.referrer || ''}>{shortRef(r.referrer)}</td>
+                  <td>{[r.city, r.country].filter(Boolean).join(', ') || '—'}</td>
+                  <td>{[r.device_type, r.os].filter(Boolean).join(' · ') || '—'}</td>
+                  <td><AccountCell r={r} /></td>
+                  <td className="pulse-vis-seen" title={fmtDate(r.last_seen_at)}>
+                    {isLive(r.last_seen_at) && <span className="pulse-live-dot" aria-hidden="true" />}
+                    {relTime(r.last_seen_at)}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="pulse-range-btn"
+                      onClick={(e) => { e.stopPropagation(); setSelected(r.visitor_id); }}
+                    >View</button>
                   </td>
                 </tr>
               ))}
@@ -570,9 +580,9 @@ function VisitorsPanel({ range }) {
       )}
 
       {total > PAGE && (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end', marginTop: 12 }}>
+        <div className="pulse-vis-pager">
           <button type="button" className="pulse-range-btn" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>Prev</button>
-          <span style={{ fontSize: 13, opacity: 0.7 }}>Page {page} / {pages}</span>
+          <span className="pulse-vis-pageinfo">Page {page} / {pages}</span>
           <button type="button" className="pulse-range-btn" disabled={offset + PAGE >= total} onClick={() => setOffset(offset + PAGE)}>Next</button>
         </div>
       )}
@@ -585,8 +595,8 @@ function VisitorsPanel({ range }) {
 function Field({ label, value }) {
   return (
     <div>
-      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.45 }}>{label}</div>
-      <div style={{ fontSize: 13, marginTop: 3, wordBreak: 'break-word' }}>{value}</div>
+      <div className="pulse-field-label">{label}</div>
+      <div className="pulse-field-value">{value}</div>
     </div>
   );
 }
@@ -631,31 +641,31 @@ function ActionRow({ e }) {
   const meta = ACTION_META[e.type] || ACTION_META.custom;
   let label;
   if (e.type === 'identify') {
-    label = <em style={{ color: '#27ae60' }}>Signed in</em>;
+    label = <em className="pulse-act-signin">Signed in</em>;
   } else if (e.type === 'rage') {
-    label = <>Rage click <span style={{ fontFamily: 'monospace', opacity: 0.55 }}>{clip(e.props?.sel, 32)}</span></>;
+    label = <>Rage click <span className="pulse-act-sel">{clip(e.props?.sel, 32)}</span></>;
   } else if (e.type === 'custom') {
     label = clip(e.props?.name || 'event');
   } else { // click
     const raw = e.props?.txt || e.props?.sel || '';
     label = (!e.props?.txt && isSelectorLabel(raw))
-      ? <span style={{ fontFamily: 'monospace', opacity: 0.5 }}>{clip(raw, 40)}</span>
+      ? <span className="pulse-act-sel">{clip(raw, 40)}</span>
       : <span>“{clip(raw)}”</span>;
   }
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '2px 0', fontSize: 13 }}>
-      <span style={{ width: 16, textAlign: 'center', flexShrink: 0 }} aria-hidden="true">{meta.icon}</span>
-      <span style={{ minWidth: 0 }}>{label}</span>
-      <span style={{ marginLeft: 'auto', fontSize: 11, opacity: 0.35, flexShrink: 0 }}>{fmtTime(e.created_at)}</span>
+    <div className="pulse-act-row">
+      <span className="pulse-act-icon" aria-hidden="true">{meta.icon}</span>
+      <span className="pulse-act-label">{label}</span>
+      <span className="pulse-act-time">{fmtTime(e.created_at)}</span>
     </div>
   );
 }
 
 function ScrollChip({ depth }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.7 }}>
-      <span style={{ position: 'relative', width: 42, height: 5, borderRadius: 3, background: '#2a2e35', overflow: 'hidden' }}>
-        <span style={{ position: 'absolute', inset: 0, width: `${depth}%`, background: '#4a8cff' }} />
+    <span className="pulse-scrollchip">
+      <span className="pulse-scrollchip-track">
+        <span className="pulse-scrollchip-fill" style={{ width: `${depth}%` }} />
       </span>
       scrolled {depth}%
     </span>
@@ -687,6 +697,13 @@ function VisitorProfile({ visitorId, onClose }) {
     return () => { alive = false; };
   }, [visitorId]);
 
+  // Close on Escape — a modal should always be dismissable from the keyboard.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const v = profile?.visitor || null;
   const events = profile?.events || [];
   const steps = useMemo(() => groupTimeline(events), [events]);
@@ -695,14 +712,14 @@ function VisitorProfile({ visitorId, onClose }) {
   const name = v ? (v.display_name || v.email || (signedUp ? 'Account' : 'Anonymous visitor')) : '';
   const initial = (v?.display_name || v?.email || '?').trim().charAt(0).toUpperCase() || '🌐';
   const conv = !v ? null
-    : v.paid ? { label: 'PAID', bg: '#1f7a3d' }
-    : signedUp ? { label: 'MEMBER', bg: '#2d6cdf' }
-    : { label: 'ANONYMOUS', bg: '#3a3f47' };
+    : v.paid ? { label: 'PAID', cls: 'pulse-conv-paid' }
+    : signedUp ? { label: 'MEMBER', cls: 'pulse-conv-member' }
+    : { label: 'ANONYMOUS', cls: 'pulse-conv-anon' };
 
   return (
-    <div onClick={onClose} style={overlay} role="dialog" aria-modal="true">
-      <div onClick={(e) => e.stopPropagation()} style={modal}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+    <div onClick={onClose} className="pulse-modal-overlay" role="dialog" aria-modal="true">
+      <div onClick={(e) => e.stopPropagation()} className="pulse-modal">
+        <div className="pulse-modal-head">
           <h4 className="pulse-card-title" style={{ margin: 0 }}>Visitor journey</h4>
           <button type="button" className="pulse-range-btn" onClick={onClose}>Close</button>
         </div>
@@ -713,29 +730,21 @@ function VisitorProfile({ visitorId, onClose }) {
         {v && (
           <>
             {/* Identity header */}
-            <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 16 }}>
-              <div style={{
-                width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 20, fontWeight: 700, color: '#fff',
-                background: signedUp ? 'linear-gradient(135deg,#3a6df0,#7b4dd4)' : '#3a3f47',
-              }}>{initial}</div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                  <span style={chip}>{channelIcon(v.channel)} {v.channel || '—'}</span>
-                  {(v.city || v.country) && <span style={chip}>📍 {[v.city, v.country].filter(Boolean).join(', ')}</span>}
-                  <span style={chip}>🖥 {[v.device_type, v.os].filter(Boolean).join(' · ') || '—'}</span>
+            <div className="pulse-id-head">
+              <div className={`pulse-avatar ${signedUp ? 'is-member' : ''}`}>{initial}</div>
+              <div className="pulse-id-main">
+                <div className="pulse-id-name">{name}</div>
+                <div className="pulse-id-chips">
+                  <span className="pulse-chip">{channelIcon(v.channel)} {v.channel || '—'}</span>
+                  {(v.city || v.country) && <span className="pulse-chip">📍 {[v.city, v.country].filter(Boolean).join(', ')}</span>}
+                  <span className="pulse-chip">🖥 {[v.device_type, v.os].filter(Boolean).join(' · ') || '—'}</span>
                 </div>
               </div>
-              {conv && <span style={{ ...badge(conv.bg), fontSize: 12, padding: '4px 10px', letterSpacing: 0.5 }}>{conv.label}</span>}
+              {conv && <span className={`pulse-conv ${conv.cls}`}>{conv.label}</span>}
             </div>
 
             {/* Compact facts */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 12,
-              padding: 14, marginBottom: 18, borderRadius: 10, background: '#0f1216', border: '1px solid #20242b',
-            }}>
+            <div className="pulse-facts">
               <Field label="Came from" value={shortRef(v.referrer)} />
               <Field label="Landing page" value={v.landing_path || '—'} />
               <Field label="Source / campaign" value={[v.source, v.campaign].filter(Boolean).join(' · ') || '—'} />
@@ -750,28 +759,18 @@ function VisitorProfile({ visitorId, onClose }) {
             {/* Step-by-step page journey */}
             <h4 className="pulse-card-title">Journey — {steps.length} {steps.length === 1 ? 'page' : 'pages'}</h4>
             {steps.length === 0 ? <p className="pulse-empty">No events recorded.</p> : (
-              <ol style={{ listStyle: 'none', margin: 0, padding: 0, maxHeight: 360, overflowY: 'auto', position: 'relative' }}>
+              <ol className="pulse-timeline">
                 {steps.map((g, i) => (
-                  <li key={i} style={{ position: 'relative', paddingLeft: 30, paddingBottom: i === steps.length - 1 ? 0 : 16 }}>
-                    {/* connector line */}
-                    {i !== steps.length - 1 && (
-                      <span style={{ position: 'absolute', left: 9, top: 20, bottom: 0, width: 2, background: '#262b33' }} />
-                    )}
-                    {/* step number dot */}
-                    <span style={{
-                      position: 'absolute', left: 0, top: 1, width: 20, height: 20, borderRadius: '50%',
-                      background: '#2d6cdf', color: '#fff', fontSize: 11, fontWeight: 600,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>{i + 1}</span>
-                    {/* step header */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <strong style={{ fontSize: 14 }}>{g.path}</strong>
-                      <span style={{ fontSize: 11, opacity: 0.45 }}>{fmtTime(g.start)}</span>
+                  <li key={i} className={`pulse-step ${i === steps.length - 1 ? 'is-last' : ''}`}>
+                    {i !== steps.length - 1 && <span className="pulse-step-line" />}
+                    <span className="pulse-step-dot">{i + 1}</span>
+                    <div className="pulse-step-head">
+                      <strong className="pulse-step-path">{g.path}</strong>
+                      <span className="pulse-step-time">{fmtTime(g.start)}</span>
                       {g.maxScroll > 0 && <ScrollChip depth={g.maxScroll} />}
                     </div>
-                    {/* nested actions */}
                     {g.actions.length > 0 && (
-                      <div style={{ marginTop: 4 }}>
+                      <div className="pulse-step-actions">
                         {g.actions.map((e, j) => <ActionRow key={j} e={e} />)}
                       </div>
                     )}

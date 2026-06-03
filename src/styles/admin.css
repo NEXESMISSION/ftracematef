@@ -2021,3 +2021,128 @@
 .admin-shell .pulse-channel-row .pulse-bar-label { display: flex; align-items: center; gap: 8px; }
 .admin-shell .pulse-channel-icon { font-size: 16px; line-height: 1; width: 20px; text-align: center; }
 .admin-shell .pulse-channels .pulse-bars { gap: 10px; }
+
+/* =============================================================================
+   Pulse — Visitors drill-down (table + per-visitor journey modal).
+   Light "operator palette" throughout so it sits in the same world as the rest
+   of Pulse instead of the old dark-island table/modal.
+   ============================================================================= */
+
+/* Toolbar: search + filter + count */
+.admin-shell .pulse-vis-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.admin-shell .pulse-vis-search {
+  flex: 1 1 240px; padding: 8px 12px; border-radius: 8px; border: 1.5px solid var(--line);
+  background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 600;
+}
+.admin-shell .pulse-vis-search::placeholder { color: var(--ink-muted); font-weight: 400; }
+.admin-shell .pulse-vis-search:focus { outline: none; border-color: var(--ink); }
+.admin-shell .pulse-vis-check { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--ink-soft); font-weight: 600; cursor: pointer; }
+.admin-shell .pulse-vis-check input { accent-color: var(--coral); }
+.admin-shell .pulse-vis-count { font-size: 13px; color: var(--ink-muted); font-weight: 700; margin-left: auto; }
+
+/* Table */
+.admin-shell .pulse-vis-tablewrap { overflow-x: auto; }
+.admin-shell .pulse-vis-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.admin-shell .pulse-vis-table th {
+  text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted);
+  border-bottom: 2px solid var(--line); white-space: nowrap;
+}
+.admin-shell .pulse-vis-table td { padding: 9px 10px; vertical-align: middle; border-top: 1px solid var(--line); }
+.admin-shell .pulse-vis-table tbody tr { cursor: pointer; transition: background .1s; }
+.admin-shell .pulse-vis-table tbody tr:hover { background: var(--cream); }
+.admin-shell .pulse-vis-channel span { margin-right: 6px; }
+.admin-shell .pulse-vis-account { display: inline-flex; align-items: center; max-width: 260px; }
+.admin-shell .pulse-vis-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-shell .pulse-vis-anon { color: var(--ink-muted); }
+.admin-shell .pulse-vis-seen { white-space: nowrap; color: var(--ink-soft); }
+
+/* Free / paid plan badge */
+.admin-shell .pulse-badge { margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.admin-shell .pulse-badge-free { background: var(--cream-deep); color: var(--ink-muted); }
+.admin-shell .pulse-badge-paid { background: #e4f4ea; color: #1f7a3d; border: 1px solid #b9e0c8; }
+
+/* Live "active in the last 5 min" dot */
+.admin-shell .pulse-live-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px;
+  background: #2f9e5e; vertical-align: middle;
+  box-shadow: 0 0 0 0 rgba(47, 158, 94, .5); animation: pulse-live 1.8s infinite;
+}
+@keyframes pulse-live {
+  0%   { box-shadow: 0 0 0 0 rgba(47, 158, 94, .5); }
+  70%  { box-shadow: 0 0 0 6px rgba(47, 158, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(47, 158, 94, 0); }
+}
+
+/* Pagination */
+.admin-shell .pulse-vis-pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 14px; }
+.admin-shell .pulse-vis-pageinfo { font-size: 13px; color: var(--ink-muted); font-weight: 600; }
+
+/* ── Visitor journey modal ──────────────────────────────────────────────────── */
+.admin-shell .pulse-modal-overlay {
+  position: fixed; inset: 0; background: rgba(43, 33, 24, .55); z-index: 1000;
+  display: flex; align-items: flex-start; justify-content: center; padding: 5vh 16px; overflow-y: auto;
+}
+.admin-shell .pulse-modal {
+  background: var(--paper); border: 2px solid var(--ink); border-radius: 14px;
+  padding: 22px; width: 100%; max-width: 720px; box-shadow: 0 24px 70px rgba(43, 33, 24, .35);
+}
+.admin-shell .pulse-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+
+/* Identity header */
+.admin-shell .pulse-id-head { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; }
+.admin-shell .pulse-avatar {
+  width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 800; color: var(--ink); background: var(--cream-deep);
+}
+.admin-shell .pulse-avatar.is-member { color: #fff; background: linear-gradient(135deg, var(--coral), var(--yellow)); }
+.admin-shell .pulse-id-main { min-width: 0; flex: 1; }
+.admin-shell .pulse-id-name { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.admin-shell .pulse-id-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.admin-shell .pulse-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; background: var(--cream); border: 1px solid var(--line); white-space: nowrap;
+}
+
+/* Conversion badge */
+.admin-shell .pulse-conv { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: .5px; white-space: nowrap; }
+.admin-shell .pulse-conv-paid { background: #1f7a3d; color: #fff; }
+.admin-shell .pulse-conv-member { background: var(--ink); color: var(--paper); }
+.admin-shell .pulse-conv-anon { background: var(--cream-deep); color: var(--ink-muted); }
+
+/* Compact facts grid */
+.admin-shell .pulse-facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px;
+  padding: 14px; margin-bottom: 18px; border-radius: 10px; background: var(--cream); border: 1.5px solid var(--line);
+}
+.admin-shell .pulse-field-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); font-weight: 700; }
+.admin-shell .pulse-field-value { font-size: 13px; margin-top: 3px; word-break: break-word; font-weight: 600; }
+
+/* Journey timeline */
+.admin-shell .pulse-timeline { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; position: relative; }
+.admin-shell .pulse-step { position: relative; padding-left: 30px; padding-bottom: 16px; }
+.admin-shell .pulse-step.is-last { padding-bottom: 0; }
+.admin-shell .pulse-step-line { position: absolute; left: 9px; top: 20px; bottom: 0; width: 2px; background: var(--line); }
+.admin-shell .pulse-step-dot {
+  position: absolute; left: 0; top: 1px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--coral); color: #fff; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.admin-shell .pulse-step-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.admin-shell .pulse-step-path { font-size: 14px; }
+.admin-shell .pulse-step-time { font-size: 11px; color: var(--ink-muted); }
+.admin-shell .pulse-step-actions { margin-top: 4px; }
+
+/* Scroll-depth chip inside a journey step */
+.admin-shell .pulse-scrollchip { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-soft); }
+.admin-shell .pulse-scrollchip-track { position: relative; width: 42px; height: 5px; border-radius: 3px; background: var(--cream-deep); overflow: hidden; }
+.admin-shell .pulse-scrollchip-fill { position: absolute; inset: 0; background: var(--coral); }
+
+/* Action rows (click / rage / identify / custom) */
+.admin-shell .pulse-act-row { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; font-size: 13px; }
+.admin-shell .pulse-act-icon { width: 16px; text-align: center; flex-shrink: 0; }
+.admin-shell .pulse-act-label { min-width: 0; }
+.admin-shell .pulse-act-time { margin-left: auto; font-size: 11px; color: var(--ink-muted); flex-shrink: 0; }
+.admin-shell .pulse-act-sel { font-family: monospace; color: var(--ink-muted); font-size: 12px; }
+.admin-shell .pulse-act-signin { color: #1f7a3d; font-style: normal; font-weight: 700; }
