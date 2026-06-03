@@ -2746,3 +2746,121 @@
   text-decoration: underline; padding: 6px;
 }
 .exit-survey-skip:hover { color: var(--ink, #222); }
+
+/* ── Install promo (account page) ─────────────────────────────────────────── */
+/* Floating "Install app" button. Sits bottom-right above the mobile tabbar. */
+.install-fab {
+  position: fixed;
+  right: 22px;
+  bottom: 24px;
+  z-index: 45;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 20px 13px 17px;
+  border: 2px solid var(--ink, #2b2118);
+  border-radius: 999px;
+  background: var(--coral, #e87a7a);
+  color: #fff;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--ink, #2b2118);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.install-fab:hover { transform: translateY(-2px); box-shadow: 5px 5px 0 var(--ink, #2b2118); }
+.install-fab:active { transform: translateY(1px); box-shadow: 2px 2px 0 var(--ink, #2b2118); }
+.install-fab-icon { width: 20px; height: 20px; flex-shrink: 0; }
+.install-fab-label { line-height: 1; }
+
+@media (max-width: 720px) {
+  /* Lift clear of the fixed bottom tabbar (~118px tall). */
+  .install-fab { right: 16px; bottom: calc(132px + env(safe-area-inset-bottom)); padding: 12px 18px; font-size: 14px; }
+}
+
+/* Promo popup — mirrors the landing "Get the app" section. */
+.install-promo {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.install-promo-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(43, 33, 24, 0.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.install-promo-card {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  background: var(--cream, #fff8ef);
+  border: 2px solid var(--ink, #2b2118);
+  border-radius: 22px;
+  box-shadow: 6px 6px 0 var(--ink, #2b2118);
+  padding: 34px 26px 30px;
+  text-align: center;
+}
+.install-promo-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-soft, #6b5d4d);
+  cursor: pointer;
+}
+.install-promo-close:hover { background: rgba(43, 33, 24, 0.08); color: var(--ink, #2b2118); }
+.install-promo-title {
+  font-family: 'Caveat', cursive;
+  font-size: clamp(30px, 7vw, 40px);
+  color: var(--ink, #2b2118);
+  line-height: 1.05;
+  margin: 0 0 10px;
+}
+.install-promo-title em { font-style: normal; color: var(--coral, #e87a7a); }
+.install-promo-sub {
+  color: var(--ink-soft, #6b5d4d);
+  font-size: 15px;
+  margin: 0 0 22px;
+  line-height: 1.45;
+}
+.install-promo-native {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto 20px;
+  padding: 13px 26px;
+  border: 2px solid var(--ink, #2b2118);
+  border-radius: 12px;
+  background: var(--ink, #2b2118);
+  color: var(--cream, #fff8ef);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--coral, #e87a7a);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.install-promo-native:hover { transform: translateY(-2px); box-shadow: 5px 5px 0 var(--coral, #e87a7a); }
+.install-promo-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+.install-promo-buttons .store-btn img { height: 64px; width: auto; display: block; }

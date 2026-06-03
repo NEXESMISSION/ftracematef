@@ -171,6 +171,65 @@ let timer = null;
 let currentUserId = null;
 let started = false;
 
+/* ── PWA / install funnel ───────────────────────────────────────────────────
+ * The whole install journey is tracked as `custom` events whose `props.name`
+ * carries the step (the ingest endpoint whitelists `name`, drops everything
+ * else — so the platform is baked into the name, e.g. pwa_pick_ios). Steps:
+ *   pwa_standalone      — a load where the app is already running installed
+ *   pwa_promo_open      — the account "Install app" floating button was tapped
+ *   pwa_pick_ios|android— a platform was chosen in the promo popup
+ *   pwa_prompt_available— the browser offered a native install prompt
+ *   pwa_prompt_accepted — the user accepted the native prompt
+ *   pwa_prompt_dismissed— the user dismissed the native prompt
+ *   pwa_installed       — the appinstalled event fired
+ * get_analytics_overview rolls these into overview.pwa for the Pulse dashboard.
+ */
+let deferredInstallPrompt = null;
+const installListeners = new Set();
+function notifyInstall() { for (const cb of installListeners) { try { cb(); } catch { /* ignore */ } } }
+
+/** True when the page is running as an installed PWA (standalone display). */
+export function isStandalone() {
+  try {
+    return window.matchMedia?.('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;
+  } catch { return false; }
+}
+
+/** True when a native install prompt has been captured and can be fired. */
+export function isInstallPromptAvailable() { return !!deferredInstallPrompt; }
+
+/** Subscribe to install-availability changes. Returns an unsubscribe fn. */
+export function onInstallAvailability(cb) {
+  installListeners.add(cb);
+  return () => installListeners.delete(cb);
+}
+
+/** Record an install-funnel step (see the name list above). */
+export function trackInstall(name, props = {}) {
+  enqueue('custom', { name, ...props });
+}
+
+/**
+ * Fire the captured native install prompt (Android / desktop Chrome). Resolves
+ * to 'accepted' | 'dismissed' | null (no prompt was available). Tracks the
+ * outcome. Safe no-op on browsers (iOS Safari) that never expose a prompt.
+ */
+export async function promptInstall() {
+  const dp = deferredInstallPrompt;
+  if (!dp) return null;
+  deferredInstallPrompt = null;
+  notifyInstall();
+  try {
+    dp.prompt();
+    const choice = await dp.userChoice;
+    const outcome = choice?.outcome === 'accepted' ? 'accepted' : 'dismissed';
+    trackInstall(outcome === 'accepted' ? 'pwa_prompt_accepted' : 'pwa_prompt_dismissed');
+    flush();
+    return outcome;
+  } catch { return null; }
+}
+
 function enqueue(type, props = {}, path) {
   if (!INGEST_URL) return;
   const sess = sessionId();
@@ -248,6 +307,25 @@ export function initTracking() {
   } catch { /* ignore */ }
 
   timer = setInterval(flush, FLUSH_MS);
+
+  // ── PWA / install funnel listeners ──
+  // A load while already installed (counts distinct visitors server-side, so
+  // re-emitting per load is harmless).
+  try { if (isStandalone()) enqueue('custom', { name: 'pwa_standalone' }); } catch { /* ignore */ }
+  // Capture the native prompt so the account "Install app" button can fire it
+  // on demand instead of letting the browser's mini-infobar decide the timing.
+  window.addEventListener('beforeinstallprompt', (e) => {
+    try { e.preventDefault(); } catch { /* ignore */ }
+    deferredInstallPrompt = e;
+    enqueue('custom', { name: 'pwa_prompt_available' });
+    notifyInstall();
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    enqueue('custom', { name: 'pwa_installed' });
+    notifyInstall();
+    flush();
+  });
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flush();

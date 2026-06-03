@@ -451,10 +451,72 @@ function GrowthScore({ data, range }) {
   );
 }
 
+/* ── App install funnel (PWA) ─────────────────────────────────────────────── */
+// Rolls up the pwa_* custom events into the install journey: promo opened on
+// the account page → platform chosen → native prompt offered/accepted →
+// installed → opened as a standalone app. Reads overview.pwa (added by the
+// pwa_install_tracking migration); degrades to an empty state on older data.
+function InstallStat({ label, value, hint, accent }) {
+  return (
+    <div className={`pulse-install-stat ${accent ? 'is-accent' : ''}`}>
+      <span className="pulse-install-value">{fmt(value || 0)}</span>
+      <span className="pulse-install-label">{label}</span>
+      {hint && <span className="pulse-install-hint">{hint}</span>}
+    </div>
+  );
+}
+
+function InstallFunnel({ pwa }) {
+  const p = pwa || {};
+  const promoOpen   = p.promo_open || 0;
+  const pickIos     = p.pick_ios || 0;
+  const pickAndroid = p.pick_android || 0;
+  const promptAvail = p.prompt_available || 0;
+  const accepted    = p.prompt_accepted || 0;
+  const dismissed   = p.prompt_dismissed || 0;
+  const installed   = p.installed || 0;
+  const standalone  = p.standalone_visitors || 0;
+  const anyData = promoOpen || pickIos || pickAndroid || promptAvail || installed || standalone;
+
+  const platformMax = Math.max(pickIos, pickAndroid, 1);
+
+  return (
+    <div className="pulse-card pulse-install">
+      <h4 className="pulse-card-title">App installs (PWA)</h4>
+      {!anyData ? (
+        <p className="pulse-empty">No install activity in this range yet.</p>
+      ) : (
+        <>
+          <div className="pulse-install-grid">
+            <InstallStat label="Installed" value={installed} hint="appinstalled fired" accent />
+            <InstallStat label="Using the app" value={standalone} hint="opened standalone" accent />
+            <InstallStat label="Promo opened" value={promoOpen} hint="tapped “Install app”" />
+            <InstallStat label="Native prompts" value={promptAvail} hint={`${fmt(accepted)} accepted · ${fmt(dismissed)} dismissed`} />
+          </div>
+
+          <div className="pulse-install-platforms">
+            {[
+              { label: 'iOS — Safari steps', v: pickIos, icon: '' },
+              { label: 'Android — Chrome steps', v: pickAndroid, icon: '🤖' },
+            ].map((row) => (
+              <div key={row.label} className="pulse-bar-row">
+                <span className="pulse-bar-label">{row.icon} {row.label}</span>
+                <span className="pulse-bar-track">
+                  <span className="pulse-bar-fill" style={{ width: `${(row.v / platformMax) * 100}%` }} />
+                </span>
+                <span className="pulse-bar-value">{fmt(row.v)}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ── main ─────────────────────────────────────────────────────────────────── */
 export default function AnalyticsPulse() {
   const [range, setRange] = useState('7d');
-  const [view, setView] = useState('overview'); // 'overview' | 'visitors'
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -512,28 +574,10 @@ export default function AnalyticsPulse() {
         </div>
       </header>
 
-      {/* Overview (stacked rollups) ⇆ Visitors (per-individual drill-down). */}
-      <div className="pulse-range" role="tablist" aria-label="View" style={{ marginBottom: 12 }}>
-        {[{ id: 'overview', label: 'Overview' }, { id: 'visitors', label: 'Visitors' }].map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            role="tab"
-            aria-selected={view === v.id}
-            className={`pulse-range-btn ${view === v.id ? 'is-active' : ''}`}
-            onClick={() => setView(v.id)}
-          >
-            {v.label}
-          </button>
-        ))}
-      </div>
+      {error && <p className="admin-error" role="alert">{error}</p>}
+      {loading && !data && <p className="pulse-empty">Loading analytics…</p>}
 
-      {view === 'visitors' && <VisitorsPanel range={range} />}
-
-      {view === 'overview' && error && <p className="admin-error" role="alert">{error}</p>}
-      {view === 'overview' && loading && !data && <p className="pulse-empty">Loading analytics…</p>}
-
-      {view === 'overview' && data && (
+      {data && (
         <>
           {/* Growth Health — the interpreted headline that grades the raw KPIs
               below against benchmarks. Re-computed client-side per range. */}
@@ -547,6 +591,9 @@ export default function AnalyticsPulse() {
             <Kpi label="Signups" value={fmt(t.signups)} sub={`${pct(t.signups, t.visitors)} of visitors`} />
             <Kpi label="Live now" value={fmt(t.live)} accent />
           </div>
+
+          {/* App install funnel (PWA) */}
+          <InstallFunnel pwa={data.pwa} />
 
           {/* Globe + country ranking */}
           <div className="pulse-geo">
@@ -652,6 +699,11 @@ export default function AnalyticsPulse() {
           </div>
         </>
       )}
+
+      {/* Per-visitor drill-down — now part of the same single page rather than a
+          separate tab. Self-loads off the range, independent of the overview. */}
+      <h3 className="pulse-section-title">Visitors</h3>
+      <VisitorsPanel range={range} />
     </section>
   );
 }

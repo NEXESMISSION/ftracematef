@@ -15,6 +15,7 @@ import { canUseFreeTrial, freeSessionsLeft } from '../lib/freeTrial.js';
 import Alert from '../components/Alert.jsx';
 import { usePresence } from '../hooks/usePresence.js';
 import Community from '../components/Community.jsx';
+import InstallPromo from '../components/InstallPromo.jsx';
 
 const STATUS_TONE = {
   active:    { label: 'Active',     tone: 'good'    },
@@ -838,6 +839,10 @@ export default function Account() {
         title={alert?.title ?? 'Heads up'}
         message={alert?.message ?? ''}
       />
+
+      {/* Floating "Install app" button → popup mirroring the landing page's
+          install section. Hides itself when already running installed. */}
+      <InstallPromo />
     </div>
   );
 }
