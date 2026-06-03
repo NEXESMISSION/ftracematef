@@ -60,16 +60,18 @@ function ConfettiBoom() {
 }
 
 /* ── countdown ──────────────────────────────────────────────────────────────
- * A personal 24h offer window, stamped in localStorage on first reveal so it
- * doesn't reset on refresh (and doesn't restart once expired — that would read
- * as fake). Returns padded h/m/s + expired flag, ticking every second. */
+ * A rolling 24h offer window, per device. The deadline is stamped in
+ * localStorage so it survives refreshes and return visits — they come back to
+ * the same clock still ticking down. When it hits zero it rolls a fresh 24h so
+ * the urgency always feels live. Returns padded h/m/s, ticking every second. */
 const DEADLINE_KEY = 'tm:lifetime-deadline';
 const OFFER_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+// Current deadline, or a fresh now+24h if there's none or the last one lapsed.
 function readDeadline() {
   try {
     const raw = Number(window.localStorage.getItem(DEADLINE_KEY));
-    if (raw && !Number.isNaN(raw)) return raw;
+    if (raw && !Number.isNaN(raw) && raw > Date.now()) return raw;
     const d = Date.now() + OFFER_WINDOW_MS;
     window.localStorage.setItem(DEADLINE_KEY, String(d));
     return d;
@@ -81,20 +83,29 @@ function readDeadline() {
 const pad = (n) => String(n).padStart(2, '0');
 
 function useCountdown() {
-  const deadlineRef = useRef(null);
-  if (deadlineRef.current == null) deadlineRef.current = readDeadline();
+  const [deadline, setDeadline] = useState(() => readDeadline());
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const id = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      // Looped back to zero → roll a fresh 24h window (and persist it) so the
+      // countdown never sits dead.
+      if (t >= deadline) {
+        const next = t + OFFER_WINDOW_MS;
+        try { window.localStorage.setItem(DEADLINE_KEY, String(next)); } catch { /* ignore */ }
+        setDeadline(next);
+      }
+    }, 1000);
     return () => clearInterval(id);
-  }, []);
-  const ms = Math.max(0, deadlineRef.current - now);
+  }, [deadline]);
+  const ms = Math.max(0, deadline - now);
   const total = Math.floor(ms / 1000);
   return {
     h: pad(Math.floor(total / 3600)),
     m: pad(Math.floor((total % 3600) / 60)),
     s: pad(total % 60),
-    expired: ms <= 0,
+    expired: false,
   };
 }
 
