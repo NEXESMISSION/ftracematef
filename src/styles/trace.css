@@ -832,14 +832,16 @@ body:has(.trace-stage) {
   text-transform: uppercase;
 }
 
-/* ----- Idle dim: chrome fades after 10s of no interaction ----- */
+/* ----- Idle dim: chrome fades after 10s of no interaction -----
+   Only the bottom menu (dock) and legacy /live controls fade. The top bar
+   stays at full opacity so the logo/brand remains visible during tracing
+   and in recordings. */
 .trace-topbar,
 .trace-dock,
 .trace-controls,
 .warp-reset {
   transition: opacity 0.6s ease;
 }
-.trace-stage.is-idle .trace-topbar,
 .trace-stage.is-idle .trace-dock,
 .trace-stage.is-idle .trace-controls,
 .trace-stage.is-idle .warp-reset {

@@ -26,8 +26,13 @@ export default function Landing() {
       <Nav />
       <Hero onPlayClick={openVideo} />
       <Marquee />
-      <HowItWorks />
-      <AudienceSections />
+      {/* On mobile the order flips (see .how-aud-group in globals.css): the
+          "Made for you" reels come first to show the product in motion before
+          the step-by-step explainer. Desktop keeps source order. */}
+      <div className="how-aud-group">
+        <HowItWorks />
+        <AudienceSections />
+      </div>
       {!isPaid && <Pricing />}
       <GetApp />
       <WelcomeOverlay />

@@ -239,6 +239,218 @@ function ScrollFunnel({ scroll, pageviews }) {
   );
 }
 
+/* ── Growth Health score ──────────────────────────────────────────────────── */
+// A single 0–10 read on how the top-of-funnel is doing, graded against rough but
+// honest SaaS landing-page benchmarks. Three sub-scores roll up into the
+// headline number:
+//   • Conversion  — visitor→signup and signup→paid rates (45%)
+//   • Engagement  — returning-visitor rate and pages per session (30%)
+//   • Acquisition — channel diversity, i.e. not over-reliant on one source (25%)
+// Everything derives from the rollup we already fetch, so there's no extra
+// request and the score re-grades itself whenever you change the date range.
+
+// Map a measured value to 0–10 against three ascending benchmark tiers.
+// Below `ok` ramps 0→4, ok→good ramps 4→7, good→great ramps 7→10, ≥great = 10.
+function gradeTiers(value, { ok, good, great }) {
+  if (!isFinite(value) || value <= 0) return 0;
+  if (value >= great) return 10;
+  if (value >= good)  return 7 + (3 * (value - good)) / (great - good);
+  if (value >= ok)    return 4 + (3 * (value - ok)) / (good - ok);
+  return (4 * value) / ok;
+}
+
+// Effective number of channels via inverse Herfindahl (1 / Σ shareᵢ²). One
+// dominant source ≈ 1; an even spread across N sources ≈ N. Rewards a
+// diversified acquisition mix without punishing a healthy one.
+function effectiveChannels(byChannel) {
+  const rows = (byChannel || []).filter((r) => (r.visitors || 0) > 0);
+  const total = rows.reduce((s, r) => s + (r.visitors || 0), 0);
+  if (total <= 0) return 0;
+  const hhi = rows.reduce((s, r) => { const sh = (r.visitors || 0) / total; return s + sh * sh; }, 0);
+  return hhi > 0 ? 1 / hhi : 0;
+}
+
+const clamp10 = (n) => Math.max(0, Math.min(10, n));
+const round1 = (n) => Math.round(n * 10) / 10;
+const fmtPct = (v) => `${(v * 100).toFixed(1)}%`;
+const fmtNum = (v) => v.toFixed(1);
+
+function computeGrowthScore(data) {
+  const t = data?.totals || {};
+  const f = data?.funnel || {};
+  const visitors  = f.visitors || t.visitors || 0;
+  const signups   = (f.signups != null ? f.signups : t.signups) || 0;
+  const paid      = f.paid || 0;
+  const sessions  = t.sessions || 0;
+  const pageviews = t.pageviews || 0;
+  const returning = t.returning_visitors || 0;
+
+  const signupRate = visitors > 0 ? signups / visitors : 0;
+  const paidRate   = signups  > 0 ? paid / signups : 0;
+  const returnRate = visitors > 0 ? returning / visitors : 0;
+  const pps        = sessions > 0 ? pageviews / sessions : 0;
+  const effCh      = effectiveChannels(data?.by_channel);
+
+  const B = {
+    signup: { ok: 0.02, good: 0.05, great: 0.10 },
+    paid:   { ok: 0.02, good: 0.05, great: 0.12 },
+    ret:    { ok: 0.10, good: 0.25, great: 0.40 },
+    pps:    { ok: 1.5,  good: 2.5,  great: 4 },
+    chan:   { ok: 1.5,  good: 3,    great: 5 },
+  };
+
+  const gSignup = gradeTiers(signupRate, B.signup);
+  const gPaid   = gradeTiers(paidRate,   B.paid);
+  const gReturn = gradeTiers(returnRate, B.ret);
+  const gPps    = gradeTiers(pps,        B.pps);
+  const gChan   = gradeTiers(effCh,      B.chan);
+
+  const conversion  = clamp10((gSignup + gPaid) / 2);
+  const engagement  = clamp10((gReturn + gPps) / 2);
+  const acquisition = clamp10(gChan);
+  const overall = round1(clamp10(conversion * 0.45 + engagement * 0.30 + acquisition * 0.25));
+
+  const metrics = [
+    {
+      key: 'signup', label: 'Signup rate', display: fmtPct(signupRate), grade: gSignup,
+      goal: `${(B.signup.good * 100).toFixed(0)}%+`,
+      tipLow: 'Few visitors sign up. Tighten the hero promise, surface the CTA above the fold, and cut fields before the signup wall.',
+      tipMid: 'Signup rate is decent. Test CTA copy and place social proof right beside it to push past the 5% mark.',
+    },
+    {
+      key: 'paid', label: 'Free → paid', display: fmtPct(paidRate), grade: gPaid,
+      goal: `${(B.paid.good * 100).toFixed(0)}%+`,
+      tipLow: 'Signups rarely convert to paid. Add an in-product nudge at the free-session limit and make the upgrade value obvious.',
+      tipMid: 'Paid conversion is okay. Try a time-boxed first-purchase discount and clearer plan framing on the paywall.',
+    },
+    {
+      key: 'ret', label: 'Returning visitors', display: fmtPct(returnRate), grade: gReturn,
+      goal: `${(B.ret.good * 100).toFixed(0)}%+`,
+      tipLow: 'Most visitors never come back. Capture emails earlier and add a reason to return (saved work, streaks, reminders).',
+      tipMid: 'Return rate is healthy-ish. Lifecycle email or a "your trace is waiting" nudge can lift it further.',
+    },
+    {
+      key: 'pps', label: 'Pages / session', display: fmtNum(pps), grade: gPps,
+      goal: `${B.pps.good}+`,
+      tipLow: 'Sessions are shallow. Add clear next-step links between sections so visitors explore beyond the landing page.',
+      tipMid: 'Depth is okay. Stronger internal links from the hero to pricing / how-to-use will deepen sessions.',
+    },
+    {
+      key: 'chan', label: 'Channel diversity', display: `${fmtNum(effCh)} eff.`, grade: gChan,
+      goal: `${B.chan.good}+`,
+      tipLow: 'Traffic leans on one source — risky. Open a second channel (SEO, a social loop, or referrals) to de-risk growth.',
+      tipMid: 'Channel mix is forming. Double down on the two best performers and seed one more to spread the risk.',
+    },
+  ];
+
+  const weakest = metrics.reduce((lo, m) => (m.grade < lo.grade ? m : lo), metrics[0]);
+  const tip = overall >= 8
+    ? 'Strong all round — keep the funnel instrumented and protect what is working.'
+    : (weakest.grade < 4 ? weakest.tipLow : weakest.tipMid);
+
+  return { overall, conversion, engagement, acquisition, metrics, weakestKey: weakest.key, tip, sample: visitors };
+}
+
+const SCORE_COLOR = (s) => (s >= 7 ? '#3f9e6b' : s >= 4 ? '#d99021' : '#e0524b');
+const verdict = (s) =>
+  s >= 8 ? 'Excellent' : s >= 6.5 ? 'Healthy' : s >= 4.5 ? 'Mixed' : s >= 2.5 ? 'Needs work' : 'Critical';
+
+function ScoreGauge({ score }) {
+  const R = 52;
+  const C = 2 * Math.PI * R;
+  const frac = Math.max(0, Math.min(1, score / 10));
+  const color = SCORE_COLOR(score);
+  return (
+    <div className="pulse-score-gauge">
+      <svg viewBox="0 0 120 120" width="120" height="120" aria-hidden="true">
+        <circle cx="60" cy="60" r={R} fill="none" stroke="var(--cream-deep)" strokeWidth="11" />
+        <circle
+          cx="60" cy="60" r={R} fill="none" stroke={color} strokeWidth="11" strokeLinecap="round"
+          strokeDasharray={C} strokeDashoffset={C * (1 - frac)} transform="rotate(-90 60 60)"
+        />
+      </svg>
+      <div className="pulse-score-num">
+        <span className="pulse-score-value" style={{ color }}>{score.toFixed(1)}</span>
+        <span className="pulse-score-outof">/ 10</span>
+      </div>
+    </div>
+  );
+}
+
+function SubScore({ label, value }) {
+  const color = SCORE_COLOR(value);
+  return (
+    <div className="pulse-subscore">
+      <div className="pulse-subscore-head">
+        <span className="pulse-subscore-label">{label}</span>
+        <span className="pulse-subscore-value" style={{ color }}>{value.toFixed(1)}</span>
+      </div>
+      <span className="pulse-subscore-track">
+        <span className="pulse-subscore-fill" style={{ width: `${value * 10}%`, background: color }} />
+      </span>
+    </div>
+  );
+}
+
+function MetricRow({ m, weakest }) {
+  const color = SCORE_COLOR(m.grade);
+  return (
+    <li className={`pulse-metric-row ${weakest ? 'is-weakest' : ''}`}>
+      <span className="pulse-metric-label">{m.label}</span>
+      <span className="pulse-metric-track">
+        {/* Benchmark tick sits at the "good" tier (grade 7 = 70%). */}
+        <span className="pulse-metric-bench" style={{ left: '70%' }} aria-hidden="true" />
+        <span className="pulse-metric-fill" style={{ width: `${m.grade * 10}%`, background: color }} />
+      </span>
+      <span className="pulse-metric-val">{m.display}</span>
+      <span className="pulse-metric-goal">goal {m.goal}</span>
+    </li>
+  );
+}
+
+function GrowthScore({ data, range }) {
+  const s = useMemo(() => computeGrowthScore(data), [data]);
+  const lowData = s.sample < 50;
+  const rangeLabel = (RANGES.find((r) => r.id === range) || {}).label || range;
+  return (
+    <div className="pulse-card pulse-score-card">
+      <div className="pulse-score-main">
+        <ScoreGauge score={s.overall} />
+        <div className="pulse-score-headline">
+          <h4 className="pulse-card-title" style={{ margin: 0 }}>Growth Health</h4>
+          <p className="pulse-score-verdict" style={{ color: SCORE_COLOR(s.overall) }}>
+            {verdict(s.overall)}
+          </p>
+          <p className="pulse-score-meta">
+            Funnel · engagement · acquisition, graded vs benchmarks · {rangeLabel}
+          </p>
+          {lowData && (
+            <p className="pulse-score-lowdata">
+              ⚠ Only {fmt(s.sample)} visitors in range — score is directional until you have more traffic.
+            </p>
+          )}
+        </div>
+        <div className="pulse-subscores">
+          <SubScore label="Conversion" value={s.conversion} />
+          <SubScore label="Engagement" value={s.engagement} />
+          <SubScore label="Acquisition" value={s.acquisition} />
+        </div>
+      </div>
+
+      <ul className="pulse-metrics">
+        {s.metrics.map((m) => (
+          <MetricRow key={m.key} m={m} weakest={m.key === s.weakestKey} />
+        ))}
+      </ul>
+
+      <p className="pulse-score-tip">
+        <span className="pulse-score-tip-icon" aria-hidden="true">💡</span>
+        <span><strong>Biggest lever:</strong> {s.tip}</span>
+      </p>
+    </div>
+  );
+}
+
 /* ── main ─────────────────────────────────────────────────────────────────── */
 export default function AnalyticsPulse() {
   const [range, setRange] = useState('7d');
@@ -323,6 +535,10 @@ export default function AnalyticsPulse() {
 
       {view === 'overview' && data && (
         <>
+          {/* Growth Health — the interpreted headline that grades the raw KPIs
+              below against benchmarks. Re-computed client-side per range. */}
+          <GrowthScore data={data} range={range} />
+
           {/* KPI tiles */}
           <div className="pulse-kpis">
             <Kpi label="Visitors" value={fmt(t.visitors)} sub={`${fmt(t.new_visitors)} new · ${fmt(t.returning_visitors)} returning`} />

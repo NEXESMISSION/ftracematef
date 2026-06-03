@@ -656,6 +656,15 @@ main, header, section, footer { position: relative; z-index: 1; }
   padding-bottom: clamp(60px, 7vw, 100px);
 }
 
+/* "How it works" + "Made for you" share this wrapper purely so we can reorder
+   them on mobile. On desktop it's a plain block (source order: How → Made for
+   you). On mobile it becomes a flex column and the reels (.aud) jump to the top
+   so visitors see the product moving before the four-step explainer. */
+@media (max-width: 960px) {
+  .how-aud-group { display: flex; flex-direction: column; }
+  .how-aud-group .aud { order: -1; }
+}
+
 .how-grid {
   display: flex;
   align-items: stretch;
@@ -892,13 +901,41 @@ main, header, section, footer { position: relative; z-index: 1; }
     0 22px 40px -14px rgba(43, 33, 24, 0.20);
 }
 
-/* ── Free starter card — subtle mint tint to read as "start here" ───────── */
+/* ── Free starter card — the welcoming "start here" on-ramp ─────────────── */
 .pricing-plan-free {
-  background: #f1f7ee;
-  border-color: rgba(90, 138, 110, 0.28);
+  background:
+    radial-gradient(120% 80% at 0% 0%, #eaf4e4 0%, rgba(234, 244, 228, 0) 60%),
+    linear-gradient(180deg, #f3f9ef 0%, #ecf5e6 100%);
+  border-color: rgba(90, 138, 110, 0.30);
 }
-.pricing-plan-free .pricing-plan-name { color: #4a7a5a; }
-.pricing-plan-free .pricing-plan-price .num { color: var(--ink); }
+.pricing-plan-free:hover {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 22px 40px -14px rgba(74, 122, 90, 0.30);
+}
+.pricing-plan-free .pricing-plan-name { color: #3f6e4f; }
+.pricing-plan-free .pricing-plan-price .num { color: #2f5a3e; }
+
+/* "Start here" eyebrow — a quiet mint pill that frames the free tier as the
+   recommended entry point without shouting over the paid plans. */
+.pc-free-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  font-family: 'Nunito', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: #3f6e4f;
+  background: rgba(90, 138, 110, 0.14);
+  border: 1px solid rgba(90, 138, 110, 0.28);
+  padding: 5px 12px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+.pc-free-eyebrow span { color: #6aa07c; font-size: 12px; }
 
 /* Free header reads as a quantity ("3 free sessions"), not a price. The word
    "free" in mint sits beside the number so it can't be mistaken for "$3". */
@@ -907,8 +944,30 @@ main, header, section, footer { position: relative; z-index: 1; }
   display: flex; flex-direction: column; line-height: 1.05;
   font-family: 'Nunito', sans-serif;
 }
-.pc-free-unit strong { font-size: 22px; font-weight: 800; color: #4a7a5a; }
+.pc-free-unit strong { font-size: 22px; font-weight: 800; color: #3f6e4f; }
 .pc-free-unit span { font-size: 14px; font-weight: 700; color: var(--ink-soft); }
+
+/* Mint badge + checks — keep the free card monochromatically green rather
+   than borrowing the paid plans' coral accent. */
+.pc-free-badge {
+  color: #3f6e4f;
+  background: rgba(90, 138, 110, 0.12);
+  border-color: rgba(90, 138, 110, 0.45);
+}
+.pc-check.pc-check-mint {
+  background: rgba(90, 138, 110, 0.18);
+  color: #4a8a6e;
+}
+
+/* Mint CTA — a "go" green instead of the paid plans' dark button, so the free
+   path is visually the easiest one to take. */
+.pricing-plan-cta.pricing-plan-cta-free {
+  background: #4a8a6e;
+}
+.pricing-plan-cta.pricing-plan-cta-free:hover {
+  background: #3f7a60;
+  box-shadow: 0 10px 22px -8px rgba(63, 110, 79, 0.45);
+}
 
 .pricing-plan-name {
   font-family: 'Caveat', cursive;
@@ -2680,6 +2739,27 @@ main, header, section, footer { position: relative; z-index: 1; }
   object-fit: cover;
 }
 @media (max-width: 560px) {
-  /* Two reels per row on phones so the section doesn't run very tall. */
-  .aud-reel-card { flex: 0 1 44%; max-width: 48%; }
+  /* Phones: a swipeable, snap-scrolling carousel instead of two shrunken reels
+     per row. Each card is large with the next one peeking, so it reads as
+     "swipe me". The negative margins let the row bleed to the screen edges
+     while the leading padding keeps the first card aligned to the content. */
+  .aud-reels-grid {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scroll-padding-left: 24px;
+    gap: 14px;
+    margin-left: -24px;
+    margin-right: -24px;
+    padding: 4px 24px 14px;
+    scrollbar-width: none;
+  }
+  .aud-reels-grid::-webkit-scrollbar { display: none; }
+  .aud-reel-card {
+    flex: 0 0 72%;
+    max-width: 72%;
+    scroll-snap-align: center;
+  }
 }

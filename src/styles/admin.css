@@ -1963,6 +1963,74 @@
   background: var(--paper); border: 2px solid var(--ink); border-radius: 12px;
   padding: 16px; margin-bottom: 16px;
 }
+
+/* ── Growth Health score card ─────────────────────────────────────────────── */
+.admin-shell .pulse-score-card { box-shadow: 4px 4px 0 var(--ink); }
+.admin-shell .pulse-score-main {
+  display: grid;
+  grid-template-columns: auto 1fr minmax(200px, 280px);
+  align-items: center;
+  gap: 20px;
+}
+@media (max-width: 720px) {
+  .admin-shell .pulse-score-main { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+}
+
+.admin-shell .pulse-score-gauge { position: relative; width: 120px; height: 120px; flex-shrink: 0; }
+.admin-shell .pulse-score-num {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; line-height: 1;
+}
+.admin-shell .pulse-score-value { font-size: 34px; font-weight: 800; }
+.admin-shell .pulse-score-outof { font-size: 12px; font-weight: 700; color: var(--ink-muted); margin-top: 2px; }
+
+.admin-shell .pulse-score-headline { min-width: 0; }
+.admin-shell .pulse-score-verdict { font-size: 22px; font-weight: 800; margin: 4px 0 2px; line-height: 1.1; }
+.admin-shell .pulse-score-meta { font-size: 12px; color: var(--ink-soft); margin: 0; }
+.admin-shell .pulse-score-lowdata { font-size: 12px; color: #b06a14; margin: 6px 0 0; font-weight: 700; }
+
+.admin-shell .pulse-subscores { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.admin-shell .pulse-subscore-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.admin-shell .pulse-subscore-label { font-size: 12px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .05em; }
+.admin-shell .pulse-subscore-value { font-size: 15px; font-weight: 800; }
+.admin-shell .pulse-subscore-track { display: block; height: 8px; background: var(--cream-deep); border-radius: 999px; overflow: hidden; }
+.admin-shell .pulse-subscore-fill { display: block; height: 100%; border-radius: 999px; transition: width .4s ease; }
+
+/* Per-metric grade rows with a benchmark tick. */
+.admin-shell .pulse-metrics {
+  list-style: none; margin: 16px 0 0; padding: 16px 0 0;
+  border-top: 1.5px solid var(--line); display: flex; flex-direction: column; gap: 10px;
+}
+.admin-shell .pulse-metric-row {
+  display: grid; grid-template-columns: minmax(120px, 1.3fr) 2fr auto auto;
+  align-items: center; gap: 12px; font-size: 13px;
+}
+.admin-shell .pulse-metric-label { font-weight: 700; }
+.admin-shell .pulse-metric-track {
+  position: relative; height: 9px; background: var(--cream-deep);
+  border-radius: 999px; overflow: hidden;
+}
+.admin-shell .pulse-metric-fill { display: block; height: 100%; border-radius: 999px; transition: width .4s ease; }
+.admin-shell .pulse-metric-bench {
+  position: absolute; top: -2px; bottom: -2px; width: 2px;
+  background: var(--ink); opacity: .35; border-radius: 2px; z-index: 1;
+}
+.admin-shell .pulse-metric-val { font-weight: 800; text-align: right; min-width: 52px; }
+.admin-shell .pulse-metric-goal { font-size: 11px; color: var(--ink-muted); font-weight: 700; text-align: right; white-space: nowrap; }
+.admin-shell .pulse-metric-row.is-weakest .pulse-metric-label { color: #c0392b; }
+@media (max-width: 560px) {
+  .admin-shell .pulse-metric-row { grid-template-columns: 1fr auto; row-gap: 4px; }
+  .admin-shell .pulse-metric-track { grid-column: 1 / -1; order: 3; }
+  .admin-shell .pulse-metric-goal { order: 2; }
+}
+
+.admin-shell .pulse-score-tip {
+  display: flex; gap: 8px; align-items: flex-start;
+  margin: 14px 0 0; padding: 12px 14px;
+  background: var(--cream); border: 1.5px solid var(--line); border-radius: 10px;
+  font-size: 13px; line-height: 1.45;
+}
+.admin-shell .pulse-score-tip-icon { flex-shrink: 0; }
 .admin-shell .pulse-card-title { margin: 0 0 12px; font-size: 14px; font-weight: 800; letter-spacing: .02em; }
 .admin-shell .pulse-empty { color: var(--ink-soft); font-size: 13px; margin: 4px 0; }
 

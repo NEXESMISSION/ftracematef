@@ -46,7 +46,7 @@ function ReelCard({ reel }) {
   }, [load]);
 
   return (
-    <div className="aud-reel-card">
+    <div className="aud-reel-card" role="listitem">
       <video
         ref={videoRef}
         className="aud-reel-video"
@@ -70,9 +70,13 @@ export default function AudienceSections() {
       <div className="section-head">
         <p className="kicker hand">made for you</p>
         <h2 id="aud-title">However you create.</h2>
+        <p className="lead">Artists, students, crafters, tattooists — real traces, start to finish.</p>
       </div>
 
-      <div className="aud-reels-grid">
+      {/* Desktop: centered row of reels. Mobile: a swipeable, snap-scrolling
+          carousel with larger cards (see .aud-reels-grid in globals.css) so the
+          portrait reels read clearly instead of shrinking two-to-a-row. */}
+      <div className="aud-reels-grid" role="list">
         {REELS.map((r) => (
           <ReelCard key={r.id} reel={r} />
         ))}

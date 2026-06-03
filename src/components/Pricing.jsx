@@ -3,9 +3,9 @@ import { VISIBLE_PLANS } from '../lib/plans.js';
 import { FREE_SESSION_LIMIT } from '../lib/freeTrial.js';
 import { usePlanCheckout } from '../hooks/usePlanCheckout.js';
 
-function Check({ gold }) {
+function Check({ gold, mint }) {
   return (
-    <span className={`pc-check${gold ? ' pc-check-gold' : ''}`}>
+    <span className={`pc-check${gold ? ' pc-check-gold' : ''}${mint ? ' pc-check-mint' : ''}`}>
       <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor"
            strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
         <path d="M 2 6 L 5 9 L 10 3" />
@@ -82,20 +82,22 @@ export default function Pricing() {
       )}
 
       <div className="pricing-plans">
-        {/* Free starter card — the same box style as the paid plans. */}
+        {/* Free starter card — the welcoming "start here" entry. Mint-themed
+            so it reads as the on-ramp, distinct from the paid (dark CTA) plans. */}
         <article className="pricing-plan pricing-plan-free">
+          <div className="pc-free-eyebrow"><span aria-hidden="true">✦</span> Start here</div>
           <div className="pricing-plan-name">Free</div>
           <div className="pricing-plan-price pc-free-price">
             <span className="num">{FREE_SESSION_LIMIT}</span>
             <span className="pc-free-unit"><strong>free</strong><span>sessions</span></span>
           </div>
-          <div className="pricing-plan-badge">no card needed</div>
+          <div className="pricing-plan-badge pc-free-badge">no card needed</div>
           <ul className="pricing-plan-features">
-            <li><Check />{FREE_SESSION_LIMIT} full tracing sessions</li>
-            <li><Check />All tools unlocked</li>
-            <li><Check />Works on any device</li>
+            <li><Check mint />{FREE_SESSION_LIMIT} full tracing sessions</li>
+            <li><Check mint />All tools unlocked</li>
+            <li><Check mint />Works on any device</li>
           </ul>
-          <Link to="/upload" className="pricing-plan-cta">Try it for free →</Link>
+          <Link to="/upload" className="pricing-plan-cta pricing-plan-cta-free">Try it for free →</Link>
         </article>
 
         {VISIBLE_PLANS.map((plan) => (
