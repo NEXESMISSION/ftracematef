@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import Img from './Img.jsx';
 
@@ -7,44 +7,27 @@ import Img from './Img.jsx';
 // broken `YOUR_VIDEO_ID` embed.
 const DEMO_VIDEO_ID = '';
 
-// The hero "phone" now plays the product reels in rotation instead of a static
-// mockup. Each plays once (muted, inline autoplay) then advances to the next,
-// looping after the last. Posters are tiny WebPs so the frame is filled
-// instantly while the first clip loads.
-const HERO_REELS = [
-  { src: '/videos/reel1.mp4', poster: '/videos/reel1.webp' },
-  { src: '/videos/reel2.mp4', poster: '/videos/reel2.webp' },
-  { src: '/videos/reel3.mp4', poster: '/videos/reel3.webp' },
-];
-
+// Hero centerpiece: one looping, muted, inline-autoplay reel. The MP4 is heavily
+// optimized (square 800×800, no audio, +faststart so the moov atom is up front
+// and playback starts before the full file lands) and a tiny WebP poster fills
+// the frame instantly so it's never an empty box on first paint.
 function HeroReel() {
   const videoRef = useRef(null);
-  const [i, setI] = useState(0);
-
-  // On each clip ending, advance (wrapping to the first after the last).
-  const next = () => setI((p) => (p + 1) % HERO_REELS.length);
-
-  // Reload + (re)start playback whenever the active reel changes.
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.load();
-    v.play?.().catch(() => {});
-  }, [i]);
-
-  const reel = HERO_REELS[i];
+  // Nudge playback on mount — some browsers (iOS Safari) need the explicit call
+  // even with the autoPlay attribute.
+  useEffect(() => { videoRef.current?.play?.().catch(() => {}); }, []);
   return (
     <div className="hero-phone-video">
       <video
         ref={videoRef}
         className="hero-phone-reel"
-        src={reel.src}
-        poster={reel.poster}
+        src="/videos/hero.mp4"
+        poster="/videos/hero.webp"
         muted
+        loop
         autoPlay
         playsInline
         preload="auto"
-        onEnded={next}
         aria-hidden="true"
         tabIndex={-1}
       />

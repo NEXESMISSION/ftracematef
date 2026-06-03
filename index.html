@@ -66,10 +66,11 @@
     <!-- Performance: preconnect to Google Fonts + preload critical assets -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Above-the-fold hero + logo. AVIF preload (with type so non-supporting
-         browsers ignore it and fall back to the <picture> webp) for the
-         smallest possible first paint. -->
-    <link rel="preload" as="image" href="/images/hero/phone-preview-v3.avif" type="image/avif" fetchpriority="high" />
+    <!-- Above-the-fold hero + logo. The hero video's poster is preloaded at top
+         priority so the frame is filled the instant the page paints (never an
+         empty box), and the optimized MP4 is preloaded so playback starts fast. -->
+    <link rel="preload" as="image" href="/videos/hero.webp" type="image/webp" fetchpriority="high" />
+    <link rel="preload" as="video" href="/videos/hero.mp4" type="video/mp4" />
     <link rel="preload" as="image" href="/images/ui/btn-try-now.avif" type="image/avif" />
     <link rel="preload" as="image" href="/images/brand/logo.avif" type="image/avif" />
 
