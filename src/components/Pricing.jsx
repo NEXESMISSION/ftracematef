@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { VISIBLE_PLANS } from '../lib/plans.js';
 import { FREE_SESSION_LIMIT } from '../lib/freeTrial.js';
 import { usePlanCheckout } from '../hooks/usePlanCheckout.js';
+import LifetimeReveal from './LifetimeReveal.jsx';
 
 function Check({ gold, mint }) {
   return (
@@ -96,13 +97,25 @@ export default function Pricing() {
         </article>
 
         {VISIBLE_PLANS.map((plan) => (
-          <PlanCard
-            key={plan.id}
-            plan={plan}
-            onChoose={choose}
-            busy={busy}
-            lifetimeLeft={plan.gold ? lifetimeLeft : null}
-          />
+          plan.gold ? (
+            /* Lifetime is hidden behind a blurred "secret deal" teaser that
+               booms open into a special countdown popup. */
+            <LifetimeReveal
+              key={plan.id}
+              plan={plan}
+              onChoose={choose}
+              busy={busy}
+              lifetimeLeft={lifetimeLeft}
+            />
+          ) : (
+            <PlanCard
+              key={plan.id}
+              plan={plan}
+              onChoose={choose}
+              busy={busy}
+              lifetimeLeft={null}
+            />
+          )
         ))}
       </div>
 
