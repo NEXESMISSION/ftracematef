@@ -89,9 +89,9 @@ export default function Pricing() {
         <article className="pricing-plan pricing-plan-free">
           <div className="pricing-plan-name pc-free-name">Free</div>
           <ul className="pricing-plan-features">
-            <li><Check mint />{FREE_SESSION_LIMIT} free sessions</li>
-            <li><Check mint />All tools unlocked</li>
-            <li><Check mint />Works on any device</li>
+            <li><Check />{FREE_SESSION_LIMIT} free sessions</li>
+            <li><Check />All tools unlocked</li>
+            <li><Check />Works on any device</li>
           </ul>
           <Link to="/upload" className="pricing-plan-cta pricing-plan-cta-free">Try it for free →</Link>
         </article>
