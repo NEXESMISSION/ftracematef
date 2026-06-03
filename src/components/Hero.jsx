@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import Img from './Img.jsx';
 
@@ -5,6 +6,51 @@ import Img from './Img.jsx';
 // renders once a real id is in place — no more dead button shipping a
 // broken `YOUR_VIDEO_ID` embed.
 const DEMO_VIDEO_ID = '';
+
+// The hero "phone" now plays the product reels in rotation instead of a static
+// mockup. Each plays once (muted, inline autoplay) then advances to the next,
+// looping after the last. Posters are tiny WebPs so the frame is filled
+// instantly while the first clip loads.
+const HERO_REELS = [
+  { src: '/videos/reel1.mp4', poster: '/videos/reel1.webp' },
+  { src: '/videos/reel2.mp4', poster: '/videos/reel2.webp' },
+  { src: '/videos/reel3.mp4', poster: '/videos/reel3.webp' },
+];
+
+function HeroReel() {
+  const videoRef = useRef(null);
+  const [i, setI] = useState(0);
+
+  // On each clip ending, advance (wrapping to the first after the last).
+  const next = () => setI((p) => (p + 1) % HERO_REELS.length);
+
+  // Reload + (re)start playback whenever the active reel changes.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.load();
+    v.play?.().catch(() => {});
+  }, [i]);
+
+  const reel = HERO_REELS[i];
+  return (
+    <div className="hero-phone-video">
+      <video
+        ref={videoRef}
+        className="hero-phone-reel"
+        src={reel.src}
+        poster={reel.poster}
+        muted
+        autoPlay
+        playsInline
+        preload="auto"
+        onEnded={next}
+        aria-hidden="true"
+        tabIndex={-1}
+      />
+    </div>
+  );
+}
 
 // Synchronous heuristic — see Nav.jsx for the same trick.
 function hasPersistedSession() {
@@ -75,7 +121,7 @@ export default function Hero({ onPlayClick }) {
         <div className="hero-phone">
           <span className="hero-spark hero-spark-l" aria-hidden="true">✦</span>
           <div className="phone-frame">
-            <Img src="/images/hero/phone-preview-v3.webp" alt="Trace Mate app preview" priority />
+            <HeroReel />
           </div>
           <span className="hero-spark hero-spark-r" aria-hidden="true">✧</span>
         </div>
