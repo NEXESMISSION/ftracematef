@@ -750,6 +750,10 @@ export default function Account() {
             access without going through Dodo. */}
         {!isAdminUser(profile) && <ReceiptsCard />}
 
+        {/* ── Install app — a floating button on desktop, an inline button
+            here in the flow on mobile (so it never overlaps the cards). ── */}
+        <InstallPromo />
+
         {/* ── Sign out ── */}
         <div className="profile-foot">
           <button type="button" className="profile-btn profile-btn-ghost" onClick={signOut}>
@@ -839,10 +843,6 @@ export default function Account() {
         title={alert?.title ?? 'Heads up'}
         message={alert?.message ?? ''}
       />
-
-      {/* Floating "Install app" button → popup mirroring the landing page's
-          install section. Hides itself when already running installed. */}
-      <InstallPromo />
     </div>
   );
 }

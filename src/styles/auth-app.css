@@ -2776,8 +2776,18 @@
 .install-fab-label { line-height: 1; }
 
 @media (max-width: 720px) {
-  /* Lift clear of the fixed bottom tabbar (~118px tall). */
-  .install-fab { right: 16px; bottom: calc(132px + env(safe-area-inset-bottom)); padding: 12px 18px; font-size: 14px; }
+  /* On phones it's not a floating overlay (it covered the cards) — it sits in
+     the account flow as a centred button. */
+  .install-fab {
+    position: static;
+    right: auto;
+    bottom: auto;
+    display: flex;
+    width: fit-content;
+    margin: 6px auto 4px;
+    padding: 13px 22px;
+    font-size: 15px;
+  }
 }
 
 /* Promo popup — mirrors the landing "Get the app" section. */
