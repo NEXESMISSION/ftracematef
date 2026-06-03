@@ -44,9 +44,9 @@ export default function Nav() {
           <span className="nav-account-cta-short">Profile →</span>
         </Link>
       ) : (
-        <Link className="img-btn img-btn-sm" to="/login" aria-label="Try it Now">
+        <a className="img-btn img-btn-sm" href="#pricing" aria-label="Try it Now">
           <Img src="/images/ui/btn-try-now.webp" alt="Try it Now" priority />
-        </Link>
+        </a>
       )}
     </header>
   );

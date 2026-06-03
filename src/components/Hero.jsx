@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import Img from './Img.jsx';
 
@@ -52,9 +51,9 @@ export default function Hero({ onPlayClick }) {
             {/* Signed-in users get the 'See my profile' button via Nav.
                 The Hero CTA is reserved for the visitor's primary action. */}
             {!isOrLikelySignedIn && (
-              <Link className="img-btn" to="/login" aria-label="Try it Now">
+              <a className="img-btn" href="#pricing" aria-label="Try it Now">
                 <Img src="/images/ui/btn-try-now.webp" alt="Try it Now" priority />
-              </Link>
+              </a>
             )}
 
             {DEMO_VIDEO_ID && (
