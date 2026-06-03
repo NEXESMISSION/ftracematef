@@ -19,6 +19,19 @@ import { identify } from '../lib/track.js';
  */
 const AuthContext = createContext(null);
 
+// Race a (possibly-hanging) promise against a timeout. Resolves to `fallback`
+// if `ms` elapses first — so a stalled Supabase auth/network call can never pin
+// the boot loader. A hung promise neither resolves nor rejects, so a plain
+// try/catch wouldn't save us; this does.
+function withTimeout(promise, ms, fallback) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (v) => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
+    const timer = setTimeout(() => finish(fallback), ms);
+    Promise.resolve(promise).then(finish, () => finish(fallback));
+  });
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession]           = useState(null);
   const [profile, setProfile]           = useState(null);
@@ -314,7 +327,16 @@ export function AuthProvider({ children }) {
     const validateOrClear = async (candidateSession) => {
       if (!candidateSession) return null;
       try {
-        const { data: { user: verifiedUser }, error } = await supabase.auth.getUser();
+        // Bound the round-trip — getUser() can hang on a flaky network. On
+        // timeout we keep the session (treated like a network blip); a true
+        // ghost still self-corrects on the next data fetch in loadUserData.
+        const res = await withTimeout(
+          supabase.auth.getUser(),
+          5000,
+          { data: { user: null }, error: { message: 'getUser timed out' } },
+        );
+        const verifiedUser = res?.data?.user ?? null;
+        const error = res?.error ?? null;
         // Only treat as a definitive ghost when the response is unambiguous:
         // a user actually came back AND it didn't match the local session.
         // Previously this branch fired on ANY error from getUser() — including
@@ -451,6 +473,23 @@ export function AuthProvider({ children }) {
       }
     };
 
+    // Boot watchdog — guarantee the loader clears even if the whole auth chain
+    // hangs (getSession() stalling on a stuck token-refresh lock, getUser()
+    // validation, or the profile fetch never resolving *or* rejecting on a
+    // flaky network). This is the exact "stuck on the spinner until I refresh"
+    // failure. After this bound we drop the loader and render with whatever
+    // state we have — the session is already set early in settle(), so a
+    // signed-in user lands in ProfileRecover/the gates (which self-retry)
+    // rather than an endless spinner. The real data still lands if/when the
+    // chain resolves.
+    const bootWatchdog = setTimeout(() => {
+      if (!mounted) return;
+      setLoading((cur) => {
+        if (cur) console.warn('[AuthProvider] auth boot exceeded watchdog — clearing the loader.');
+        return false;
+      });
+    }, 10000);
+
     // 1) initial session (handles existing session OR ?code= on /auth/callback).
     //    Only this path runs the ghost-session check — see comment above.
     supabase.auth
@@ -459,7 +498,8 @@ export function AuthProvider({ children }) {
       .catch((err) => {
         console.error('[AuthProvider] getSession failed:', err);
         if (mounted) setLoading(false);
-      });
+      })
+      .finally(() => clearTimeout(bootWatchdog));
 
     // 2) subscribe to future changes (sign-in, sign-out, token refresh, etc.)
     //    No re-validation: events come from in-tab actions we already trust.
@@ -472,6 +512,7 @@ export function AuthProvider({ children }) {
 
     return () => {
       mounted = false;
+      clearTimeout(bootWatchdog);
       authSub.unsubscribe();
     };
   }, [loadUserData]);
