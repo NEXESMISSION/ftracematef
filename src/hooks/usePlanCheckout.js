@@ -46,6 +46,12 @@ export function usePlanCheckout({ redirectUnauthedToLogin = true } = {}) {
     setError(null);
     if (!user) {
       if (redirectUnauthedToLogin) {
+        // Persist the chosen plan immediately. sessionStorage survives the
+        // OAuth round-trip to Google (AuthCallback → /pricing then resumes
+        // checkout from it); React Router's location.state does NOT — which is
+        // why the choice was getting lost after login. Pass location.state too
+        // as a belt-and-braces for any rare non-OAuth path.
+        try { sessionStorage.setItem('tm:intent-plan', planId); } catch { /* ignore */ }
         navigate('/login', { state: { intent: { plan: planId } } });
       }
       return;

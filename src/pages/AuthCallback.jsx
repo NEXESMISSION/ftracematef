@@ -58,10 +58,21 @@ async function purgeStalePkceState() {
   } catch { /* ignore — quota / private mode */ }
 }
 
+// Where to send a freshly-signed-in user. If they clicked a plan before
+// logging in, Login.jsx stashed it as `tm:intent-plan`; route them to /pricing
+// so it gets consumed and checkout resumes automatically. Otherwise /account.
+// Without this, the OAuth round-trip always landed on /account and the chosen
+// plan was silently lost — the user had to find and click it all over again.
+function postAuthDest() {
+  try {
+    if (sessionStorage.getItem('tm:intent-plan')) return '/pricing';
+  } catch { /* ignore — private mode / disabled storage */ }
+  return '/account';
+}
+
 // Google sends users back here after consent (?code=…). We wait for Supabase
-// to settle the session, then route everyone to /account. Keeps the
-// post-auth landing simple and predictable: from /account the user can pick
-// what to do next (open studio, upload, manage plan).
+// to settle the session, then route to /pricing (if a plan was chosen
+// pre-login) or /account. Keeps the post-auth landing simple and predictable.
 //
 // Failure paths surface to /login with a `state.error` message so the user
 // gets actionable feedback instead of a silent bounce. Three cases are
@@ -108,7 +119,7 @@ export default function AuthCallback() {
     // emits SIGNED_IN before our `.then()` chain wires up the navigation.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-        go('/account');
+        go(postAuthDest());
       }
     });
 
@@ -124,7 +135,7 @@ export default function AuthCallback() {
     // through the exchange again).
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        go('/account');
+        go(postAuthDest());
         return;
       }
       // No existing session and no `?code=…` — the user shouldn't really be
