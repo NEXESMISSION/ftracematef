@@ -15,7 +15,6 @@ import { beginTrialSession, canUseFreeTrial } from '../lib/freeTrial.js';
 import { removeBackground } from '../lib/removeBackground.js';
 import { optimizeImage } from '../lib/imageOptimize.js';
 import LibraryPicker from '../components/LibraryPicker.jsx';
-import CameraCapture from '../components/CameraCapture.jsx';
 import { usePresence } from '../hooks/usePresence.js';
 
 /**
@@ -39,7 +38,6 @@ export default function Upload() {
   usePresence('upload');
 
   const inputRef = useRef(null);
-  const [camOpen, setCamOpen] = useState(false);   // A2 — in-app camera capture
   const [libOpen, setLibOpen] = useState(false);   // A1 — library picker modal
   const [preview, setPreview]       = useState(null);   // object URL for current preview
   const [fileName, setFileName]     = useState('');
@@ -312,44 +310,31 @@ export default function Upload() {
 
           {!preview ? (
             <>
-            <label
-              className={`upload-drop ${isDragging ? 'is-dragging' : ''}`}
-              onDragOver={onDragOver}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={onDrop}
-            >
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
-                onChange={onPick}
-                className="upload-input"
-              />
-              <span className="upload-drop-icon" aria-hidden="true">
-                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" stroke="currentColor"
-                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 24 V8 M11 15 L18 8 L25 15" />
-                  <path d="M6 24 V28 a2 2 0 0 0 2 2 H28 a2 2 0 0 0 2 -2 V24" />
-                </svg>
-              </span>
-              <strong className="upload-drop-title">Drop an image here</strong>
-              <span className="upload-drop-or">or click to browse</span>
-              <span className="upload-drop-meta">JPG · PNG · WebP — up to 25 MB</span>
-            </label>
-
-            {/* Alternative image sources, side by side under the drop zone:
-                A2 — capture a photo with the device camera; A1 — pick from the
-                curated library. Both route through the same acceptFile → D1
-                optimize pipeline as a normal upload. */}
+            {/* Two image sources, side by side: pick a file (a button-styled
+                label that wraps the hidden file input — also a drag-and-drop
+                target) and the curated library. Both route through the same
+                acceptFile → D1 optimize pipeline. */}
             <div className="upload-sources">
-              <button type="button" className="upload-source-btn" onClick={() => setCamOpen(true)}>
+              <label
+                className={`upload-source-btn upload-source-primary ${isDragging ? 'is-dragging' : ''}`}
+                onDragOver={onDragOver}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={onDrop}
+              >
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                  onChange={onPick}
+                  className="upload-input"
+                />
                 <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-                     strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M3 6.5 H6 L7.5 5 H12.5 L14 6.5 H17 a1 1 0 0 1 1 1 V15 a1 1 0 0 1 -1 1 H3 a1 1 0 0 1 -1 -1 V7.5 a1 1 0 0 1 1 -1 Z" />
-                  <circle cx="10" cy="11" r="3" />
+                     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M10 13 V4 M6 7.5 L10 4 L14 7.5" />
+                  <path d="M4 13 V15.5 a1 1 0 0 0 1 1 H15 a1 1 0 0 0 1 -1 V13" />
                 </svg>
-                Take a photo
-              </button>
+                Choose an image
+              </label>
               <button type="button" className="upload-source-btn" onClick={() => setLibOpen(true)}>
                 <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor"
                      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -360,6 +345,7 @@ export default function Upload() {
                 Browse library
               </button>
             </div>
+            <p className="upload-pick-meta">Drag &amp; drop or browse · JPG, PNG, WebP — up to 25 MB</p>
             </>
           ) : (
             <div className="upload-preview">
@@ -402,13 +388,6 @@ export default function Upload() {
 
         <img className="auth-side-cat" src="/images/popup/floating-cat.webp" alt="" aria-hidden="true" />
       </main>
-
-      <CameraCapture
-        open={camOpen}
-        title="Take a photo to trace"
-        onClose={() => setCamOpen(false)}
-        onCapture={(file) => { setCamOpen(false); acceptFile(file); }}
-      />
 
       <LibraryPicker open={libOpen} onClose={() => setLibOpen(false)} onPick={onPickLibrary} />
 

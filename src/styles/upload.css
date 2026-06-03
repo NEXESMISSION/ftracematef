@@ -58,28 +58,8 @@
 }
 
 /* ----- Drop zone ----- */
-.upload-drop {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 32px 20px;
-  border: 2px dashed rgba(43, 33, 24, 0.22);
-  border-radius: 18px;
-  background: var(--cream);
-  cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
-}
-.upload-drop:hover {
-  border-color: var(--coral);
-  background: rgba(232, 122, 122, 0.04);
-}
-.upload-drop.is-dragging {
-  border-color: var(--coral);
-  background: rgba(232, 122, 122, 0.08);
-  transform: scale(1.01);
-}
+/* Hidden file input that fills its parent label (the "Choose an image"
+   button) so the whole button is the click + drop target. */
 .upload-input {
   position: absolute;
   inset: 0;
@@ -88,36 +68,6 @@
   opacity: 0;
   cursor: pointer;
 }
-.upload-drop-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--pink);
-  color: var(--coral);
-  border: 1.5px solid var(--ink);
-  box-shadow: 3px 3px 0 var(--ink);
-  margin-bottom: 6px;
-}
-.upload-drop-title {
-  font-size: 17px;
-  font-weight: 800;
-  color: var(--ink);
-}
-.upload-drop-or {
-  font-size: 13px;
-  color: var(--ink-soft);
-}
-.upload-drop-meta {
-  font-size: 11px;
-  color: var(--ink-muted);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-top: 6px;
-}
-
 /* ----- Preview ----- */
 .upload-preview {
   display: flex;
@@ -183,6 +133,31 @@
 .upload-source-btn svg { flex-shrink: 0; }
 @media (max-width: 380px) {
   .upload-sources { grid-template-columns: 1fr; }
+}
+
+/* Primary "Choose an image" button — a label wrapping the hidden file input
+   (so the whole button is the click target) that doubles as a drag-and-drop
+   zone. position:relative anchors the absolutely-positioned .upload-input. */
+.upload-source-primary {
+  position: relative;
+  overflow: hidden;
+  background: var(--coral);
+  color: #fff;
+}
+.upload-source-primary.is-dragging {
+  background: #d96a6a;
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+/* Format/size hint under the picker buttons (replaces the old dropzone meta). */
+.upload-pick-meta {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 /* Row of preview actions (Remove background / Restore + Choose different). */
@@ -324,5 +299,4 @@
   .upload-shell { padding: 64px 18px 28px; }
   .upload-card { border-radius: 20px; }
   .upload-title { font-size: 24px; }
-  .upload-drop { padding: 26px 16px; }
 }
