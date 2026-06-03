@@ -469,14 +469,11 @@ main, header, section, footer { position: relative; z-index: 1; }
   height: 100%;
   object-fit: cover;
 }
-/* On phones the video bleeds edge-to-edge (full viewport width), squared off. */
+/* On phones the video fills the content width, centered (the flex parent keeps
+   it centered — no viewport-width / negative-margin tricks that drift off-axis). */
 @media (max-width: 560px) {
-  .hero-phone { display: block; width: 100%; }
-  .hero-phone-video {
-    width: 100vw;
-    margin-left: calc(50% - 50vw);
-    border-radius: 0;
-  }
+  .hero-phone { width: 100%; }
+  .hero-phone-video { width: 100%; border-radius: 20px; }
 }
 
 .hero-spark {
