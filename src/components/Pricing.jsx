@@ -82,10 +82,10 @@ export default function Pricing() {
       )}
 
       <div className="pricing-plans">
-        {/* Free starter card — the welcoming "start here" entry. Mint-themed
-            so it reads as the on-ramp, distinct from the paid (dark CTA) plans. */}
+        {/* Free starter card — the mint on-ramp, distinct from the paid (dark
+            CTA) plans. The header doubles as the headline benefit, so the
+            feature list only carries what it doesn't already say. */}
         <article className="pricing-plan pricing-plan-free">
-          <div className="pc-free-eyebrow"><span aria-hidden="true">✦</span> Start here</div>
           <div className="pricing-plan-name">Free</div>
           <div className="pricing-plan-price pc-free-price">
             <span className="num">{FREE_SESSION_LIMIT}</span>
@@ -93,7 +93,6 @@ export default function Pricing() {
           </div>
           <div className="pricing-plan-badge pc-free-badge">no card needed</div>
           <ul className="pricing-plan-features">
-            <li><Check mint />{FREE_SESSION_LIMIT} full tracing sessions</li>
             <li><Check mint />All tools unlocked</li>
             <li><Check mint />Works on any device</li>
           </ul>

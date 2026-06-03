@@ -14,7 +14,7 @@ export default function GetApp() {
           Get <em>Trace Mate</em> on your phone
         </h2>
         <p className="get-app-sub">
-          Install it like a native app — works offline, opens with one tap.
+          Add it to your home screen — opens in one tap, no app store needed.
         </p>
 
         <div className="get-app-buttons">

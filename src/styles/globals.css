@@ -916,27 +916,6 @@ main, header, section, footer { position: relative; z-index: 1; }
 .pricing-plan-free .pricing-plan-name { color: #3f6e4f; }
 .pricing-plan-free .pricing-plan-price .num { color: #2f5a3e; }
 
-/* "Start here" eyebrow — a quiet mint pill that frames the free tier as the
-   recommended entry point without shouting over the paid plans. */
-.pc-free-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  font-family: 'Nunito', sans-serif;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
-  color: #3f6e4f;
-  background: rgba(90, 138, 110, 0.14);
-  border: 1px solid rgba(90, 138, 110, 0.28);
-  padding: 5px 12px;
-  border-radius: 999px;
-  margin-bottom: 14px;
-}
-.pc-free-eyebrow span { color: #6aa07c; font-size: 12px; }
-
 /* Free header reads as a quantity ("3 free sessions"), not a price. The word
    "free" in mint sits beside the number so it can't be mistaken for "$3". */
 .pc-free-price { align-items: center; gap: 12px; margin-bottom: 16px; }

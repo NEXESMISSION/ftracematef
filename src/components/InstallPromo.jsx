@@ -83,7 +83,7 @@ export default function InstallPromo() {
               Get <em>Trace Mate</em> on your phone
             </h2>
             <p className="install-promo-sub">
-              Install it like a native app — works offline, opens with one tap.
+              Add it to your home screen — opens in one tap, no app store needed.
             </p>
 
             {canPrompt && (
