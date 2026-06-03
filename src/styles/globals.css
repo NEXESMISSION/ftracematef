@@ -900,6 +900,16 @@ main, header, section, footer { position: relative; z-index: 1; }
 .pricing-plan-free .pricing-plan-name { color: #4a7a5a; }
 .pricing-plan-free .pricing-plan-price .num { color: var(--ink); }
 
+/* Free header reads as a quantity ("3 free sessions"), not a price. The word
+   "free" in mint sits beside the number so it can't be mistaken for "$3". */
+.pc-free-price { align-items: center; gap: 12px; margin-bottom: 16px; }
+.pc-free-unit {
+  display: flex; flex-direction: column; line-height: 1.05;
+  font-family: 'Nunito', sans-serif;
+}
+.pc-free-unit strong { font-size: 22px; font-weight: 800; color: #4a7a5a; }
+.pc-free-unit span { font-size: 14px; font-weight: 700; color: var(--ink-soft); }
+
 .pricing-plan-name {
   font-family: 'Caveat', cursive;
   font-size: 28px;

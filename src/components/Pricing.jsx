@@ -85,10 +85,10 @@ export default function Pricing() {
         {/* Free starter card — the same box style as the paid plans. */}
         <article className="pricing-plan pricing-plan-free">
           <div className="pricing-plan-name">Free</div>
-          <div className="pricing-plan-price">
+          <div className="pricing-plan-price pc-free-price">
             <span className="num">{FREE_SESSION_LIMIT}</span>
+            <span className="pc-free-unit"><strong>free</strong><span>sessions</span></span>
           </div>
-          <div className="pricing-plan-period">free sessions</div>
           <div className="pricing-plan-badge">no card needed</div>
           <ul className="pricing-plan-features">
             <li><Check />{FREE_SESSION_LIMIT} full tracing sessions</li>
