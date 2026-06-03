@@ -103,12 +103,13 @@ export default function ExitSurvey({ onDone, onSkip }) {
 
   return (
     <section className="exit-survey-card" aria-labelledby="survey-q">
-      <p className="exit-survey-card-kicker">✦ two quick taps</p>
+      <p className="exit-survey-card-kicker">✦ a few quick taps</p>
       <h2 id="survey-q" className="exit-survey-card-title">
         Help shape what we build next.
       </h2>
       <p className="exit-survey-card-lead">
-        Both answers help us line up references and tools you'll actually use.
+        These answers help us line up references and tools you'll actually use —
+        it only takes a moment.
       </p>
 
       {error && (

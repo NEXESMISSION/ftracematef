@@ -1424,15 +1424,12 @@ export default function Trace() {
 
       {showSurveyModal && (
         <div className="profile-modal trace-survey-modal" role="dialog" aria-modal="true" aria-labelledby="survey-q">
-          {/* Dismissible: a returning user shouldn't be hard-blocked from the
-              studio. Backdrop click and the "Maybe later" button both defer the
-              survey for this session (it re-asks next visit until completed). */}
-          <div className="profile-modal-backdrop" onClick={() => setSurveyDismissed(true)} />
+          {/* Mandatory now — no backdrop-dismiss and no "Maybe later". The
+              returning user must answer before continuing into the studio
+              (only onDone clears it). */}
+          <div className="profile-modal-backdrop" />
           <div className="profile-modal-card trace-survey-modal-card">
-            <ExitSurvey
-              onDone={() => setSurveyDismissed(true)}
-              onSkip={() => setSurveyDismissed(true)}
-            />
+            <ExitSurvey onDone={() => setSurveyDismissed(true)} />
           </div>
         </div>
       )}

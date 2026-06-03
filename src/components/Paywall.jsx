@@ -81,18 +81,27 @@ export default function Paywall({ trialUsed = false }) {
       </header>
 
       <main className="studio-paywall">
+        {/* Celebratory flourish — a soft aura + floating sparkles so the
+            unlock reads like a reward rather than a wall. */}
+        <div className="paywall-aura" aria-hidden="true" />
+        <span className="paywall-spark paywall-spark-1" aria-hidden="true">✦</span>
+        <span className="paywall-spark paywall-spark-2" aria-hidden="true">✧</span>
+        <span className="paywall-spark paywall-spark-3" aria-hidden="true">✦</span>
+
         <p className="kicker hand">
           {trialUsed ? `nice work, ${greeting} ✦` : `welcome, ${greeting} ✦`}
         </p>
         <h1>
-          {trialUsed
-            ? `You've made ${FREE_SESSION_LIMIT} awesome pieces`
-            : 'One unlock. Every tool. Every device.'}
+          {trialUsed ? (
+            <>You've made {FREE_SESSION_LIMIT} <em>awesome</em> pieces</>
+          ) : (
+            <>One unlock. <em>Every tool.</em> Every device.</>
+          )}
         </h1>
         <p className="lead">
           {trialUsed
-            ? `Unlock unlimited high-res tracing for $${monthlyPrice}/month — try every paper, lighting setup, and character with no limits.`
-            : 'Trace anything you can photograph — sketches, tattoos, murals, signs. Pick the plan that fits.'}
+            ? `Keep that momentum going — unlock unlimited high-res tracing for $${monthlyPrice}/month. Every paper, every lighting setup, every character, no limits.`
+            : 'Trace anything you can photograph — sketches, tattoos, murals, lettering. Pick the plan that fits and start in seconds.'}
         </p>
 
         {/* Trust strip used to live here as small pills (Secure / Cancel /
