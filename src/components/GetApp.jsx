@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import InstallModal from './InstallModal.jsx';
 import Img from './Img.jsx';
+import { useSectionView } from '../hooks/useSectionView.js';
 
 export default function GetApp() {
   const [platform, setPlatform] = useState(null);
   const open = (p) => setPlatform(p);
   const close = () => setPlatform(null);
+  const viewRef = useSectionView('get-app');
 
   return (
-    <section className="get-app tm-section-pad" id="get-app">
+    <section className="get-app tm-section-pad" id="get-app" ref={viewRef}>
       <div className="get-app-inner">
         <h2 className="get-app-title">
           Get <em>Trace Mate</em> on your phone

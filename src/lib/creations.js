@@ -156,7 +156,9 @@ export async function listCreations({
 
   const items = rows.map((r) => ({
     id: r.id,
-    userId: r.user_id,
+    // Server now returns is_mine (a boolean) instead of the raw author UUID,
+    // so anonymous visitors can't enumerate user ids from the public feed.
+    mine: r.is_mine ?? false,
     title: r.title,
     note: r.note || null,
     likeCount: r.like_count,

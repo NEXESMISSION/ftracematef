@@ -312,7 +312,19 @@ export function initTracking() {
   try {
     const q = new URLSearchParams(location.search);
     const utmSource = q.get('utm_source');
-    if (utmSource) stampSource(utmSource, q.get('utm_campaign') || q.get('utm_medium'));
+    if (utmSource) {
+      stampSource(utmSource, q.get('utm_campaign') || q.get('utm_medium'));
+    } else {
+      // Paid-click fallback: ad platforms drop a click id (gclid/fbclid/…) but
+      // often NO utm_source, so paid traffic was landing as "(direct)". Map the
+      // click id to a real channel so paid spend is attributable.
+      const adChannel =
+        q.get('gclid')   ? 'google_ads' :
+        q.get('fbclid')  ? 'meta_ads'   :
+        q.get('ttclid')  ? 'tiktok_ads' :
+        q.get('msclkid') ? 'bing_ads'   : null;
+      if (adChannel) stampSource(adChannel, q.get('utm_campaign'));
+    }
   } catch { /* ignore */ }
 
   timer = setInterval(flush, FLUSH_MS);

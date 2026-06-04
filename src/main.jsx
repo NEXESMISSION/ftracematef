@@ -12,8 +12,8 @@ import './styles/upload.css';
 import './styles/trace.css';
 import './styles/auth-app.css';
 import './styles/live.css';
-import './styles/admin.css';
-import './styles/admin-redesign.css';
+// admin.css + admin-redesign.css are imported inside the lazy AdminDashboard
+// page so the ~80KB of operator-only CSS never ships to normal visitors.
 import './styles/partner.css';
 import './styles/library.css';
 import './styles/community.css';

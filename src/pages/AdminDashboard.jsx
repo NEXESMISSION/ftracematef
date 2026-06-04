@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
+// Operator-only styles, imported here (not in main.jsx) so this ~80KB of CSS
+// loads with the lazy admin chunk and never ships to normal visitors.
+import '../styles/admin.css';
+import '../styles/admin-redesign.css';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import {
   listAllUsers, getUserActivity, getAdminStats, getAnalytics,

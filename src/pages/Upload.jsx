@@ -16,6 +16,7 @@ import { removeBackground } from '../lib/removeBackground.js';
 import { optimizeImage } from '../lib/imageOptimize.js';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import { usePresence } from '../hooks/usePresence.js';
+import { trackEvent } from '../lib/track.js';
 
 /**
  * /upload — public entry. Anyone can upload an image without signing in.
@@ -372,7 +373,7 @@ export default function Upload() {
             type="button"
             className="upload-cta"
             disabled={!preview || loading}
-            onClick={startTracing}
+            onClick={() => { trackEvent('custom', { name: 'cta_start_tracing' }); startTracing(); }}
           >
             Start tracing
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"

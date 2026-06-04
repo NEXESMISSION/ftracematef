@@ -246,7 +246,7 @@ export default function Community({ mode, tab: tabProp, onTabChange }) {
                   )}
 
                   {/* Top-right: owner deletes their own; others can report. */}
-                  {user?.id === it.userId ? (
+                  {it.mine ? (
                     <button type="button" className="creation-del" onClick={() => onDelete(it)} aria-label="Delete">
                       ×
                     </button>
