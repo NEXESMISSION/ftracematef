@@ -71,7 +71,7 @@ export function startBroadcaster({
   let stopped = false;
 
   const logTag = `[livePreview bcast ${channelName(userId)} ${myId.slice(0, 6)}]`;
-  console.log(`${logTag} starting`);
+  import.meta.env.DEV && console.log(`${logTag} starting`);
 
   const channel = supabase.channel(channelName(userId), {
     config: {
@@ -134,7 +134,7 @@ export function startBroadcaster({
     const state = channel.presenceState();
     const keys = Object.keys(state);
     const roles = keys.map((k) => `${k.slice(0, 6)}=${state[k]?.[0]?.role ?? '?'}`);
-    console.log(`${logTag} presence sync — ${roles.length} peer(s):`, roles.join(', ') || '(none)');
+    import.meta.env.DEV && console.log(`${logTag} presence sync — ${roles.length} peer(s):`, roles.join(', ') || '(none)');
     let foundViewer = null;
     for (const key of keys) {
       const meta = state[key]?.[0];
@@ -142,11 +142,11 @@ export function startBroadcaster({
     }
     if (foundViewer && foundViewer !== viewerId) {
       viewerId = foundViewer;
-      console.log(`${logTag} viewer appeared, sending offer`);
+      import.meta.env.DEV && console.log(`${logTag} viewer appeared, sending offer`);
       initiateOffer();
     } else if (!foundViewer && viewerId) {
       viewerId = null;
-      console.log(`${logTag} viewer left, tearing down PC`);
+      import.meta.env.DEV && console.log(`${logTag} viewer left, tearing down PC`);
       teardownPC();
       onStatus?.('waiting');
     }
@@ -184,11 +184,11 @@ export function startBroadcaster({
 
   channel.subscribe(async (status) => {
     if (stopped) return;
-    console.log(`${logTag} subscribe → ${status}`);
+    import.meta.env.DEV && console.log(`${logTag} subscribe → ${status}`);
     if (status === 'SUBSCRIBED') {
       try {
         await channel.track({ role: 'broadcaster' });
-        console.log(`${logTag} presence tracked as broadcaster`);
+        import.meta.env.DEV && console.log(`${logTag} presence tracked as broadcaster`);
         onStatus?.('waiting');
       } catch (err) {
         console.warn(`${logTag} track() failed:`, err);
@@ -203,7 +203,7 @@ export function startBroadcaster({
     stop: () => {
       if (stopped) return;
       stopped = true;
-      console.log(`${logTag} stop()`);
+      import.meta.env.DEV && console.log(`${logTag} stop()`);
       try { channel.untrack(); } catch { /* ignore */ }
       teardownPC();
       try { supabase.removeChannel(channel); } catch { /* ignore */ }
@@ -235,7 +235,7 @@ export function startViewer({ userId, onStream, onStatus, onError }) {
   let stopped = false;
 
   const logTag = `[livePreview view ${channelName(userId)} ${myId.slice(0, 6)}]`;
-  console.log(`${logTag} starting`);
+  import.meta.env.DEV && console.log(`${logTag} starting`);
 
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   pc.addTransceiver('video', { direction: 'recvonly' });
@@ -272,7 +272,7 @@ export function startViewer({ userId, onStream, onStatus, onError }) {
     const state = channel.presenceState();
     const keys = Object.keys(state);
     const roles = keys.map((k) => `${k.slice(0, 6)}=${state[k]?.[0]?.role ?? '?'}`);
-    console.log(`${logTag} presence sync — ${roles.length} peer(s):`, roles.join(', ') || '(none)');
+    import.meta.env.DEV && console.log(`${logTag} presence sync — ${roles.length} peer(s):`, roles.join(', ') || '(none)');
     let foundBroadcaster = null;
     for (const key of keys) {
       const meta = state[key]?.[0];
@@ -280,11 +280,11 @@ export function startViewer({ userId, onStream, onStatus, onError }) {
     }
     if (foundBroadcaster && foundBroadcaster !== broadcasterId) {
       broadcasterId = foundBroadcaster;
-      console.log(`${logTag} broadcaster appeared`);
+      import.meta.env.DEV && console.log(`${logTag} broadcaster appeared`);
       onStatus?.('connecting');
     } else if (!foundBroadcaster && broadcasterId) {
       broadcasterId = null;
-      console.log(`${logTag} broadcaster left`);
+      import.meta.env.DEV && console.log(`${logTag} broadcaster left`);
       onStatus?.('waiting');
     }
   });
@@ -321,11 +321,11 @@ export function startViewer({ userId, onStream, onStatus, onError }) {
 
   channel.subscribe(async (status) => {
     if (stopped) return;
-    console.log(`${logTag} subscribe → ${status}`);
+    import.meta.env.DEV && console.log(`${logTag} subscribe → ${status}`);
     if (status === 'SUBSCRIBED') {
       try {
         await channel.track({ role: 'viewer' });
-        console.log(`${logTag} presence tracked as viewer`);
+        import.meta.env.DEV && console.log(`${logTag} presence tracked as viewer`);
         onStatus?.('waiting');
       } catch (err) {
         console.warn(`${logTag} track() failed:`, err);

@@ -66,11 +66,10 @@
     <!-- Performance: preconnect to Google Fonts + preload critical assets -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Above-the-fold hero + logo. The hero video's poster is preloaded at top
-         priority so the frame is filled the instant the page paints (never an
-         empty box), and the optimized MP4 is preloaded so playback starts fast. -->
-    <link rel="preload" as="image" href="/videos/hero.webp" type="image/webp" fetchpriority="high" />
-    <link rel="preload" as="video" href="/videos/hero.mp4" type="video/mp4" />
+    <!-- Above-the-fold LCP: the hero phone image, plus the primary CTA + logo.
+         Preloading the real LCP element (the hero image) at top priority fills
+         the frame the instant the page paints. -->
+    <link rel="preload" as="image" href="/images/hero/phone-preview-v3.avif" type="image/avif" fetchpriority="high" />
     <link rel="preload" as="image" href="/images/ui/btn-try-now.avif" type="image/avif" />
     <link rel="preload" as="image" href="/images/brand/logo.avif" type="image/avif" />
 
@@ -138,10 +137,9 @@
             "priceCurrency": "USD",
             "lowPrice": "5.00",
             "highPrice": "15.00",
-            "offerCount": 3,
+            "offerCount": 2,
             "offers": [
               { "@type": "Offer", "name": "Monthly", "price": "5.00", "priceCurrency": "USD", "category": "subscription" },
-              { "@type": "Offer", "name": "3 Months", "price": "10.00", "priceCurrency": "USD", "category": "subscription" },
               { "@type": "Offer", "name": "Lifetime", "price": "15.00", "priceCurrency": "USD", "category": "one-time" }
             ]
           }

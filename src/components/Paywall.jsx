@@ -11,8 +11,8 @@ import { FREE_SESSION_LIMIT } from '../lib/freeTrial.js';
 // (e.g. "less than a coffee") so the user has a comparison they can feel
 // instead of a number floating on its own.
 const PAYWALL_COPY = {
-  monthly:   { equiv: 'less than a coffee a month',  cta: 'Start Monthly'  },
-  quarterly: { equiv: '≈ $3.33 / month',             cta: 'Get 3 Months',  popular: true },
+  monthly:   { equiv: 'less than a coffee a month',  cta: 'Start Monthly', popular: true },
+  quarterly: { equiv: '≈ $3.33 / month',             cta: 'Get 3 Months'  },
   lifetime:  { equiv: 'pay once · use forever',      cta: 'Claim Lifetime' },
 };
 

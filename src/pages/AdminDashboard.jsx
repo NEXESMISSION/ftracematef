@@ -667,6 +667,7 @@ function AnnouncementsPanel() {
       setError(null);
     } catch (e) {
       setError(friendlyError(e, 'Could not load announcements.'));
+      setRows([]); // never leave rows null on failure — the render does rows.map
     }
   }, []);
 

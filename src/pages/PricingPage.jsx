@@ -119,9 +119,9 @@ export default function PricingPage() {
             return (
               <article
                 key={p.id}
-                className={`pp-card ${p.gold ? 'pp-card-gold' : ''} ${p.id === 'quarterly' ? 'pp-card-popular' : ''}`}
+                className={`pp-card ${p.gold ? 'pp-card-gold' : ''} ${p.id === 'monthly' ? 'pp-card-popular' : ''}`}
               >
-                {p.id === 'quarterly' && !p.gold && (
+                {p.id === 'monthly' && !p.gold && (
                   <div className="pp-card-ribbon">Most popular</div>
                 )}
                 {lifetimeLabel && (

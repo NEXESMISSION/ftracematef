@@ -5,6 +5,7 @@ import Hero from '../components/Hero.jsx';
 import Marquee from '../components/Marquee.jsx';
 import HowItWorks from '../components/HowItWorks.jsx';
 import AudienceSections from '../components/AudienceSections.jsx';
+import Gallery from '../components/Gallery.jsx';
 import Pricing from '../components/Pricing.jsx';
 import GetApp from '../components/GetApp.jsx';
 import Footer from '../components/Footer.jsx';
@@ -22,18 +23,22 @@ export default function Landing() {
 
   return (
     <>
+      <a href="#main" className="skip-link">Skip to content</a>
       <SvgDefs />
       <Nav />
-      <Hero onPlayClick={openVideo} />
-      <Marquee />
-      {/* "How it works" — the four-step explainer (four images) above the
-          "Made for you" reels. */}
-      <div className="how-aud-group">
-        <HowItWorks />
-        <AudienceSections />
-      </div>
-      {!isPaid && <Pricing />}
-      <GetApp />
+      <main id="main">
+        <Hero onPlayClick={openVideo} />
+        <Marquee />
+        {/* "How it works" — the four-step explainer (four images) above the
+            "Made for you" reels. */}
+        <div className="how-aud-group">
+          <HowItWorks />
+          <AudienceSections />
+        </div>
+        <Gallery />
+        {!isPaid && <Pricing />}
+        <GetApp />
+      </main>
       <WelcomeOverlay />
       <CatPopup />
       <VideoModal open={video.open} videoId={video.id} onClose={closeVideo} />

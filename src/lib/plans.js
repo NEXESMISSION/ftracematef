@@ -74,9 +74,11 @@ export const VISIBLE_PLANS = PLANS.filter((p) => !p.hidden);
 /** Quick lookup helpers. */
 export const PLAN_BY_ID = Object.fromEntries(PLANS.map((p) => [p.id, p]));
 
+// Derived from PLANS so a price edit can never drift from the label.
+// Monthly is the only recurring plan that shows a "/mo" suffix.
 export const PLAN_LABEL = {
-  free:      'Free tier',
-  monthly:   'Monthly · $5/mo',
-  quarterly: '3 Months · $10',
-  lifetime:  'Lifetime · $15',
+  free: 'Free tier',
+  ...Object.fromEntries(
+    PLANS.map((p) => [p.id, `${p.name} · $${p.price}${p.id === 'monthly' ? '/mo' : ''}`]),
+  ),
 };

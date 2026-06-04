@@ -28,7 +28,7 @@ export default function CatPopup() {
   if (!shouldRender) return null;
 
   return (
-    <Link to="/login" className="cat-popup" aria-label="Let's start tracing — sign in">
+    <Link to="/upload" className="cat-popup" aria-label="Let's start tracing">
       <img src="/images/popup/floating-cat.webp" alt="Let's Start Tracing!" />
     </Link>
   );
