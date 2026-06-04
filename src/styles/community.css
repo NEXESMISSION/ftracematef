@@ -358,8 +358,9 @@ a.like-btn { text-decoration: none; }
   .acct-pane { display: none; }
   .acct-pane.is-active { display: block; }
 
-  /* Leave room so the fixed (taller) bar never covers the last card. */
-  .profile-page { padding-bottom: calc(118px + env(safe-area-inset-bottom)); }
+  /* Section nav is now an in-flow pill at the top, not a fixed bottom bar, so
+     no big bottom reserve is needed. */
+  .profile-page { padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
 
   /* Account · Streaks · (Trace) · Gallery — 4 slots, the 3rd is the raised
      circular Trace button. Bigger bar with comfortable tap targets. */

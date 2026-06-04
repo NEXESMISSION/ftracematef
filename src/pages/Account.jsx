@@ -14,7 +14,7 @@ import { isAdminUser } from '../lib/admin.js';
 import { canUseFreeTrial, freeSessionsLeft } from '../lib/freeTrial.js';
 import Alert from '../components/Alert.jsx';
 import { usePresence } from '../hooks/usePresence.js';
-import Community from '../components/Community.jsx';
+import StudioTabBar from '../components/StudioTabBar.jsx';
 import InstallPromo from '../components/InstallPromo.jsx';
 
 const STATUS_TONE = {
@@ -556,13 +556,6 @@ export default function Account() {
   const { user, profile, subscription, signOut, refresh, isPaid, loading } = useAuth();
   usePresence('account');
   const [showChange, setShowChange] = useState(false);
-  // Mobile-only bottom-nav tab. Desktop ignores this (CSS shows both panes);
-  // on phones it swaps between account info, the streak board, and the
-  // community gallery. 'account' | 'streaks' | 'gallery'. Streaks + gallery
-  // both live in the <Community> pane — the tab also picks Community's inner
-  // view via communityTab.
-  const [mobileTab, setMobileTab] = useState('account');
-  const communityTab = mobileTab === 'streaks' ? 'streaks' : 'gallery';
   // Single source of truth for action/portal/change-plan errors. SubscriptionCard
   // and ChangePlanModal both write here; one Alert at page level renders it.
   const [alert, setAlert] = useState(null); // { title, message } | null
@@ -645,9 +638,8 @@ export default function Account() {
         </div>
       </header>
 
-      <main className={`profile-page acct-tab-${mobileTab}`}>
-       {/* ── Account pane (default mobile tab) ── */}
-       <div className={`acct-pane acct-pane-account ${mobileTab === 'account' ? 'is-active' : ''}`}>
+      <main className="profile-page">
+       <StudioTabBar />
         {/* ── Hero: the main action lives here ── */}
         <section className="profile-hero">
           <span className="profile-hero-tape" aria-hidden="true" />
@@ -781,57 +773,7 @@ export default function Account() {
             </Link>
           </div>
         )}
-       </div>{/* /acct-pane-account */}
-
-       {/* ── Community pane: Gallery + Streaks. On mobile it's shown for both
-            the 'gallery' and 'streaks' tabs (the inner view follows). On
-            desktop it just stacks below as usual. ── */}
-       <div className={`acct-pane acct-pane-gallery ${mobileTab === 'gallery' || mobileTab === 'streaks' ? 'is-active' : ''}`}>
-         <Community tab={communityTab} onTabChange={(t) => setMobileTab(t === 'streaks' ? 'streaks' : 'gallery')} />
-       </div>
       </main>
-
-      {/* ── Mobile bottom nav: Account · Streaks · Gallery. Hidden on desktop. ── */}
-      <nav className="acct-tabbar" aria-label="Account sections">
-        <button
-          type="button"
-          className={`acct-tabbar-btn ${mobileTab === 'account' ? 'is-active' : ''}`}
-          onClick={() => setMobileTab('account')}
-          aria-current={mobileTab === 'account'}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="12" cy="8" r="3.6" />
-            <path d="M4.5 19.5 a7.5 7.5 0 0 1 15 0" />
-          </svg>
-          <span>Account</span>
-        </button>
-
-        <button
-          type="button"
-          className={`acct-tabbar-btn ${mobileTab === 'streaks' ? 'is-active' : ''}`}
-          onClick={() => setMobileTab('streaks')}
-          aria-current={mobileTab === 'streaks'}
-        >
-          <span className="acct-tabbar-emoji" aria-hidden="true">🔥</span>
-          <span>Streaks</span>
-        </button>
-
-        <button
-          type="button"
-          className={`acct-tabbar-btn ${mobileTab === 'gallery' ? 'is-active' : ''}`}
-          onClick={() => setMobileTab('gallery')}
-          aria-current={mobileTab === 'gallery'}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
-            <path d="M3.5 15 L8 10.5 L12 14.5 M14 12.5 L16.5 10 L20.5 14" />
-            <circle cx="8.5" cy="9" r="1.3" fill="currentColor" stroke="none" />
-          </svg>
-          <span>Gallery</span>
-        </button>
-      </nav>
 
       {showChange && (
         <ChangePlanModal

@@ -73,6 +73,8 @@ const Upload          = lazyWithReload(() => import('./pages/Upload.jsx'), 'uplo
 const Trace           = lazyWithReload(() => import('./pages/Trace.jsx'), 'trace');
 const LivePreview     = lazyWithReload(() => import('./pages/LivePreview.jsx'), 'live');
 const Account         = lazyWithReload(() => import('./pages/Account.jsx'), 'account');
+const Streaks          = lazyWithReload(() => import('./pages/Streaks.jsx'), 'streaks');
+const CommunityGallery = lazyWithReload(() => import('./pages/CommunityGallery.jsx'), 'gallery');
 const CheckoutSuccess = lazyWithReload(() => import('./pages/CheckoutSuccess.jsx'), 'checkout');
 const PricingPage     = lazyWithReload(() => import('./pages/PricingPage.jsx'), 'pricing');
 const Terms           = lazyWithReload(() => import('./pages/Terms.jsx'), 'terms');
@@ -181,6 +183,8 @@ export default function App() {
 
         {/* Auth required (free users allowed) */}
         <Route path="/account"          element={<RequireAuth><Account /></RequireAuth>} />
+        <Route path="/streaks"          element={<RequireAuth><Streaks /></RequireAuth>} />
+        <Route path="/gallery"          element={<RequireAuth><CommunityGallery /></RequireAuth>} />
         <Route path="/live"             element={<RequireAuth><LivePreview /></RequireAuth>} />
         <Route path="/checkout/success" element={<RequireAuth><CheckoutSuccess /></RequireAuth>} />
 

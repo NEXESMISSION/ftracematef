@@ -2937,3 +2937,49 @@
   flex-wrap: nowrap;
 }
 .install-promo-buttons .store-btn img { height: 64px; width: auto; display: block; }
+
+/* ── Shared section nav (Account · Streaks · Gallery) ─────────────────────── */
+.studio-tabs {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto clamp(18px, 3vw, 28px);
+  padding: 6px;
+  background: var(--paper, #fff);
+  border: 1.5px solid var(--ink, #2b2118);
+  border-radius: 999px;
+  box-shadow: 3px 3px 0 var(--ink, #2b2118);
+}
+.studio-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px;
+  border-radius: 999px;
+  color: var(--ink-soft, #6b5d4d);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.studio-tab svg { width: 18px; height: 18px; flex-shrink: 0; }
+.studio-tab-emoji { font-size: 17px; line-height: 1; }
+.studio-tab:hover { color: var(--ink, #2b2118); }
+.studio-tab.is-active { background: var(--coral, #e87a7a); color: #fff; }
+
+/* Streaks / Gallery sub-pages share the account shell. */
+.studio-subpage-head { text-align: center; margin: 0 auto clamp(14px, 2.5vw, 22px); max-width: 640px; }
+.studio-subpage-head h1 {
+  font-family: 'Caveat', cursive;
+  font-size: clamp(36px, 6vw, 52px);
+  color: var(--ink, #2b2118);
+  line-height: 1;
+  margin: 0 0 6px;
+}
+.studio-subpage-head p { color: var(--ink-soft, #6b5d4d); font-size: 15px; margin: 0; line-height: 1.5; }

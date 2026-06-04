@@ -232,7 +232,12 @@ export default function Trace() {
       ({ data, error }) => {
         if (error || !data) return;
         if (data.incremented) {
-          setStreakInfo({ current: data.current_streak, longest: data.longest_streak });
+          setStreakInfo({
+            current: data.current_streak,
+            longest: data.longest_streak,
+            wasReset: !!data.was_reset,
+            lost: data.lost_streak || 0,
+          });
           refresh();
         }
       },
@@ -1626,25 +1631,32 @@ export default function Trace() {
         onCapture={onShotCaptured}
       />
 
-      {/* B2 — daily streak celebration (today's first trace). */}
+      {/* B2 — daily streak moment (today's first trace): a lost-streak nudge if
+          a day was missed, otherwise a celebration that points at the board. */}
       {streakInfo && (
-        <div className="trace-ask" role="dialog" aria-modal="true" aria-labelledby="streak-title">
+        <div className={`trace-ask trace-streak-pop ${streakInfo.wasReset ? 'is-lost' : ''}`} role="dialog" aria-modal="true" aria-labelledby="streak-title">
           <div className="trace-ask-backdrop" onClick={() => setStreakInfo(null)} />
           <div className="trace-ask-card trace-streak-card">
-            <div className="trace-streak-flame" aria-hidden="true">🔥</div>
+            <div className="trace-streak-flame" aria-hidden="true">{streakInfo.wasReset ? '💔' : '🔥'}</div>
             <h3 id="streak-title" className="trace-ask-title">
-              {streakInfo.current <= 1 ? 'Streak started!' : `${streakInfo.current}-day streak!`}
+              {streakInfo.wasReset
+                ? `You lost your ${streakInfo.lost}-day streak`
+                : streakInfo.current <= 1
+                  ? 'Streak started!'
+                  : `${streakInfo.current}-day streak!`}
             </h3>
             <p className="trace-ask-text">
-              {streakInfo.current <= 1
-                ? 'Come back and trace tomorrow to keep it alive.'
-                : streakInfo.longest > streakInfo.current
-                  ? `${streakInfo.current} days in a row — your best is ${streakInfo.longest}.`
-                  : `${streakInfo.current} days in a row — a new personal best!`}
+              {streakInfo.wasReset
+                ? `A missed day broke it — but you're back. Day 1 starts now; trace every day to climb the leaderboard again.`
+                : streakInfo.current <= 1
+                  ? 'Day 1 is on the board. Trace tomorrow to keep it alive and start climbing the leaderboard.'
+                  : streakInfo.longest > streakInfo.current
+                    ? `${streakInfo.current} days in a row — keep going to beat your best of ${streakInfo.longest} and rise up the leaderboard.`
+                    : `${streakInfo.current} days in a row — a new personal best! Keep it up to climb the leaderboard.`}
             </p>
             <div className="trace-ask-actions">
               <button type="button" className="trace-ask-btn trace-ask-btn-primary" onClick={() => setStreakInfo(null)}>
-                Let's go
+                {streakInfo.wasReset ? "Let's go again" : "Let's go"}
               </button>
             </div>
           </div>

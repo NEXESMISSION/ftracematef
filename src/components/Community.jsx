@@ -15,17 +15,18 @@ const PAGE = 30;
  * traced reference revealed only on tap (a "Reference" peek) instead of a
  * second permanent tile.
  */
-export default function Community({ tab: tabProp, onTabChange }) {
+export default function Community({ mode, tab: tabProp, onTabChange }) {
   const { user } = useAuth();
   const [items, setItems] = useState(null);    // null = loading first page
   const [cursor, setCursor] = useState(null);  // ISO ts of last row, or null = no more
   const [loadingMore, setLoadingMore] = useState(false);
   const [busyId, setBusyId] = useState(null);
   const [lightbox, setLightbox] = useState(null); // creation shown in compare popup
-  // Tab can be controlled by a parent (the mobile bottom-bar drives it) or
-  // managed locally (desktop). Controlled when `tabProp` is provided.
+  // `mode` ('gallery' | 'streaks') pins this to one section with no internal tab
+  // switcher — used by the dedicated /gallery and /streaks pages. Without it the
+  // legacy combined card behaviour applies (tabProp/local state + the switcher).
   const [tabLocal, setTabLocal] = useState('gallery'); // 'gallery' | 'streaks'
-  const tab = tabProp ?? tabLocal;
+  const tab = mode ?? tabProp ?? tabLocal;
   const setTab = (t) => { if (onTabChange) onTabChange(t); else setTabLocal(t); };
   const [board, setBoard] = useState(null);    // streak leaderboard rows
   const [myRank, setMyRank] = useState(null);  // caller's own rank (when outside top 20)
@@ -121,22 +122,26 @@ export default function Community({ tab: tabProp, onTabChange }) {
     && board && !board.some((r) => r.rank === myRank.rank);
 
   return (
-    <section className="community-card" aria-labelledby="community-title">
-      <div className="community-head">
-        <h2 id="community-title">Community</h2>
-        <div className="community-tabs" role="tablist">
-          <button
-            type="button" role="tab" aria-selected={tab === 'gallery'}
-            className={`community-tab ${tab === 'gallery' ? 'is-active' : ''}`}
-            onClick={() => setTab('gallery')}
-          >Gallery</button>
-          <button
-            type="button" role="tab" aria-selected={tab === 'streaks'}
-            className={`community-tab ${tab === 'streaks' ? 'is-active' : ''}`}
-            onClick={() => setTab('streaks')}
-          >🔥 Streaks</button>
+    <section className="community-card">
+      {/* Internal tab switcher only in the legacy combined mode. The dedicated
+          pages pass `mode` and provide their own page heading + the tab bar. */}
+      {!mode && (
+        <div className="community-head">
+          <h2 id="community-title">Community</h2>
+          <div className="community-tabs" role="tablist">
+            <button
+              type="button" role="tab" aria-selected={tab === 'gallery'}
+              className={`community-tab ${tab === 'gallery' ? 'is-active' : ''}`}
+              onClick={() => setTab('gallery')}
+            >Gallery</button>
+            <button
+              type="button" role="tab" aria-selected={tab === 'streaks'}
+              className={`community-tab ${tab === 'streaks' ? 'is-active' : ''}`}
+              onClick={() => setTab('streaks')}
+            >🔥 Streaks</button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Streak leaderboard ── */}
       {tab === 'streaks' && (
