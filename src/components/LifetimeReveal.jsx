@@ -14,6 +14,22 @@ import { trackEvent } from '../lib/track.js';
 
 const BOOM_COLORS = ['#e87a7a', '#f5d77a', '#7fbf9c', '#7fb3e8', '#c89cf0', '#ffb27a', '#ffe6a0', '#fff'];
 
+/* ── one-time-per-device gate ─────────────────────────────────────────────────
+ * The "secret deal" theatre (staged pop-in + confetti + popup) is a one-time
+ * delight. Once this device has actually unwrapped it (clicked the box to see
+ * the countdown), we stamp localStorage and from then on the Lifetime offer
+ * just shows straight as a card — no animation, no popup. Device-scoped, so it
+ * stays quiet even if they make a second account. */
+const SEEN_KEY = 'tm:lifetime-seen';
+
+export function hasSeenLifetime() {
+  try { return window.localStorage.getItem(SEEN_KEY) === '1'; } catch { return false; }
+}
+
+function markLifetimeSeen() {
+  try { window.localStorage.setItem(SEEN_KEY, '1'); } catch { /* ignore */ }
+}
+
 /* ── confetti boom ──────────────────────────────────────────────────────────
  * Particles explode outward from screen center, spin, then fall + fade. Pure
  * CSS via per-piece custom properties; fixed + pointer-events:none so it plays
@@ -194,6 +210,68 @@ function LifetimeModal({ plan, lifetimeLeft, busy, onChoose, onClose }) {
   );
 }
 
+/* ── straightforward revealed card (returning device) ─────────────────────────
+ * Once the device has already unwrapped the secret, the Lifetime offer just
+ * sits in the grid as a normal gold plan card — real price, live countdown and
+ * a direct claim button. No teaser veil, no confetti, no popup. */
+function PcCheckGold() {
+  return (
+    <span className="pc-check pc-check-gold">
+      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+           strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M 2 6 L 5 9 L 10 3" />
+      </svg>
+    </span>
+  );
+}
+
+export function LifetimeInlineCard({ plan, lifetimeLeft, busy, onChoose }) {
+  const { h, m, s, expired } = useCountdown();
+  const soldOut = lifetimeLeft === 0;
+  const limitedText =
+    lifetimeLeft === null ? 'Limited — only 10 spots'
+    : lifetimeLeft > 0 ? `Limited — only ${lifetimeLeft} of 10 spots left`
+    : 'Sold out — waitlist only';
+
+  return (
+    <article className="pricing-plan pricing-plan-gold lifetime-revealed">
+      <div className="pricing-plan-limited">
+        <span className="pulse-dot" aria-hidden="true"></span>{limitedText}
+      </div>
+
+      <div className="pricing-plan-name">{plan.name}</div>
+      <div className="pricing-plan-price">
+        <span className="num"><span className="currency">$</span>{plan.price}</span>
+      </div>
+      <div className="pricing-plan-badge">once · forever</div>
+
+      <div className={`lf-countdown lf-countdown-inline ${expired ? 'is-expired' : ''}`}>
+        <span className="lf-countdown-label">{expired ? 'Offer ended' : 'Your price holds for'}</span>
+        <div className="lf-clock" aria-hidden="true">
+          <span className="lf-clock-unit"><b>{h}</b><i>hrs</i></span>
+          <span className="lf-clock-sep">:</span>
+          <span className="lf-clock-unit"><b>{m}</b><i>min</i></span>
+          <span className="lf-clock-sep">:</span>
+          <span className="lf-clock-unit"><b>{s}</b><i>sec</i></span>
+        </div>
+      </div>
+
+      <ul className="pricing-plan-features">
+        {plan.features.map((f) => <li key={f}><PcCheckGold />{f}</li>)}
+      </ul>
+
+      <button
+        type="button"
+        className="pricing-plan-cta pricing-plan-cta-gold"
+        onClick={() => { trackEvent('custom', { name: 'lifetime_claim' }); onChoose(plan.id); }}
+        disabled={busy === plan.id || soldOut}
+      >
+        {soldOut ? 'Sold out' : busy === plan.id ? 'Opening checkout…' : `${plan.cta} →`}
+      </button>
+    </article>
+  );
+}
+
 /* ── blurred teaser tile (lives in the pricing grid) ──────────────────────── */
 export default function LifetimeReveal({ plan, lifetimeLeft, busy, onChoose }) {
   const [open, setOpen] = useState(false);
@@ -204,6 +282,8 @@ export default function LifetimeReveal({ plan, lifetimeLeft, busy, onChoose }) {
 
   const reveal = () => {
     trackEvent('custom', { name: 'lifetime_unwrap' });
+    // Remember the unwrap on this device — next visit skips the whole show.
+    markLifetimeSeen();
     setOpen(true);
     setBooming(true);
     clearTimeout(boomTimer.current);

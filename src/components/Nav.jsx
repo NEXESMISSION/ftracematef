@@ -47,6 +47,8 @@ export default function Nav() {
         <div className="nav-cta-group">
           {/* Returning users who already have an account go straight to sign-in. */}
           <Link className="nav-login-link" to="/login">Log in</Link>
+          {/* New visitors who'd rather create an account before trying. */}
+          <Link className="btn-signup btn-signup-sm" to="/login">Create profile</Link>
           <Link className="img-btn img-btn-sm" to="/upload" aria-label="Try it Now">
             <Img src="/images/ui/btn-try-now.webp" alt="Try it Now" priority />
           </Link>

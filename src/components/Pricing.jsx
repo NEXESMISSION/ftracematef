@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { VISIBLE_PLANS } from '../lib/plans.js';
 import { FREE_SESSION_LIMIT } from '../lib/freeTrial.js';
 import { usePlanCheckout } from '../hooks/usePlanCheckout.js';
-import LifetimeReveal from './LifetimeReveal.jsx';
+import LifetimeReveal, { LifetimeInlineCard, hasSeenLifetime } from './LifetimeReveal.jsx';
 
 function Check({ gold, mint }) {
   return (
@@ -95,12 +95,15 @@ export default function Pricing() {
   // reveal actually happens while they're looking.
   const sectionRef = useRef(null);
   const startedRef = useRef(false);
-  const [revealed, setRevealed] = useState(false);
+  // Devices that already unwrapped the secret skip the whole show — Lifetime is
+  // present from first paint and renders as a plain card (no teaser/confetti).
+  const [seenLifetime] = useState(() => hasSeenLifetime());
+  const [revealed, setRevealed] = useState(seenLifetime);
   const [announce, setAnnounce] = useState(false);
 
   useEffect(() => {
     const el = sectionRef.current;
-    if (!el) return undefined;
+    if (!el || seenLifetime) return undefined;
     const timers = [];
     const io = new IntersectionObserver((entries) => {
       if (!entries[0]?.isIntersecting || startedRef.current) return;
@@ -119,7 +122,7 @@ export default function Pricing() {
     }, { threshold: 0.3 });
     io.observe(el);
     return () => { io.disconnect(); timers.forEach(clearTimeout); };
-  }, []);
+  }, [seenLifetime]);
 
   return (
     <section id="pricing" ref={sectionRef} className="pricing tm-section-pad">
@@ -160,15 +163,26 @@ export default function Pricing() {
         {VISIBLE_PLANS.map((plan) => (
           plan.gold ? (
             /* Lifetime stays out of the grid until the staged reveal fires; then
-               it pops in (lf-enter) as the blurred "secret deal" teaser. */
+               it pops in (lf-enter) as the blurred "secret deal" teaser. Devices
+               that already unwrapped it skip straight to the plain card. */
             revealed ? (
-              <LifetimeReveal
-                key={plan.id}
-                plan={plan}
-                onChoose={choose}
-                busy={busy}
-                lifetimeLeft={lifetimeLeft}
-              />
+              seenLifetime ? (
+                <LifetimeInlineCard
+                  key={plan.id}
+                  plan={plan}
+                  onChoose={choose}
+                  busy={busy}
+                  lifetimeLeft={lifetimeLeft}
+                />
+              ) : (
+                <LifetimeReveal
+                  key={plan.id}
+                  plan={plan}
+                  onChoose={choose}
+                  busy={busy}
+                  lifetimeLeft={lifetimeLeft}
+                />
+              )
             ) : null
           ) : (
             <PlanCard
