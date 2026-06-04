@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import {
@@ -17,6 +17,9 @@ import { ANALYTICS_PROVIDER, ANALYTICS_EMBED_URL } from '../lib/analytics.js';
 import { formatDuration, formatRelative as formatTraceRelative } from '../lib/traceStats.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import AnalyticsPulse from '../components/AnalyticsPulse.jsx';
+// Pulse 2 (the heavy deep-dive) is lazy-loaded so its bytes — and cobe's — only
+// download when the operator opens that tab, keeping the default admin chunk lean.
+const AnalyticsPulseDetail = lazy(() => import('../components/AnalyticsPulseDetail.jsx'));
 
 // Anyone seen pinging the heartbeat within this window is treated as "in the
 // app right now". Tab visibility throttles the heartbeat to 60s, so 2 minutes
@@ -2262,6 +2265,7 @@ export default function AdminDashboard() {
           {[
             { id: 'users',     label: 'Users' },
             { id: 'pulse',     label: 'Pulse' },
+            { id: 'pulse2',    label: 'Pulse 2' },
             { id: 'stats',     label: 'Acquisition' },
             { id: 'referrals', label: 'Referrals' },
             { id: 'survey',    label: 'Survey' },
@@ -2285,6 +2289,11 @@ export default function AdminDashboard() {
         </nav>
 
         {view === 'pulse' && <AnalyticsPulse />}
+        {view === 'pulse2' && (
+          <Suspense fallback={<p className="pulse-empty">Loading detailed analytics…</p>}>
+            <AnalyticsPulseDetail />
+          </Suspense>
+        )}
         {view === 'stats' && <AcquisitionPanel users={users} />}
         {view === 'referrals' && <ReferralsPanel />}
         {view === 'announce' && <AnnouncementsPanel />}

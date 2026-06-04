@@ -17,7 +17,7 @@ import { getAnalytics, listVisitors, getVisitorProfile } from '../lib/admin.js';
 import { gatherFullExport, buildReportText, downloadText } from '../lib/analyticsExport.js';
 import { friendlyError } from '../lib/errors.js';
 
-const RANGES = [
+export const RANGES = [
   { id: '24h', label: '24h' },
   { id: '7d',  label: '7 days' },
   { id: '30d', label: '30 days' },
@@ -25,8 +25,8 @@ const RANGES = [
   { id: 'all', label: 'All time' },
 ];
 
-const fmt = (n) => (typeof n === 'number' ? n.toLocaleString() : '0');
-const pct = (num, den) => (den > 0 ? `${((num / den) * 100).toFixed(1)}%` : '—');
+export const fmt = (n) => (typeof n === 'number' ? n.toLocaleString() : '0');
+export const pct = (num, den) => (den > 0 ? `${((num / den) * 100).toFixed(1)}%` : '—');
 
 // Icon per named channel (from analytics_channel() in the DB). Anything not
 // listed falls back to a neutral dot, so adding a channel server-side doesn't
@@ -41,7 +41,7 @@ const CHANNEL_ICON = {
   GitHub: '🐙', 'Product Hunt': '🐱', Gmail: '✉️', Outlook: '✉️',
   Newsletter: '📰', Direct: '🔗',
 };
-const channelIcon = (name) => CHANNEL_ICON[name] || '•';
+export const channelIcon = (name) => CHANNEL_ICON[name] || '•';
 
 /* ── interactive globe ────────────────────────────────────────────────────── */
 // Drag to spin: horizontal drag rotates longitude (phi), vertical drag tilts
@@ -146,7 +146,7 @@ function Globe({ countries }) {
 }
 
 /* ── horizontal bar breakdown ─────────────────────────────────────────────── */
-function Breakdown({ title, rows, labelKey, valueKey = 'visitors' }) {
+export function Breakdown({ title, rows, labelKey, valueKey = 'visitors' }) {
   const max = (rows || []).reduce((m, r) => Math.max(m, r[valueKey] || 0), 1);
   return (
     <div className="pulse-card">
@@ -174,7 +174,7 @@ function Breakdown({ title, rows, labelKey, valueKey = 'visitors' }) {
 // Renders normalised click points (0..1 in both axes) as additive radial
 // blobs on a tall canvas mimicking a scrolled page. Hand-rolled so we pull in
 // no heatmap dependency.
-function HeatCanvas({ points }) {
+export function HeatCanvas({ points }) {
   const canvasRef = useRef(null);
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -218,7 +218,7 @@ function HeatCanvas({ points }) {
 }
 
 /* ── scroll-depth funnel ──────────────────────────────────────────────────── */
-function ScrollFunnel({ scroll, pageviews }) {
+export function ScrollFunnel({ scroll, pageviews }) {
   const base = Math.max(pageviews || 0, scroll?.d25 || 0, 1);
   const rows = [
     { label: 'Reached 25%',  v: scroll?.d25 || 0 },
@@ -481,7 +481,7 @@ function InstallStat({ label, value, hint, accent }) {
   );
 }
 
-function InstallFunnel({ pwa }) {
+export function InstallFunnel({ pwa }) {
   const p = pwa || {};
   const promoOpen   = p.promo_open || 0;
   const pickIos     = p.pick_ios || 0;
@@ -532,7 +532,7 @@ function InstallFunnel({ pwa }) {
 /* ── Lifetime "secret deal" funnel ────────────────────────────────────────── */
 // teaser seen → unwrapped (boom + popup) → claim clicked. Reads overview.lifetime
 // (added by the lifetime_tracking migration); empty-states on older data.
-function LifetimeFunnel({ lifetime }) {
+export function LifetimeFunnel({ lifetime }) {
   const l = lifetime || {};
   const views = l.teaser_views || 0;
   const unwraps = l.unwraps || 0;
@@ -558,7 +558,7 @@ function LifetimeFunnel({ lifetime }) {
 // One button that, on click, gathers EVERYTHING (per-visitor journeys, clicks,
 // scroll depth, time-on-page, sources, referrers, referral program, heatmaps)
 // and downloads it as a detailed text report. Nothing here loads until clicked.
-function DownloadReport({ range, overview }) {
+export function DownloadReport({ range, overview }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [err, setErr] = useState('');
@@ -776,7 +776,7 @@ function AccountCell({ r }) {
   );
 }
 
-function VisitorsPanel({ range }) {
+export function VisitorsPanel({ range }) {
   const PAGE = 50;
   const [list, setList] = useState({ total: 0, rows: [] });
   const [loading, setLoading] = useState(true);
@@ -1079,7 +1079,7 @@ function VisitorProfile({ visitorId, onClose }) {
   );
 }
 
-function Kpi({ label, value, sub, accent }) {
+export function Kpi({ label, value, sub, accent }) {
   return (
     <div className={`pulse-kpi ${accent ? 'pulse-kpi-accent' : ''}`}>
       <span className="pulse-kpi-label">{label}</span>
@@ -1089,7 +1089,7 @@ function Kpi({ label, value, sub, accent }) {
   );
 }
 
-function FunnelStep({ label, value, base }) {
+export function FunnelStep({ label, value, base }) {
   const v = value || 0;
   return (
     <div className="pulse-funnel-step">
