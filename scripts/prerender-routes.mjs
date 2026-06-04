@@ -69,7 +69,7 @@ const HOWTO_BODY = `
     </ul>
 
     <h2>Why TraceMate vs. other tracing apps</h2>
-    <p>Most AR-tracing tools (Da Vinci Eye, AR Sketch, SketchAR, Trace Anything) are subscription-only native apps you install from the App Store. TraceMate runs in your browser with no install, offers a one-time $15 lifetime plan instead of subscription-only pricing, starts at $7/month, works on Android and desktop, keeps your image on your device, and gives every account one free session to try first. It is the easiest and most affordable way to start learning to draw with AR.</p>
+    <p>Most AR-tracing tools (Da Vinci Eye, AR Sketch, SketchAR, Trace Anything) are subscription-only native apps you install from the App Store. TraceMate runs in your browser with no install, offers a one-time $15 lifetime plan instead of subscription-only pricing, starts at $5/month, works on Android and desktop, keeps your image on your device, and gives every account one free session to try first. It is the easiest and most affordable way to start learning to draw with AR.</p>
 
     <h2>Frequently asked questions</h2>
     <h3>Does tracing actually help you learn to draw?</h3>
@@ -83,7 +83,7 @@ const HOWTO_BODY = `
     <h3>What can I trace?</h3>
     <p>Anything: photos, portraits, anime and cartoon characters, logos, lettering and calligraphy, tattoo designs, landscapes, and technical drawings.</p>
     <h3>How much does it cost?</h3>
-    <p>Every account gets one free tracing session. Paid plans are $7/month, $10 per 3 months, or a one-time $15 lifetime plan (limited to 10 spots).</p>
+    <p>Every account gets one free tracing session. Paid plans are $5/month, $10 per 3 months, or a one-time $15 lifetime plan (limited to 10 spots).</p>
 
     <p><a href="https://www.tracemate.art/upload">Start tracing free</a> · <a href="https://www.tracemate.art/pricing">Pricing</a></p>
   </article>
@@ -115,7 +115,7 @@ const HOWTO_JSONLD = {
         { '@type': 'Question', 'name': 'Is it good for kids?', 'acceptedAnswer': { '@type': 'Answer', 'text': 'Yes. It is a guided, low-frustration way for children to draw their favorite characters and finish with real art on paper.' } },
         { '@type': 'Question', 'name': 'Will my images be uploaded?', 'acceptedAnswer': { '@type': 'Answer', 'text': 'The image you trace stays on your device. Only account info is stored. Sharing a finished result to the gallery is opt-in.' } },
         { '@type': 'Question', 'name': 'What can I trace?', 'acceptedAnswer': { '@type': 'Answer', 'text': 'Anything: photos, portraits, anime and cartoon characters, logos, lettering, tattoo designs, landscapes, and technical drawings.' } },
-        { '@type': 'Question', 'name': 'How much does it cost?', 'acceptedAnswer': { '@type': 'Answer', 'text': 'Every account gets one free session. Paid plans are $7/month, $10 per 3 months, or a one-time $15 lifetime plan limited to 10 spots.' } },
+        { '@type': 'Question', 'name': 'How much does it cost?', 'acceptedAnswer': { '@type': 'Answer', 'text': 'Every account gets one free session. Paid plans are $5/month, $10 per 3 months, or a one-time $15 lifetime plan limited to 10 spots.' } },
       ],
     },
     {
@@ -136,8 +136,8 @@ const ROUTES = [
   },
   {
     path: '/pricing',
-    title: 'Pricing — TraceMate AR Tracing | $7/mo or $15 lifetime',
-    description: 'TraceMate plans: $7/month, $10/3-months, or $15 one-time lifetime (10 spots). Every new account gets one free tracing session. Cancel anytime on monthly and 3-month plans.',
+    title: 'Pricing — TraceMate AR Tracing | $5/mo or $15 lifetime',
+    description: 'TraceMate plans: $5/month, $10/3-months, or $15 one-time lifetime (10 spots). Every new account gets one free tracing session. Cancel anytime on monthly and 3-month plans.',
   },
   {
     path: '/upload',

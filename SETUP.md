@@ -36,7 +36,7 @@ You only do this **once**. Follow it top to bottom.
 
 | Name | Type | Price | Interval | Save the ID as |
 |---|---|---|---|---|
-| Trace Mate Monthly | Subscription | $7 USD | 1 month | `DODO_PRODUCT_MONTHLY` |
+| Trace Mate Monthly | Subscription | $5 USD | 1 month | `DODO_PRODUCT_MONTHLY` |
 | Trace Mate Quarterly | Subscription | $10 USD | 3 months | `DODO_PRODUCT_QUARTERLY` |
 | Trace Mate Lifetime | One-time | $25 USD | — | `DODO_PRODUCT_LIFETIME` |
 
@@ -84,7 +84,7 @@ supabase secrets set \
 # matrix. Floors should be the listed price in cents (matches Dodo's
 # recurring_pre_tax_amount for tax-exclusive regions).
 supabase secrets set \
-  DODO_PRICE_MONTHLY_CENTS_USD=700       \
+  DODO_PRICE_MONTHLY_CENTS_USD=500       \
   DODO_PRICE_QUARTERLY_CENTS_USD=1000    \
   DODO_PRICE_LIFETIME_CENTS_USD=2500
 
