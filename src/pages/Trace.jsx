@@ -22,6 +22,10 @@ import {
 
 const INITIAL_TRANSFORM = { x: 0, y: 0, scale: 1, rotation: 0, flip: false };
 
+// Free-tier tracing sessions are capped at 5 minutes of studio time. Paid plans
+// trace with no limit.
+const FREE_SESSION_LIMIT_MS = 5 * 60 * 1000;
+
 export default function Trace() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -103,6 +107,9 @@ export default function Trace() {
   const streakDoneRef = useRef(false);
   // C2 publish — "show off your result" flow shown when ending a session.
   const [exitPrompt, setExitPrompt] = useState(false);
+  // Free-tier 5-minute session cap. When it fires, a blocking popup offers to
+  // upgrade or head back to the account for a fresh session.
+  const [limitReached, setLimitReached] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishMsg, setPublishMsg] = useState('');
   const [noteText, setNoteText] = useState('');    // C2 caption for the shared result
@@ -178,6 +185,16 @@ export default function Trace() {
   useEffect(() => {
     if (!imageUrl) navigate('/upload', { replace: true });
   }, [imageUrl, navigate]);
+
+  // Free-tier sessions are capped at 5 minutes. Paid users get no timer. The
+  // effect re-arms if paid-state flips after auth settles (timer is harmless on
+  // a brief misread since the cap is long). A fresh /trace visit remounts → a
+  // fresh 5 minutes.
+  useEffect(() => {
+    if (isPaid) return undefined;
+    const id = setTimeout(() => setLimitReached(true), FREE_SESSION_LIMIT_MS);
+    return () => clearTimeout(id);
+  }, [isPaid]);
 
   // Free-tier users get FREE_SESSION_LIMIT tracing sessions before the
   // paywall. Burn one per fresh /trace visit (a refresh inside the studio
@@ -1430,6 +1447,31 @@ export default function Trace() {
           <div className="profile-modal-backdrop" />
           <div className="profile-modal-card trace-survey-modal-card">
             <ExitSurvey onDone={() => setSurveyDismissed(true)} />
+          </div>
+        </div>
+      )}
+
+      {/* Free-tier 5-minute cap reached — blocking. Upgrade for unlimited, or
+          head back to the account to start a fresh free session. */}
+      {limitReached && (
+        <div className="trace-ask trace-limit" role="dialog" aria-modal="true" aria-labelledby="limit-title">
+          <div className="trace-ask-backdrop" />
+          <div className="trace-ask-card">
+            <div className="trace-streak-flame" aria-hidden="true">⏳</div>
+            <h3 id="limit-title" className="trace-ask-title">Your 5 free minutes are up</h3>
+            <p className="trace-ask-text">
+              Free sessions are capped at 5 minutes. Upgrade for <strong>unlimited
+              tracing</strong> — or head back to your account to start a fresh
+              free session.
+            </p>
+            <div className="trace-ask-actions">
+              <button type="button" className="trace-ask-btn" onClick={() => doExit('/account')}>
+                Back to account
+              </button>
+              <button type="button" className="trace-ask-btn trace-ask-btn-primary" onClick={() => doExit('/pricing')}>
+                Upgrade for unlimited ✦
+              </button>
+            </div>
           </div>
         </div>
       )}

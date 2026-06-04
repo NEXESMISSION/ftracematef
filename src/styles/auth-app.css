@@ -1225,6 +1225,23 @@
   border-style: solid;
   transform: translateY(-1px);
 }
+/* Upgrade — gold/premium, sits beside the coral "Start tracing". */
+.profile-cta-upgrade {
+  background: linear-gradient(135deg, #ffd166 0%, #f59e2c 100%);
+  color: #5c3d10;
+  border: 2px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  padding: 14px 22px;
+  font-size: 16px;
+}
+.profile-cta-upgrade:hover {
+  transform: translate(-2px, -2px) rotate(0.6deg);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+.profile-cta-upgrade:active {
+  transform: translate(0, 0);
+  box-shadow: 2px 2px 0 var(--ink);
+}
 
 /* ── Stats: scrapbook polaroids ── */
 .profile-stats {

@@ -688,6 +688,13 @@ export default function Account() {
             <Link to="/upload" className="profile-cta profile-cta-primary">
               Start tracing →
             </Link>
+            {/* Upgrade — only for free users; opens the plans so they can move to
+                unlimited tracing (no 5-minute cap). */}
+            {!isPaid && (
+              <Link to="/pricing" className="profile-cta profile-cta-upgrade">
+                Upgrade ✦
+              </Link>
+            )}
             {/* Admin button hidden on purpose — reach the dashboard via the
                 /admin-me URL directly. Flip `false` to bring the button back. */}
             {false && isAdminUser(profile) && (
