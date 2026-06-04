@@ -1225,26 +1225,25 @@
   border-style: solid;
   transform: translateY(-1px);
 }
-/* Upgrade — a clean, refined secondary that complements (not competes with)
-   the coral primary. White pill, soft amber accent, gentle lift. */
+/* Upgrade — the mirror of the coral primary in the same neo-brutalist style:
+   dark ink fill + coral hard shadow (vs the primary's coral fill + ink shadow).
+   Cohesive, clearly secondary, no off-brand colour. */
 .profile-cta-upgrade {
-  background: #fff;
-  color: #b06a12;
-  border: 1.5px solid rgba(217, 158, 42, 0.55);
-  box-shadow: 0 6px 16px -8px rgba(176, 106, 18, 0.45);
-  padding: 13px 22px;
-  font-size: 15px;
+  background: var(--ink);
+  color: var(--cream);
+  border: 2px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--coral);
+  padding: 14px 22px;
+  font-size: 16px;
 }
 .profile-cta-upgrade:hover {
-  background: #fffaf0;
-  border-color: #d99e2a;
-  color: #8a5410;
-  transform: translateY(-2px);
-  box-shadow: 0 10px 22px -8px rgba(176, 106, 18, 0.5);
+  transform: translate(-2px, -2px) rotate(0.6deg);
+  background: #1a1410;
+  box-shadow: 6px 6px 0 var(--coral);
 }
 .profile-cta-upgrade:active {
-  transform: translateY(0);
-  box-shadow: 0 4px 12px -8px rgba(176, 106, 18, 0.5);
+  transform: translate(0, 0);
+  box-shadow: 2px 2px 0 var(--coral);
 }
 
 /* ── Stats: scrapbook polaroids ── */
