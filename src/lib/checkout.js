@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js';
 import { unwrapFunctionError } from './errors.js';
+import { withTimeout } from './withTimeout.js';
 
 /**
  * Calls the `create-checkout` Supabase Edge Function with the chosen plan.
@@ -9,9 +10,10 @@ import { unwrapFunctionError } from './errors.js';
  * @param {'monthly'|'quarterly'|'lifetime'} plan
  */
 export async function startCheckout(plan) {
-  const { data, error } = await supabase.functions.invoke('create-checkout', {
-    body: { plan },
-  });
+  const { data, error } = await withTimeout(
+    supabase.functions.invoke('create-checkout', { body: { plan } }),
+    20000, 'Checkout',
+  );
   if (error) throw new Error(await unwrapFunctionError(error));
   if (!data?.checkout_url) throw new Error('No checkout_url returned from Edge Function');
   // Stamp first checkout open BEFORE returning the URL so the journey

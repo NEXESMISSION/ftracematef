@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import { trackEvent } from '../lib/track.js';
 
 // Catches uncaught render-time errors anywhere below it and renders a
 // friendly fallback instead of the silent blank screen React shows by
@@ -15,10 +16,18 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    // Log so the dev console / Sentry-style reporter can pick it up. In
-    // prod this is the only signal we have until proper error reporting
-    // is wired up.
     console.error('[ErrorBoundary] uncaught:', error, info);
+    // Report to our own analytics firehose so crashes are visible in the Pulse
+    // dashboard timeline (frequency + which route), not just the dev console.
+    // Fire-and-forget; reporting must never throw inside an error handler.
+    try {
+      trackEvent('custom', {
+        name: 'app_error',
+        // The ingest endpoint whitelists short string props; a trimmed
+        // message is enough to spot a recurring crash without a full SDK.
+        id: String(error?.message || error || 'unknown').slice(0, 120),
+      });
+    } catch { /* never let reporting break the fallback */ }
   }
 
   handleReload = () => {

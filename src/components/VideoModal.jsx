@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap.js';
 
 export default function VideoModal({ open, videoId, onClose }) {
+  const trapRef = useFocusTrap(open);
   // Esc to close + lock body scroll while open
   useEffect(() => {
     if (!open) return;
@@ -25,7 +27,7 @@ export default function VideoModal({ open, videoId, onClose }) {
       aria-hidden={!open}
     >
       <div className="video-modal-backdrop" onClick={onClose}></div>
-      <div className="video-modal-inner">
+      <div className="video-modal-inner" ref={trapRef}>
         <button type="button" className="video-modal-close" aria-label="Close video" onClick={onClose}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                strokeWidth="2.5" strokeLinecap="round">

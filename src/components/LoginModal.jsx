@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { isNative, nativeGoogleSignIn } from '../lib/native.js';
+import { useFocusTrap } from '../hooks/useFocusTrap.js';
 
 /**
  * Lightweight login overlay used by /upload (and anywhere else we want a
@@ -14,6 +15,7 @@ import { isNative, nativeGoogleSignIn } from '../lib/native.js';
 export default function LoginModal({ open, onClose, intentLabel = 'Sign in to continue' }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const trapRef = useFocusTrap(open);
 
   // Lock body scroll while the modal is open + close on Esc.
   useEffect(() => {
@@ -64,7 +66,7 @@ export default function LoginModal({ open, onClose, intentLabel = 'Sign in to co
     <div className="login-modal" role="dialog" aria-modal="true" aria-label="Sign in">
       <div className="login-modal-backdrop" onClick={onClose}></div>
 
-      <section className="login-modal-card">
+      <section className="login-modal-card" ref={trapRef}>
         <button type="button" className="login-modal-close" onClick={onClose} aria-label="Close">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
                strokeWidth="2" strokeLinecap="round">

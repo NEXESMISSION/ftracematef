@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useFocusTrap } from '../hooks/useFocusTrap.js';
 
 const STEPS = {
   ios: {
@@ -25,6 +26,7 @@ const STEPS = {
 
 export default function InstallModal({ platform, onClose }) {
   const open = !!platform;
+  const trapRef = useFocusTrap(open);
   const data = platform ? STEPS[platform] : null;
   const total = data ? data.items.length : 0;
 
@@ -70,7 +72,7 @@ export default function InstallModal({ platform, onClose }) {
       aria-hidden={!open}
     >
       <div className="install-modal-backdrop" onClick={onClose}></div>
-      <div className="install-modal-inner">
+      <div className="install-modal-inner" ref={trapRef}>
         <button type="button" className="install-modal-close" aria-label="Close" onClick={onClose}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                strokeWidth="2.5" strokeLinecap="round">
