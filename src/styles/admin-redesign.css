@@ -1,0 +1,204 @@
+/* =============================================================================
+   /admin-me redesign — unified operator dashboard chrome.
+   Layered ON TOP of admin.css: the inner panels (user rows, pulse, referrals,
+   content grids, activity drawer) keep their existing `.admin-*`/`.pulse-*`
+   styles; this file owns the new shell, the 5-section nav, and the Overview.
+   All new classes are prefixed `.adm`. Scoped under `.adm` so nothing leaks.
+   ============================================================================= */
+
+.adm {
+  --adm-bg: #f6f3ec;
+  --adm-paper: #ffffff;
+  --adm-ink: #1d1a16;
+  --adm-soft: #6f6a62;
+  --adm-faint: #a39d92;
+  --adm-line: #e7e1d6;
+  --adm-line-2: #efeae1;
+  --adm-coral: #ff5d52;
+  --adm-coral-soft: #fff0ee;
+  --adm-green: #1f9d63;
+  --adm-green-soft: #e9f7ef;
+  --adm-amber: #c98a17;
+  --adm-amber-soft: #fbf2dd;
+  --adm-blue: #2f7de1;
+  --adm-blue-soft: #e9f1fc;
+  --adm-violet: #8a5cf6;
+  --adm-radius: 16px;
+  background: var(--adm-bg);
+  color: var(--adm-ink);
+  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+}
+
+/* ── Top bar ──────────────────────────────────────────────────────────────── */
+.adm .adm-top {
+  position: sticky; top: 0; z-index: 40;
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px 22px;
+  background: rgba(255,255,255,.86);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--adm-line);
+}
+.adm .adm-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: .3px; }
+.adm .adm-brand-tag {
+  font-size: 10px; font-weight: 800; letter-spacing: .14em;
+  background: var(--adm-ink); color: #fff; padding: 3px 8px; border-radius: 6px;
+}
+.adm .adm-brand-title { font-size: 15px; }
+.adm .adm-top-spacer { flex: 1; }
+.adm .adm-top-me { font-size: 12.5px; color: var(--adm-soft); }
+.adm .adm-live-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 700; color: var(--adm-green);
+  background: var(--adm-green-soft); padding: 5px 10px; border-radius: 20px;
+}
+.adm .adm-live-chip .adm-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--adm-green);
+  box-shadow: 0 0 0 0 rgba(31,157,99,.5); animation: admPulse 2s infinite;
+}
+@keyframes admPulse { 0%{box-shadow:0 0 0 0 rgba(31,157,99,.45)} 70%{box-shadow:0 0 0 7px rgba(31,157,99,0)} 100%{box-shadow:0 0 0 0 rgba(31,157,99,0)} }
+.adm .adm-tlink {
+  font-size: 12.5px; color: var(--adm-soft); background: none; border: none;
+  cursor: pointer; padding: 6px 8px; border-radius: 8px; text-decoration: none;
+}
+.adm .adm-tlink:hover { background: var(--adm-line-2); color: var(--adm-ink); }
+.adm .adm-tlink-danger:hover { color: var(--adm-coral); background: var(--adm-coral-soft); }
+
+/* ── Primary section nav ──────────────────────────────────────────────────── */
+.adm .adm-nav {
+  display: flex; gap: 4px; padding: 10px 18px 0; flex-wrap: wrap;
+  background: rgba(255,255,255,.55); border-bottom: 1px solid var(--adm-line);
+  position: sticky; top: 49px; z-index: 30; backdrop-filter: blur(12px);
+}
+.adm .adm-nav-tab {
+  position: relative; display: flex; align-items: center; gap: 8px;
+  padding: 11px 16px; border: none; background: none; cursor: pointer;
+  font-size: 14px; font-weight: 700; color: var(--adm-soft);
+  border-radius: 10px 10px 0 0;
+}
+.adm .adm-nav-tab:hover { color: var(--adm-ink); background: var(--adm-line-2); }
+.adm .adm-nav-tab.is-active { color: var(--adm-ink); }
+.adm .adm-nav-tab.is-active::after {
+  content: ""; position: absolute; left: 12px; right: 12px; bottom: -1px;
+  height: 3px; border-radius: 3px 3px 0 0; background: var(--adm-coral);
+}
+.adm .adm-nav-ico { font-size: 16px; }
+
+/* ── Secondary (sub) nav ──────────────────────────────────────────────────── */
+.adm .adm-sub { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
+.adm .adm-sub-tab {
+  padding: 7px 14px; border: 1px solid var(--adm-line); background: var(--adm-paper);
+  border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--adm-soft);
+}
+.adm .adm-sub-tab:hover { border-color: var(--adm-faint); color: var(--adm-ink); }
+.adm .adm-sub-tab.is-active { background: var(--adm-ink); color: #fff; border-color: var(--adm-ink); }
+.adm .adm-sub-count { margin-left: 7px; font-size: 11px; opacity: .7; }
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+.adm .adm-wrap { max-width: 1240px; margin: 0 auto; padding: 22px; }
+.adm .adm-sec-title { font-size: 13px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--adm-faint); margin: 26px 0 12px; }
+.adm .adm-sec-title:first-child { margin-top: 0; }
+
+/* ── KPI cards ───────────────────────────────────────────────────────────── */
+.adm .adm-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.adm .adm-kpi {
+  background: var(--adm-paper); border: 1px solid var(--adm-line); border-radius: var(--adm-radius);
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; position: relative; overflow: hidden;
+}
+.adm .adm-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--adm-line); }
+.adm .adm-kpi-coral::before { background: var(--adm-coral); }
+.adm .adm-kpi-green::before { background: var(--adm-green); }
+.adm .adm-kpi-blue::before { background: var(--adm-blue); }
+.adm .adm-kpi-violet::before { background: var(--adm-violet); }
+.adm .adm-kpi-amber::before { background: var(--adm-amber); }
+.adm .adm-kpi-label { font-size: 12px; font-weight: 700; color: var(--adm-soft); letter-spacing: .02em; }
+.adm .adm-kpi-value { font-size: 30px; font-weight: 800; line-height: 1.05; letter-spacing: -.02em; }
+.adm .adm-kpi-sub { font-size: 12px; color: var(--adm-faint); font-weight: 600; }
+.adm .adm-kpi-sub b { color: var(--adm-green); }
+
+/* ── Cards / grid ────────────────────────────────────────────────────────── */
+.adm .adm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px; align-items: start; }
+.adm .adm-card { background: var(--adm-paper); border: 1px solid var(--adm-line); border-radius: var(--adm-radius); padding: 18px; }
+.adm .adm-card-wide { grid-column: 1 / -1; }
+.adm .adm-card-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.adm .adm-card-title { font-size: 15px; font-weight: 800; }
+.adm .adm-card-meta { font-size: 12px; color: var(--adm-faint); font-weight: 600; }
+
+/* ── Funnel ──────────────────────────────────────────────────────────────── */
+.adm .adm-funnel { display: flex; flex-direction: column; gap: 10px; }
+.adm .adm-funnel-row { display: grid; grid-template-columns: 92px 1fr 78px; align-items: center; gap: 12px; }
+.adm .adm-funnel-label { font-size: 13px; font-weight: 700; color: var(--adm-soft); }
+.adm .adm-funnel-track { height: 30px; background: var(--adm-line-2); border-radius: 8px; overflow: hidden; }
+.adm .adm-funnel-fill { height: 100%; border-radius: 8px; display: flex; align-items: center; padding-left: 10px; color: #fff; font-weight: 800; font-size: 13px; min-width: 2px; }
+.adm .adm-funnel-fill.f1 { background: var(--adm-blue); }
+.adm .adm-funnel-fill.f2 { background: var(--adm-violet); }
+.adm .adm-funnel-fill.f3 { background: var(--adm-green); }
+.adm .adm-funnel-pct { text-align: right; font-size: 13px; font-weight: 800; color: var(--adm-soft); }
+.adm .adm-funnel-pct small { display: block; font-size: 10.5px; font-weight: 600; color: var(--adm-faint); }
+
+/* ── Horizontal bar lists (channels, countries, plans) ───────────────────── */
+.adm .adm-bars { display: flex; flex-direction: column; gap: 9px; }
+.adm .adm-bar-row { display: grid; grid-template-columns: 110px 1fr 44px; align-items: center; gap: 10px; }
+.adm .adm-bar-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .adm-bar-track { height: 10px; background: var(--adm-line-2); border-radius: 6px; overflow: hidden; }
+.adm .adm-bar-fill { height: 100%; background: var(--adm-coral); border-radius: 6px; min-width: 2px; }
+.adm .adm-bar-fill.c2 { background: var(--adm-blue); }
+.adm .adm-bar-val { font-size: 13px; font-weight: 800; text-align: right; color: var(--adm-soft); }
+.adm .adm-bar-flag { margin-right: 6px; }
+
+/* ── Mini column trend ───────────────────────────────────────────────────── */
+.adm .adm-trend { display: flex; align-items: flex-end; gap: 5px; height: 120px; padding-top: 8px; }
+.adm .adm-trend-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; height: 100%; }
+.adm .adm-trend-bar { width: 100%; max-width: 26px; background: var(--adm-coral); border-radius: 5px 5px 0 0; min-height: 2px; transition: height .2s; }
+.adm .adm-trend-bar.t2 { background: var(--adm-green); }
+.adm .adm-trend-day { font-size: 9.5px; color: var(--adm-faint); font-weight: 700; }
+.adm .adm-legend { display: flex; gap: 14px; font-size: 12px; color: var(--adm-soft); font-weight: 700; margin-top: 4px; }
+.adm .adm-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.adm .adm-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+/* ── Money strip ─────────────────────────────────────────────────────────── */
+.adm .adm-money { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 14px; }
+.adm .adm-money-cell { display: flex; flex-direction: column; gap: 2px; }
+.adm .adm-money-k { font-size: 11.5px; font-weight: 700; color: var(--adm-faint); }
+.adm .adm-money-v { font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
+.adm .adm-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.adm .adm-chip { font-size: 12px; font-weight: 700; background: var(--adm-line-2); padding: 5px 11px; border-radius: 20px; color: var(--adm-soft); }
+.adm .adm-chip b { color: var(--adm-ink); }
+
+/* ── Live-now feed ───────────────────────────────────────────────────────── */
+.adm .adm-feed { display: flex; flex-direction: column; }
+.adm .adm-feed-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 4px;
+  border-bottom: 1px solid var(--adm-line-2); cursor: pointer; border-radius: 8px;
+}
+.adm .adm-feed-row:last-child { border-bottom: none; }
+.adm .adm-feed-row:hover { background: var(--adm-line-2); }
+.adm .adm-feed-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--adm-green); flex: none; }
+.adm .adm-feed-dot.tracing { background: var(--adm-coral); }
+.adm .adm-feed-who { flex: 1; min-width: 0; }
+.adm .adm-feed-email { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .adm-feed-meta { font-size: 11.5px; color: var(--adm-faint); }
+.adm .adm-feed-badge { font-size: 10.5px; font-weight: 800; color: var(--adm-coral); background: var(--adm-coral-soft); padding: 2px 8px; border-radius: 20px; }
+
+/* ── Alerts ──────────────────────────────────────────────────────────────── */
+.adm .adm-alerts { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+.adm .adm-alert { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; font-size: 13.5px; font-weight: 600; border: 1px solid; }
+.adm .adm-alert-ico { font-size: 18px; }
+.adm .adm-alert-danger { background: var(--adm-coral-soft); border-color: #f7c9c4; color: #a3271c; }
+.adm .adm-alert-warn { background: var(--adm-amber-soft); border-color: #ecd9a6; color: #7a5605; }
+.adm .adm-alert b { font-weight: 800; }
+.adm .adm-alert-act { margin-left: auto; font-size: 12.5px; font-weight: 800; background: none; border: none; cursor: pointer; color: inherit; text-decoration: underline; }
+
+/* ── Empty / loading ─────────────────────────────────────────────────────── */
+.adm .adm-empty { text-align: center; color: var(--adm-faint); font-size: 13.5px; padding: 30px; }
+.adm .adm-skel { background: var(--adm-paper); border: 1px solid var(--adm-line); border-radius: var(--adm-radius); padding: 40px; text-align: center; color: var(--adm-faint); }
+
+/* Keep reused inner panels (which expect a content container) breathing room. */
+.adm .adm-panel-host { margin-top: 4px; }
+
+@media (max-width: 720px) {
+  .adm .adm-wrap { padding: 16px; }
+  .adm .adm-funnel-row { grid-template-columns: 72px 1fr 64px; }
+  .adm .adm-bar-row { grid-template-columns: 86px 1fr 38px; }
+  .adm .adm-nav { top: 49px; }
+}

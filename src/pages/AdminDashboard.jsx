@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } fro
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import {
-  listAllUsers, getUserActivity, getAdminStats,
+  listAllUsers, getUserActivity, getAdminStats, getAnalytics,
   listReferrers, createReferrer, updateReferrer, rotateReferrerToken, markCommissionsPaid,
   listAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement,
 } from '../lib/admin.js';
@@ -2030,6 +2030,316 @@ function LibraryPanel() {
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
+/* Overview — the at-a-glance home. Pulls the headline numbers (money, funnel,
+   live, sources) into ONE screen so the operator rarely needs the deep tabs.
+   Stats come from useAdminMeta() (passed in); visitor/funnel/channel/geo come
+   from a single getAnalytics('7d') fetch this panel owns.                    */
+
+// country-code → flag emoji (regional indicator pair). 🌐 for unknown.
+function ccFlag(cc) {
+  if (!cc || cc.length !== 2) return '🌐';
+  try {
+    return String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 127397 + c.charCodeAt(0)));
+  } catch { return '🌐'; }
+}
+
+// Compact money for headline tiles: $1.2k / $980 (no cents on big numbers).
+function compactMoney(cents, currency = 'USD') {
+  const n = (Number(cents) || 0) / 100;
+  const sym = currency === 'USD' ? '$' : '';
+  if (n >= 1000) return `${sym}${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k`;
+  return `${sym}${n % 1 === 0 ? n : n.toFixed(2)}`;
+}
+
+function OverviewPanel({ users, stats, health, onPickUser, onGoTo }) {
+  const [an, setAn] = useState(null);
+  const [anErr, setAnErr] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAnalytics('7d')
+      .then((r) => { if (!cancelled) setAn(r.overview); })
+      .catch(() => { if (!cancelled) setAnErr(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const real = useMemo(() => (users || []).filter((u) => !u.is_admin), [users]);
+  const liveUsers = useMemo(
+    () => real
+      .filter((u) => isOnline(u.last_seen_at))
+      .sort((a, b) => (isTracingNow(b) ? 1 : 0) - (isTracingNow(a) ? 1 : 0)),
+    [real],
+  );
+  const onlineCount  = liveUsers.length;
+  const tracingCount = liveUsers.filter(isTracingNow).length;
+
+  const rev    = stats?.revenue || {};
+  const fn     = stats?.funnel || {};
+  const totals = an?.totals || {};
+  const afn    = an?.funnel || {};
+
+  const visitors = totals.visitors ?? afn.visitors ?? 0;
+  const signups  = totals.signups ?? afn.signups ?? 0;
+  const paidNow  = fn.currently_paid ?? real.filter((u) => u.is_paid).length;
+  const live     = totals.live ?? onlineCount;
+  const newV     = totals.new_visitors ?? 0;
+  const retV     = totals.returning_visitors ?? 0;
+  const convPct  = visitors ? Math.round((signups / visitors) * 100) : 0;
+
+  // Funnel (visitors → signups → paid) over the 7d window.
+  const fVisitors = afn.visitors ?? visitors;
+  const fSignups  = afn.signups ?? signups;
+  const fPaid     = afn.paid ?? 0;
+  const fMax      = Math.max(fVisitors, 1);
+  const pct = (n, base) => (base ? Math.round((n / base) * 100) : 0);
+
+  const channels = (an?.by_channel || []).slice().sort((a, b) => (b.visitors || 0) - (a.visitors || 0)).slice(0, 6);
+  const chMax = Math.max(1, ...channels.map((c) => c.visitors || 0));
+  const countries = (an?.by_country || []).slice().sort((a, b) => (b.visitors || 0) - (a.visitors || 0)).slice(0, 6);
+  const coMax = Math.max(1, ...countries.map((c) => c.visitors || 0));
+
+  // 14-day trend from get_admin_stats activity (signups + paid).
+  const days = stats?.activity || [];
+  const dMax = Math.max(1, ...days.map((d) => d.signups || 0));
+
+  const plans = rev.plans || {};
+  const planEntries = Object.entries(plans);
+
+  // Alerts.
+  const stuck = health?.stuck_24h_count || 0;
+  const atRisk = (stats?.at_risk || []).length;
+
+  return (
+    <>
+      {/* Alerts strip */}
+      {(stuck > 0 || atRisk > 0) && (
+        <div className="adm-alerts">
+          {stuck > 0 && (
+            <div className="adm-alert adm-alert-danger">
+              <span className="adm-alert-ico">⚠️</span>
+              <span><b>{stuck}</b> webhook{stuck === 1 ? '' : 's'} stuck over 24h — payments may not be syncing.</span>
+              <button type="button" className="adm-alert-act" onClick={() => onGoTo('money')}>View health →</button>
+            </div>
+          )}
+          {atRisk > 0 && (
+            <div className="adm-alert adm-alert-warn">
+              <span className="adm-alert-ico">🫥</span>
+              <span><b>{atRisk}</b> paying user{atRisk === 1 ? '' : 's'} inactive 14+ days — renewal risk.</span>
+              <button type="button" className="adm-alert-act" onClick={() => onGoTo('money')}>See who →</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* KPI row */}
+      <div className="adm-kpis">
+        <div className="adm-kpi adm-kpi-blue">
+          <span className="adm-kpi-label">Visitors · 7d</span>
+          <span className="adm-kpi-value">{visitors.toLocaleString()}</span>
+          <span className="adm-kpi-sub">{newV} new · {retV} returning</span>
+        </div>
+        <div className="adm-kpi adm-kpi-violet">
+          <span className="adm-kpi-label">Signups · 7d</span>
+          <span className="adm-kpi-value">{signups.toLocaleString()}</span>
+          <span className="adm-kpi-sub">{convPct}% of visitors</span>
+        </div>
+        <div className="adm-kpi adm-kpi-green">
+          <span className="adm-kpi-label">Paying now</span>
+          <span className="adm-kpi-value">{paidNow.toLocaleString()}</span>
+          <span className="adm-kpi-sub"><b>+{rev.paid_this_week || 0}</b> this week</span>
+        </div>
+        <div className="adm-kpi adm-kpi-coral">
+          <span className="adm-kpi-label">MRR</span>
+          <span className="adm-kpi-value">{compactMoney(rev.mrr_cents)}</span>
+          <span className="adm-kpi-sub">{compactMoney(rev.lifetime_revenue_cents)} lifetime</span>
+        </div>
+        <div className="adm-kpi adm-kpi-amber">
+          <span className="adm-kpi-label">Live now</span>
+          <span className="adm-kpi-value">{live}</span>
+          <span className="adm-kpi-sub">{tracingCount} tracing</span>
+        </div>
+      </div>
+
+      <div className="adm-grid" style={{ marginTop: 16 }}>
+        {/* Funnel */}
+        <div className="adm-card">
+          <div className="adm-card-h"><span className="adm-card-title">Conversion funnel</span><span className="adm-card-meta">last 7 days</span></div>
+          {anErr ? <p className="adm-empty">Couldn’t load analytics.</p> : !an ? <p className="adm-empty">Loading…</p> : (
+            <div className="adm-funnel">
+              {[
+                { k: 'Visitors', v: fVisitors, cls: 'f1', base: null },
+                { k: 'Signups',  v: fSignups,  cls: 'f2', base: fVisitors },
+                { k: 'Paid',     v: fPaid,     cls: 'f3', base: fSignups },
+              ].map((r2) => (
+                <div className="adm-funnel-row" key={r2.k}>
+                  <span className="adm-funnel-label">{r2.k}</span>
+                  <div className="adm-funnel-track">
+                    <div className={`adm-funnel-fill ${r2.cls}`} style={{ width: `${Math.max(2, pct(r2.v, fMax))}%` }}>
+                      {r2.v.toLocaleString()}
+                    </div>
+                  </div>
+                  <span className="adm-funnel-pct">
+                    {r2.base == null ? '—' : `${pct(r2.v, r2.base)}%`}
+                    {r2.base != null && <small>of {r2.k === 'Signups' ? 'visitors' : 'signups'}</small>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Money */}
+        <div className="adm-card">
+          <div className="adm-card-h"><span className="adm-card-title">Revenue</span><span className="adm-card-meta">{paidNow} paying</span></div>
+          <div className="adm-money">
+            <div className="adm-money-cell"><span className="adm-money-k">MRR</span><span className="adm-money-v">{compactMoney(rev.mrr_cents)}</span></div>
+            <div className="adm-money-cell"><span className="adm-money-k">Lifetime</span><span className="adm-money-v">{compactMoney(rev.lifetime_revenue_cents)}</span></div>
+            <div className="adm-money-cell"><span className="adm-money-k">New today</span><span className="adm-money-v">{rev.paid_today || 0}</span></div>
+            <div className="adm-money-cell"><span className="adm-money-k">This month</span><span className="adm-money-v">{rev.paid_this_month || 0}</span></div>
+          </div>
+          {planEntries.length > 0 && (
+            <div className="adm-chips">
+              {planEntries.map(([plan, n]) => (
+                <span className="adm-chip" key={plan}>{PLAN_LABEL[plan] ?? plan} <b>{n}</b></span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Trend */}
+        <div className="adm-card">
+          <div className="adm-card-h"><span className="adm-card-title">Daily signups</span><span className="adm-card-meta">last 14 days</span></div>
+          {days.length === 0 ? <p className="adm-empty">No data yet.</p> : (
+            <>
+              <div className="adm-trend">
+                {days.map((d) => (
+                  <div className="adm-trend-col" key={d.date} title={`${d.date} · ${d.signups} signups · ${d.paid} paid`}>
+                    {d.paid > 0 && <div className="adm-trend-bar t2" style={{ height: `${pct(d.paid, dMax)}%` }} />}
+                    <div className="adm-trend-bar" style={{ height: `${Math.max(2, pct(d.signups, dMax))}%` }} />
+                    <span className="adm-trend-day">{d.date.slice(8)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="adm-legend">
+                <span><i style={{ background: 'var(--adm-coral)' }} />Signups</span>
+                <span><i style={{ background: 'var(--adm-green)' }} />Paid</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Top channels */}
+        <div className="adm-card">
+          <div className="adm-card-h"><span className="adm-card-title">Top sources</span><span className="adm-card-meta">visitors · 7d</span></div>
+          {!an ? <p className="adm-empty">Loading…</p> : channels.length === 0 ? <p className="adm-empty">No traffic yet.</p> : (
+            <div className="adm-bars">
+              {channels.map((c) => (
+                <div className="adm-bar-row" key={c.name || 'direct'}>
+                  <span className="adm-bar-name">{c.name || 'direct'}</span>
+                  <div className="adm-bar-track"><div className="adm-bar-fill" style={{ width: `${pct(c.visitors, chMax)}%` }} /></div>
+                  <span className="adm-bar-val">{c.visitors}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Top countries */}
+        <div className="adm-card">
+          <div className="adm-card-h"><span className="adm-card-title">Top countries</span><span className="adm-card-meta">visitors · 7d</span></div>
+          {!an ? <p className="adm-empty">Loading…</p> : countries.length === 0 ? <p className="adm-empty">No geo yet.</p> : (
+            <div className="adm-bars">
+              {countries.map((c) => (
+                <div className="adm-bar-row" key={c.country_code || c.country || '??'}>
+                  <span className="adm-bar-name"><span className="adm-bar-flag">{ccFlag(c.country_code)}</span>{c.country || c.country_code || 'Unknown'}</span>
+                  <div className="adm-bar-track"><div className="adm-bar-fill c2" style={{ width: `${pct(c.visitors, coMax)}%` }} /></div>
+                  <span className="adm-bar-val">{c.visitors}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Live now feed */}
+        <div className="adm-card">
+          <div className="adm-card-h"><span className="adm-card-title">Live right now</span><span className="adm-card-meta">{onlineCount} online · {tracingCount} tracing</span></div>
+          {liveUsers.length === 0 ? <p className="adm-empty">Nobody’s online right now.</p> : (
+            <div className="adm-feed">
+              {liveUsers.slice(0, 8).map((u) => {
+                const tracing = isTracingNow(u);
+                return (
+                  <div className="adm-feed-row" key={u.id} onClick={() => onPickUser(u.id)}>
+                    <span className={`adm-feed-dot ${tracing ? 'tracing' : ''}`} />
+                    <div className="adm-feed-who">
+                      <div className="adm-feed-email">{u.email || '—'}</div>
+                      <div className="adm-feed-meta">{u.current_page ? `on /${u.current_page}` : 'online'}{u.is_paid ? ' · paid' : ''}</div>
+                    </div>
+                    {tracing && <span className="adm-feed-badge">tracing</span>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* Money › Revenue — the numbers behind the headline, plus the at-risk list. */
+function MoneyRevenuePanel({ stats }) {
+  if (!stats) return <div className="adm-skel">Loading revenue…</div>;
+  const rev = stats.revenue || {};
+  const plans = rev.plans || {};
+  const planEntries = Object.entries(plans);
+  const atRisk = stats.at_risk || [];
+  return (
+    <>
+      <div className="adm-kpis">
+        <div className="adm-kpi adm-kpi-coral"><span className="adm-kpi-label">MRR</span><span className="adm-kpi-value">{compactMoney(rev.mrr_cents)}</span><span className="adm-kpi-sub">monthly recurring</span></div>
+        <div className="adm-kpi adm-kpi-green"><span className="adm-kpi-label">Lifetime revenue</span><span className="adm-kpi-value">{compactMoney(rev.lifetime_revenue_cents)}</span><span className="adm-kpi-sub">all-time collected</span></div>
+        <div className="adm-kpi adm-kpi-blue"><span className="adm-kpi-label">New today</span><span className="adm-kpi-value">{rev.paid_today || 0}</span><span className="adm-kpi-sub">{rev.paid_this_week || 0} this week</span></div>
+        <div className="adm-kpi adm-kpi-violet"><span className="adm-kpi-label">New this month</span><span className="adm-kpi-value">{rev.paid_this_month || 0}</span><span className="adm-kpi-sub">paid conversions</span></div>
+      </div>
+
+      <div className="adm-grid" style={{ marginTop: 16 }}>
+        <div className="adm-card">
+          <div className="adm-card-h"><span className="adm-card-title">Active plans</span></div>
+          {planEntries.length === 0 ? <p className="adm-empty">No active paid plans.</p> : (
+            <div className="adm-chips">
+              {planEntries.map(([plan, n]) => (
+                <span className="adm-chip" key={plan}>{PLAN_LABEL[plan] ?? plan} <b>{n}</b></span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="adm-card adm-card-wide">
+          <div className="adm-card-h"><span className="adm-card-title">At-risk paying users</span><span className="adm-card-meta">inactive 14+ days</span></div>
+          {atRisk.length === 0 ? <p className="adm-empty">No at-risk users — everyone’s active. 🎉</p> : (
+            <div className="adm-feed">
+              {atRisk.map((u) => (
+                <div className="adm-feed-row" key={u.id} style={{ cursor: 'default' }}>
+                  <span className="adm-feed-dot" style={{ background: 'var(--adm-amber)' }} />
+                  <div className="adm-feed-who">
+                    <div className="adm-feed-email">{u.email || '—'}</div>
+                    <div className="adm-feed-meta">
+                      {PLAN_LABEL[u.plan] ?? u.plan ?? 'paid'}
+                      {u.days_since_seen != null ? ` · last seen ${u.days_since_seen}d ago` : ' · never seen'}
+                      {u.current_period_end ? ` · renews ${formatDate(u.current_period_end)}` : ''}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
 
 export default function AdminDashboard() {
   const { user, signOut } = useAuth();
@@ -2051,10 +2361,14 @@ export default function AdminDashboard() {
   // the array, not DOM.
   const PAGE_SIZE = 25;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  // Top-level view toggle — the user list is the workhorse, stats and traffic
-  // panels are reference data. Tabbing them keeps the dashboard from being a
-  // wall of charts every time you open it.
-  const [view, setView]         = useState('users'); // 'users' | 'stats' | 'traffic'
+  // Primary navigation — 5 sections. Each (except Overview) has its own
+  // secondary sub-tab so related views live together instead of as 11
+  // sibling tabs.
+  const [section, setSection]   = useState('overview'); // overview|people|analytics|money|content
+  const [peopleTab, setPeopleTab]   = useState('users');    // users | survey
+  const [anaTab, setAnaTab]         = useState('overview');  // overview | deep | sources
+  const [moneyTab, setMoneyTab]     = useState('revenue');   // revenue | referrals | health
+  const [contentTab, setContentTab] = useState('gallery');   // gallery|traced|reviews|library|announce
 
   // Stats + webhook health share one fetch so the health banner stays mounted
   // across tab switches without re-firing the rollup.
@@ -2200,7 +2514,7 @@ export default function AdminDashboard() {
 
   return (
     <div
-      className="admin-shell"
+      className="admin-shell adm"
       style={pullDistance > 0 ? { transform: `translateY(${pullDistance}px)`, transition: pullDistance === 0 ? 'transform 200ms ease' : 'none' } : undefined}
     >
       {/* Pull-to-refresh indicator. Sits absolutely above the page; the
@@ -2218,100 +2532,150 @@ export default function AdminDashboard() {
           </span>
         </div>
       )}
-      <header className="admin-bar">
-        <div className="admin-bar-id">
-          <span className="admin-bar-tag">ADMIN</span>
-          <h1 className="admin-bar-title">Operator dashboard</h1>
+      <header className="adm-top">
+        <div className="adm-brand">
+          <span className="adm-brand-tag">ADMIN</span>
+          <span className="adm-brand-title">Trace Mate</span>
         </div>
-        <div className="admin-bar-right">
-          <span className="admin-bar-me">{user?.email}</span>
-          <Link to="/account" className="admin-link">Account</Link>
-          <button type="button" className="admin-link admin-link-danger" onClick={signOut}>
-            Sign out
-          </button>
-        </div>
+        <div className="adm-top-spacer" />
+        <span className="adm-live-chip"><span className="adm-dot" />{counts.online} live</span>
+        <span className="adm-top-me">{user?.email}</span>
+        <Link to="/account" className="adm-tlink">Account</Link>
+        <button type="button" className="adm-tlink adm-tlink-danger" onClick={signOut}>Sign out</button>
       </header>
 
-      <main className="admin-main">
-        <section className="admin-summary">
-          <div className="admin-summary-card">
-            <span className="admin-summary-label">Total users</span>
-            <span className="admin-summary-value">{counts.all}</span>
-          </div>
-          <div className="admin-summary-card admin-summary-card-paid">
-            <span className="admin-summary-label">Paid</span>
-            <span className="admin-summary-value">{counts.paid}</span>
-          </div>
-          <div className="admin-summary-card">
-            <span className="admin-summary-label">Unpaid</span>
-            <span className="admin-summary-value">{counts.unpaid}</span>
-          </div>
-          <div className="admin-summary-card admin-summary-card-online">
-            <span className="admin-summary-dot" aria-hidden="true" />
-            <span className="admin-summary-label">Online now</span>
-            <span className="admin-summary-value">{counts.online}</span>
-          </div>
-          <div className="admin-summary-card admin-summary-card-tracing">
-            <span className="admin-summary-label">Tracing now</span>
-            <span className="admin-summary-value">{counts.tracing}</span>
-          </div>
-        </section>
+      <nav className="adm-nav" role="tablist" aria-label="Dashboard sections">
+        {[
+          { id: 'overview',  label: 'Overview',  ico: '📊' },
+          { id: 'people',    label: 'People',    ico: '👥' },
+          { id: 'analytics', label: 'Analytics', ico: '📈' },
+          { id: 'money',     label: 'Money',     ico: '💰' },
+          { id: 'content',   label: 'Content',   ico: '🖼️' },
+        ].map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            role="tab"
+            aria-selected={section === s.id}
+            className={`adm-nav-tab ${section === s.id ? 'is-active' : ''}`}
+            onClick={() => setSection(s.id)}
+          >
+            <span className="adm-nav-ico" aria-hidden="true">{s.ico}</span>{s.label}
+          </button>
+        ))}
+      </nav>
 
-        {meta.health && <WebhookHealthPanel data={meta.health} />}
-
-        {/* View tabs — gate the heavy panels behind a click so the user list
-            (the day-to-day workhorse) is what loads first. */}
-        <nav className="admin-views" role="tablist" aria-label="Dashboard view">
-          {[
-            { id: 'users',     label: 'Users' },
-            { id: 'pulse',     label: 'Pulse' },
-            { id: 'pulse2',    label: 'Pulse 2' },
-            { id: 'stats',     label: 'Acquisition' },
-            { id: 'referrals', label: 'Referrals' },
-            { id: 'survey',    label: 'Survey' },
-            { id: 'traffic',   label: 'Traffic' },
-            { id: 'reviews',   label: 'Reviews' },
-            { id: 'traced',    label: 'Traced' },
-            { id: 'gallery',   label: 'Gallery' },
-            { id: 'library',   label: 'Library' },
-          ].map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              role="tab"
-              aria-selected={view === v.id}
-              className={`admin-view-tab ${view === v.id ? 'is-active' : ''}`}
-              onClick={() => setView(v.id)}
-            >
-              {v.label}
-            </button>
-          ))}
-        </nav>
-
-        {view === 'pulse' && <AnalyticsPulse />}
-        {view === 'pulse2' && (
-          <Suspense fallback={<p className="pulse-empty">Loading detailed analytics…</p>}>
-            <AnalyticsPulseDetail />
-          </Suspense>
-        )}
-        {view === 'stats' && <AcquisitionPanel users={users} />}
-        {view === 'referrals' && <ReferralsPanel />}
-        {view === 'announce' && <AnnouncementsPanel />}
-        {view === 'survey' && (
-          <SurveyPanel
+      <main className="adm-wrap">
+        {/* ── Overview ─────────────────────────────────────────────────── */}
+        {section === 'overview' && (
+          <OverviewPanel
             users={users}
-            // The activity drawer is an overlay, so picking a respondent opens
-            // it right here — no tab pivot or scroll-into-view gymnastics.
+            stats={meta.stats}
+            health={meta.health}
             onPickUser={(uid) => setExpanded(uid)}
+            onGoTo={(s) => setSection(s)}
           />
         )}
-        {view === 'traffic' && <TrafficPanel />}
-        {view === 'reviews' && <ReviewsPanel />}
-        {view === 'traced'  && <TracedPanel />}
-        {view === 'gallery' && <GalleryPanel />}
-        {view === 'library' && <LibraryPanel />}
 
-        {view === 'users' && (
+        {/* ── Analytics (Pulse + deep dive + sources, unified) ─────────── */}
+        {section === 'analytics' && (
+          <>
+            <div className="adm-sub">
+              {[
+                { id: 'overview', label: 'Pulse overview' },
+                { id: 'deep',     label: 'Deep dive' },
+                { id: 'sources',  label: 'Sources' },
+              ].map((t) => (
+                <button key={t.id} type="button"
+                  className={`adm-sub-tab ${anaTab === t.id ? 'is-active' : ''}`}
+                  onClick={() => setAnaTab(t.id)}>{t.label}</button>
+              ))}
+            </div>
+            <div className="adm-panel-host">
+              {anaTab === 'overview' && <AnalyticsPulse />}
+              {anaTab === 'deep' && (
+                <Suspense fallback={<p className="pulse-empty">Loading detailed analytics…</p>}>
+                  <AnalyticsPulseDetail />
+                </Suspense>
+              )}
+              {anaTab === 'sources' && <AcquisitionPanel users={users} />}
+            </div>
+          </>
+        )}
+
+        {/* ── Money (revenue + referrals + webhook health) ────────────── */}
+        {section === 'money' && (
+          <>
+            <div className="adm-sub">
+              {[
+                { id: 'revenue',   label: 'Revenue' },
+                { id: 'referrals', label: 'Referrals' },
+                { id: 'health',    label: 'Payment health' },
+              ].map((t) => (
+                <button key={t.id} type="button"
+                  className={`adm-sub-tab ${moneyTab === t.id ? 'is-active' : ''}`}
+                  onClick={() => setMoneyTab(t.id)}>{t.label}</button>
+              ))}
+            </div>
+            <div className="adm-panel-host">
+              {moneyTab === 'revenue' && <MoneyRevenuePanel stats={meta.stats} />}
+              {moneyTab === 'referrals' && <ReferralsPanel />}
+              {moneyTab === 'health' && (meta.health
+                ? <WebhookHealthPanel data={meta.health} />
+                : <div className="adm-skel">Loading payment health…</div>)}
+            </div>
+          </>
+        )}
+
+        {/* ── Content (gallery / traced / reviews / library / announce) ── */}
+        {section === 'content' && (
+          <>
+            <div className="adm-sub">
+              {[
+                { id: 'gallery',  label: 'Gallery' },
+                { id: 'traced',   label: 'Traced' },
+                { id: 'reviews',  label: 'Reviews' },
+                { id: 'library',  label: 'Library' },
+                { id: 'announce', label: 'Announcements' },
+              ].map((t) => (
+                <button key={t.id} type="button"
+                  className={`adm-sub-tab ${contentTab === t.id ? 'is-active' : ''}`}
+                  onClick={() => setContentTab(t.id)}>{t.label}</button>
+              ))}
+            </div>
+            <div className="adm-panel-host">
+              {contentTab === 'gallery'  && <GalleryPanel />}
+              {contentTab === 'traced'   && <TracedPanel />}
+              {contentTab === 'reviews'  && <ReviewsPanel />}
+              {contentTab === 'library'  && <LibraryPanel />}
+              {contentTab === 'announce' && <AnnouncementsPanel />}
+            </div>
+          </>
+        )}
+
+        {/* ── People (users + survey) ─────────────────────────────────── */}
+        {section === 'people' && (
+          <div className="adm-sub">
+            {[
+              { id: 'users',  label: 'Users',  count: counts.all },
+              { id: 'survey', label: 'Survey' },
+            ].map((t) => (
+              <button key={t.id} type="button"
+                className={`adm-sub-tab ${peopleTab === t.id ? 'is-active' : ''}`}
+                onClick={() => setPeopleTab(t.id)}>
+                {t.label}{t.count != null && <span className="adm-sub-count">{t.count}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {section === 'people' && peopleTab === 'survey' && (
+          <div className="adm-panel-host">
+            <SurveyPanel users={users} onPickUser={(uid) => setExpanded(uid)} />
+          </div>
+        )}
+
+        {section === 'people' && peopleTab === 'users' && (
           <>
         <section className="admin-controls">
           {/* Filter tabs include live-state filters (Online / Tracing) so the

@@ -13,6 +13,7 @@ import './styles/trace.css';
 import './styles/auth-app.css';
 import './styles/live.css';
 import './styles/admin.css';
+import './styles/admin-redesign.css';
 import './styles/partner.css';
 import './styles/library.css';
 import './styles/community.css';
