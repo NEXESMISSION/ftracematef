@@ -32,6 +32,17 @@ function withTimeout(promise, ms, fallback) {
   });
 }
 
+// Wrap a Supabase query so a network hang resolves to a transient-error result
+// instead of hanging forever. Without this, a single stalled profile/subscription
+// fetch pins loadUserData's retry loop on a dead promise — which is what leaves
+// the user stuck on the "Setting up your studio…" recover screen. With it, the
+// hang becomes a normal retryable miss and the next attempt re-issues a fresh
+// query that succeeds once the network/db responds.
+const QUERY_TIMEOUT_MS = 6000;
+function tq(promise) {
+  return withTimeout(promise, QUERY_TIMEOUT_MS, { data: null, error: { message: 'query timed out (network?)' } });
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession]           = useState(null);
   const [profile, setProfile]           = useState(null);
@@ -115,13 +126,13 @@ export function AuthProvider({ children }) {
     }
     try {
       let [profileRes, subRes] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-        supabase
+        tq(supabase.from('profiles').select('*').eq('id', userId).maybeSingle()),
+        tq(supabase
           .from('subscriptions')
           .select('*')
           .eq('user_id', userId)
           .eq('status', 'active')
-          .maybeSingle(),
+          .maybeSingle()),
       ]);
 
       // Postgrest errors come back on the result object, not as throws.
@@ -159,8 +170,8 @@ export function AuthProvider({ children }) {
       for (const delay of SELECT_DELAYS) {
         if (profileRes.data) break;
         await new Promise((r) => setTimeout(r, delay));
-        profileRes = await supabase
-          .from('profiles').select('*').eq('id', userId).maybeSingle();
+        profileRes = await tq(supabase
+          .from('profiles').select('*').eq('id', userId).maybeSingle());
         if (profileRes.error) {
           console.warn(`[AuthProvider] profile retry (after ${delay}ms) errored:`, profileRes.error);
         }
@@ -185,7 +196,7 @@ export function AuthProvider({ children }) {
           console.warn(`[AuthProvider] profile fetch did not return a row, calling ensure_profile RPC (attempt ${attempt})`, {
             had_error: !!profileRes.error,
           });
-          const heal = await supabase.rpc('ensure_profile');
+          const heal = await tq(supabase.rpc('ensure_profile'));
           if (heal.error) {
             console.error(`[AuthProvider] ensure_profile RPC failed (attempt ${attempt}):`, heal.error);
             const code = heal.error.code;
@@ -220,9 +231,9 @@ export function AuthProvider({ children }) {
               // The RPC also makes sure a free subscription exists. Refetch
               // it so the UI sees the freshly-created row instead of null.
               if (!subRes.data) {
-                subRes = await supabase
+                subRes = await tq(supabase
                   .from('subscriptions').select('*')
-                  .eq('user_id', userId).eq('status', 'active').maybeSingle();
+                  .eq('user_id', userId).eq('status', 'active').maybeSingle());
               }
               break;
             } else if (row) {
@@ -257,8 +268,8 @@ export function AuthProvider({ children }) {
         // but the row IS in the table.
         if (!profileRes.data && !permanentFailure) {
           await new Promise((r) => setTimeout(r, 400));
-          profileRes = await supabase
-            .from('profiles').select('*').eq('id', userId).maybeSingle();
+          profileRes = await tq(supabase
+            .from('profiles').select('*').eq('id', userId).maybeSingle());
           if (profileRes.data) {
             console.info('[AuthProvider] post-heal SELECT recovered the profile row');
           }
