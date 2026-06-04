@@ -89,6 +89,19 @@ html, body {
 
 main, header, section, footer { position: relative; z-index: 1; }
 
+/* Pricing FAQ — native <details> accordion (keyboard-accessible, crawlable) */
+.pp-faq { max-width: 640px; margin: 40px auto 0; padding: 0 20px; }
+.pp-faq-title { text-align: center; font-size: 22px; font-weight: 800; margin: 0 0 18px; }
+.pp-faq-item { border-bottom: 1px solid var(--line); padding: 4px 0; }
+.pp-faq-item summary {
+  cursor: pointer; list-style: none; padding: 14px 4px; font-weight: 700; font-size: 15.5px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.pp-faq-item summary::-webkit-details-marker { display: none; }
+.pp-faq-item summary::after { content: "+"; font-size: 22px; font-weight: 400; color: var(--coral); transition: transform .15s; }
+.pp-faq-item[open] summary::after { transform: rotate(45deg); }
+.pp-faq-item p { padding: 0 4px 16px; margin: 0; color: var(--ink-soft); line-height: 1.6; font-size: 14.5px; }
+
 .hand { font-family: 'Caveat', cursive; }
 .print { font-family: 'Patrick Hand', cursive; }
 .scribble { font-family: 'Shadows Into Light', cursive; }

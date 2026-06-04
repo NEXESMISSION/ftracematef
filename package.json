@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "lint": "eslint src scripts",
     "build": "node scripts/gen-image-avif.mjs && node scripts/csp-hash.mjs && vite build && node scripts/write-version.mjs && node scripts/prerender-routes.mjs",
     "csp:hash": "node scripts/csp-hash.mjs --print",
     "preview": "vite preview",
@@ -41,7 +42,11 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.3.1",
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^10.4.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.6.0",
     "sharp": "^0.34.5",
     "supabase": "^2.95.6",
     "vite": "^5.4.8",

@@ -19,6 +19,7 @@ import {
   CHARACTERS, getRelated,
   charTitle, charDescription, charLead, charWhy, charSteps, charFaqs,
 } from '../src/lib/characters.js';
+import { VISIBLE_PLANS } from '../src/lib/plans.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = resolve(__dirname, '..', 'dist');
@@ -136,16 +137,59 @@ const HOWTO_JSONLD = {
   ],
 };
 
+// Pricing structured data — Product/Offer derived from the SINGLE plan source
+// (plans.js) so the schema can never drift from the visible page, plus the FAQ
+// shown on /pricing. Injected into the prerendered /pricing head.
+const PRICING_PRICES = VISIBLE_PLANS.map((p) => p.price);
+const PRICING_JSONLD = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Product',
+      name: 'TraceMate',
+      description: 'Browser-based AR tracing app: see any image as a live overlay on real paper and trace it by hand. No app install.',
+      brand: { '@type': 'Brand', name: 'TraceMate' },
+      offers: {
+        '@type': 'AggregateOffer',
+        priceCurrency: 'USD',
+        lowPrice: String(Math.min(...PRICING_PRICES).toFixed(2)),
+        highPrice: String(Math.max(...PRICING_PRICES).toFixed(2)),
+        offerCount: VISIBLE_PLANS.length,
+        offers: VISIBLE_PLANS.map((p) => ({
+          '@type': 'Offer', name: p.name, price: p.price.toFixed(2),
+          priceCurrency: 'USD', availability: 'https://schema.org/InStock',
+        })),
+      },
+    },
+    {
+      '@type': 'FAQPage',
+      mainEntity: [
+        ['Will it work on my phone?', 'Yes — TraceMate runs in your browser on iPhone, Android, iPad, and desktop with a camera. There is nothing to install.'],
+        ['Are my images private?', 'Your reference images stay on your device. We only store your account info (email and plan) — never your photos.'],
+        ['What do the free sessions include?', 'Every new account gets 3 free tracing sessions with the full toolset, so you can try it before choosing a plan.'],
+        ['Can I cancel anytime?', 'Yes. The monthly plan cancels anytime from your account in one click. Lifetime is a single one-time payment.'],
+        ['Who charges my card?', 'Payments are handled securely by Dodo Payments, our Merchant of Record. The charge appears as “Dodo”, and a 14-day refund is available.'],
+      ].map(([q, a]) => ({
+        '@type': 'Question', name: q,
+        acceptedAnswer: { '@type': 'Answer', text: a },
+      })),
+    },
+  ],
+};
+
 const ROUTES = [
   {
     path: '/welcome',
     title: 'Welcome to TraceMate — AR Tracing in Your Browser',
     description: 'New to TraceMate? Here is how AR tracing on real paper works: point your phone at paper, see any image as a live overlay, and trace it by hand. Browser-based — no app install.',
+    // /welcome renders the same Landing as / — consolidate ranking on the root.
+    canonical: `${SITE}/`,
   },
   {
     path: '/pricing',
     title: 'Pricing — TraceMate AR Tracing | $5/mo or $15 lifetime',
-    description: 'TraceMate plans: $5/month, $10/3-months, or $15 one-time lifetime (10 spots). Every new account gets one free tracing session. Cancel anytime on monthly and 3-month plans.',
+    description: 'TraceMate plans: $5/month or $15 one-time lifetime. Every new account gets 3 free tracing sessions. Cancel the monthly plan anytime. 14-day refund.',
+    headExtra: `<script type="application/ld+json">${JSON.stringify(PRICING_JSONLD)}</script>`,
   },
   {
     path: '/upload',

@@ -174,6 +174,30 @@ export default function PricingPage() {
           <span className="reassure-bullet">✦</span> 14-day refund
           &nbsp;·&nbsp; secure payments by Dodo
         </p>
+
+        <section className="pp-faq" aria-label="Frequently asked questions">
+          <h2 className="pp-faq-title">Questions, answered</h2>
+          <details className="pp-faq-item">
+            <summary>Will it work on my phone?</summary>
+            <p>Yes — TraceMate runs in your browser on iPhone, Android, iPad, and desktop with a camera. There's nothing to install.</p>
+          </details>
+          <details className="pp-faq-item">
+            <summary>Are my images private?</summary>
+            <p>Your reference images stay on your device. We only store your account info (email and plan) — never your photos.</p>
+          </details>
+          <details className="pp-faq-item">
+            <summary>What do the free sessions include?</summary>
+            <p>Every new account gets 3 free tracing sessions with the full toolset, so you can try it before choosing a plan.</p>
+          </details>
+          <details className="pp-faq-item">
+            <summary>Can I cancel anytime?</summary>
+            <p>Yes. The monthly plan cancels anytime from your account in one click. Lifetime is a single one-time payment — nothing to cancel.</p>
+          </details>
+          <details className="pp-faq-item">
+            <summary>Who charges my card?</summary>
+            <p>Payments are handled securely by Dodo Payments, our Merchant of Record. The charge appears on your statement as “Dodo”, and a 14-day refund is available.</p>
+          </details>
+        </section>
       </main>
 
       {checkoutOutcome === 'cancelled' && (
