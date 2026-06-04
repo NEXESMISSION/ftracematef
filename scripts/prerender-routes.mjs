@@ -15,10 +15,18 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  CHARACTERS, getRelated,
+  charTitle, charDescription, charLead, charWhy, charSteps, charFaqs,
+} from '../src/lib/characters.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = resolve(__dirname, '..', 'dist');
 const SITE = 'https://www.tracemate.art';
+
+// Escape text destined for HTML body markup.
+const esc = (s) => String(s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 // ── Best-practices guide (/how-to-use) ──────────────────────────────────────
 // Crawler-readable static body. Mirrors src/pages/HowToUse.jsx so AI crawlers
@@ -178,6 +186,121 @@ const ROUTES = [
   },
 ];
 
+// ── "How to draw <character>" pages (data-driven from src/lib/characters.js) ──
+// Mirrors src/pages/DrawCharacter.jsx so non-JS crawlers read the full tutorial.
+// No copyrighted artwork — text-only tutorials that teach tracing-your-own-ref.
+function characterBody(c) {
+  const steps = charSteps(c).map((s) => `<li><strong>${esc(s.title)}.</strong> ${esc(s.text)}</li>`).join('');
+  const tips = c.tips.map((t) => `<li>${esc(t)}</li>`).join('');
+  const faqs = charFaqs(c).map((f) => `<h3>${esc(f.q)}</h3><p>${esc(f.a)}</p>`).join('');
+  const related = getRelated(c.slug, 6)
+    .map((r) => `<a href="${SITE}/draw/${r.slug}">How to draw ${esc(r.short)}</a>`).join(' · ');
+  return `
+<main>
+  <article>
+    <p>Draw ${esc(c.franchise)}</p>
+    <h1>How to draw ${esc(c.name)}</h1>
+    <p>${esc(charLead(c))}</p>
+    <p><a href="${SITE}/upload">Start tracing free</a> · <a href="${SITE}/pricing">See pricing</a></p>
+    <h2>Why trace ${esc(c.short)}?</h2>
+    <p>${esc(charWhy(c))}</p>
+    <h2>Trace ${esc(c.short)} in 5 steps</h2>
+    <ol>${steps}</ol>
+    <h2>Tips for drawing ${esc(c.short)}</h2>
+    <ul>${tips}</ul>
+    <h2>${esc(c.short)} — frequently asked questions</h2>
+    ${faqs}
+    <h2>More characters to draw</h2>
+    <p>${related}</p>
+  </article>
+</main>`;
+}
+
+function characterJsonLd(c) {
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'HowTo',
+        'name': `How to draw ${c.name}`,
+        'description': charLead(c),
+        'totalTime': 'PT5M',
+        'tool': [
+          { '@type': 'HowToTool', 'name': 'A phone or tablet with a camera' },
+          { '@type': 'HowToTool', 'name': 'Paper and a pencil' },
+          { '@type': 'HowToTool', 'name': `A ${c.short} reference image` },
+        ],
+        'step': charSteps(c).map((s) => ({ '@type': 'HowToStep', 'name': s.title, 'text': s.text })),
+      },
+      {
+        '@type': 'FAQPage',
+        'mainEntity': charFaqs(c).map((f) => ({
+          '@type': 'Question', 'name': f.q,
+          'acceptedAnswer': { '@type': 'Answer', 'text': f.a },
+        })),
+      },
+      {
+        '@type': 'BreadcrumbList',
+        'itemListElement': [
+          { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': `${SITE}/` },
+          { '@type': 'ListItem', 'position': 2, 'name': 'How to draw characters', 'item': `${SITE}/draw` },
+          { '@type': 'ListItem', 'position': 3, 'name': `How to draw ${c.short}`, 'item': `${SITE}/draw/${c.slug}` },
+        ],
+      },
+    ],
+  };
+}
+
+// Hub index body + JSON-LD (ItemList of every character page).
+const DRAW_INDEX_BODY = `
+<main>
+  <article>
+    <p>Step-by-step tutorials</p>
+    <h1>How to draw anime characters</h1>
+    <p>Pick a character and learn to draw it the fast way — trace any reference straight onto real paper with TraceMate's AR overlay, then redraw it freehand. No app, no printing, one free session to try.</p>
+    <p><a href="${SITE}/upload">Start tracing free</a> · <a href="${SITE}/how-to-use">Read the guide</a></p>
+    <h2>Characters</h2>
+    <ul>${CHARACTERS.map((c) => `<li><a href="${SITE}/draw/${c.slug}">How to draw ${esc(c.short)}</a> — ${esc(c.franchise)} · ${esc(c.difficulty)}</li>`).join('')}</ul>
+  </article>
+</main>`;
+
+const DRAW_INDEX_JSONLD = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'CollectionPage',
+      'name': 'How to draw anime characters',
+      'description': 'Step-by-step AR tracing tutorials for drawing popular anime characters with TraceMate.',
+      'url': `${SITE}/draw`,
+    },
+    {
+      '@type': 'ItemList',
+      'itemListElement': CHARACTERS.map((c, i) => ({
+        '@type': 'ListItem', 'position': i + 1,
+        'name': `How to draw ${c.short}`, 'url': `${SITE}/draw/${c.slug}`,
+      })),
+    },
+  ],
+};
+
+// Append the hub + one route per character.
+ROUTES.push({
+  path: '/draw',
+  title: 'How to Draw Anime Characters — Easy AR Tracing Tutorials | TraceMate',
+  description: 'Free step-by-step tutorials to draw popular anime characters — Gojo, Sukuna, Naruto, Goku, Luffy and more. Trace any reference onto real paper with TraceMate. No app, no printing.',
+  bodyHtml: DRAW_INDEX_BODY,
+  headExtra: `<script type="application/ld+json">${JSON.stringify(DRAW_INDEX_JSONLD)}</script>`,
+});
+for (const c of CHARACTERS) {
+  ROUTES.push({
+    path: `/draw/${c.slug}`,
+    title: charTitle(c),
+    description: charDescription(c),
+    bodyHtml: characterBody(c),
+    headExtra: `<script type="application/ld+json">${JSON.stringify(characterJsonLd(c))}</script>`,
+  });
+}
+
 function escAttr(value) {
   return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
@@ -258,6 +381,24 @@ async function main() {
   }
 
   console.log(`[prerender] wrote ${ROUTES.length} per-route HTML files into dist/`);
+
+  // Inject the character pages into the sitemap (dist/sitemap.xml is freshly
+  // copied from public/ each build, so this never accumulates duplicates).
+  try {
+    const smPath = resolve(DIST, 'sitemap.xml');
+    let sm = await readFile(smPath, 'utf8');
+    const urls = [
+      `  <url><loc>${SITE}/draw</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>`,
+      ...CHARACTERS.map((c) =>
+        `  <url><loc>${SITE}/draw/${c.slug}</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`),
+    ].join('\n');
+    const block = `\n  <!-- How-to-draw character tutorials (generated by prerender-routes.mjs) -->\n${urls}\n`;
+    sm = sm.replace(/<\/urlset>\s*$/, `${block}\n</urlset>\n`);
+    await writeFile(smPath, sm, 'utf8');
+    console.log(`[prerender] added ${CHARACTERS.length + 1} character URLs to sitemap.xml`);
+  } catch (err) {
+    console.error(`[prerender] sitemap injection skipped: ${err.message}`);
+  }
 }
 
 main().catch((err) => {

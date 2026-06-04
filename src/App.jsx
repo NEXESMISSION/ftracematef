@@ -80,6 +80,8 @@ const PricingPage     = lazyWithReload(() => import('./pages/PricingPage.jsx'), 
 const Terms           = lazyWithReload(() => import('./pages/Terms.jsx'), 'terms');
 const Privacy         = lazyWithReload(() => import('./pages/Privacy.jsx'), 'privacy');
 const HowToUse        = lazyWithReload(() => import('./pages/HowToUse.jsx'), 'howto');
+const DrawIndex       = lazyWithReload(() => import('./pages/DrawIndex.jsx'), 'draw');
+const DrawCharacter   = lazyWithReload(() => import('./pages/DrawCharacter.jsx'), 'drawchar');
 
 // One-shot free trial: the moment a free user navigates AWAY from /trace,
 // their single session is consumed for good. Doing this at the route layer
@@ -180,6 +182,11 @@ export default function App() {
         {/* Best-practices guide — SEO/AI surface. /proportions is an alias. */}
         <Route path="/how-to-use"    element={<HowToUse />} />
         <Route path="/proportions"   element={<HowToUse />} />
+
+        {/* "How to draw <character>" SEO landing pages + hub index. Public,
+            content-driven from src/lib/characters.js and prerendered. */}
+        <Route path="/draw"          element={<DrawIndex />} />
+        <Route path="/draw/:slug"    element={<DrawCharacter />} />
 
         {/* Auth required (free users allowed) */}
         <Route path="/account"          element={<RequireAuth><Account /></RequireAuth>} />
