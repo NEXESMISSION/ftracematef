@@ -31,6 +31,22 @@
       "purpose": "maskable"
     }
   ],
+  "screenshots": [
+    {
+      "src": "/images/hero/phone-preview-v3.png",
+      "sizes": "1200x1111",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Trace any image onto real paper with AR"
+    },
+    {
+      "src": "/images/og/og-cover.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "TraceMate — AR tracing in your browser"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Start tracing",
