@@ -41,6 +41,7 @@
 /* ── Studio shell (used by Paywall, Account, CheckoutSuccess, dashboards) ── */
 .studio-shell {
   min-height: 100vh;
+  min-height: 100dvh; /* iOS dynamic toolbar — avoid bottom clipping */
   background: var(--cream);
   display: flex;
   flex-direction: column;

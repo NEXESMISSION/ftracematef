@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { VISIBLE_PLANS } from '../lib/plans.js';
 import { FREE_SESSION_LIMIT } from '../lib/freeTrial.js';
 import { usePlanCheckout } from '../hooks/usePlanCheckout.js';
+import { useSectionView } from '../hooks/useSectionView.js';
 import LifetimeReveal, { LifetimeInlineCard, hasSeenLifetime } from './LifetimeReveal.jsx';
 
 function Check({ gold, mint }) {
@@ -95,6 +96,10 @@ export default function Pricing() {
   // reveal actually happens while they're looking.
   const sectionRef = useRef(null);
   const startedRef = useRef(false);
+  // Fire a one-time "reached pricing" funnel event (independent of the reveal
+  // animation). Merge this ref with sectionRef on the same <section>.
+  const viewRef = useSectionView('pricing', 0.3);
+  const setSectionEl = (el) => { sectionRef.current = el; viewRef.current = el; };
   // Devices that already unwrapped the secret skip the whole show — Lifetime is
   // present from first paint and renders as a plain card (no teaser/confetti).
   const [seenLifetime] = useState(() => hasSeenLifetime());
@@ -125,7 +130,7 @@ export default function Pricing() {
   }, [seenLifetime]);
 
   return (
-    <section id="pricing" ref={sectionRef} className="pricing tm-section-pad">
+    <section id="pricing" ref={setSectionEl} className="pricing tm-section-pad">
       {announce && (
         <div className="secret-announce" role="status" aria-live="polite">
           <span className="secret-announce-icon" aria-hidden="true">🎁</span>

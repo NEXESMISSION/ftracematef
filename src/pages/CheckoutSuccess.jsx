@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { consumePreCheckoutSnapshot } from '../lib/checkout.js';
 import { usePresence } from '../hooks/usePresence.js';
+import { trackEvent } from '../lib/track.js';
 
 // Dodo redirects here after a successful payment. We DO NOT trust the URL
 // alone — Dodo will sometimes hit return_url on failure too, and showing a
@@ -149,12 +150,19 @@ export default function CheckoutSuccess() {
   // Confirmed paid → /upload?welcome=1. Strict: we only fire when isPaid is
   // true AND the subscription row genuinely changed since pre-checkout. The
   // no-snapshot case is handled above (route to /account, no celebration).
+  const purchaseTracked = useRef(false);
   useEffect(() => {
     if (loading) return;
     if (!isPaid) return;
     if (!subscriptionChanged) return;
+    // Fire the conversion event exactly once — this is THE bottom-of-funnel
+    // signal (revenue attribution, checkout→purchase rate). Plan rides in `id`.
+    if (!purchaseTracked.current) {
+      purchaseTracked.current = true;
+      trackEvent('custom', { name: 'purchase', id: subscription?.plan || undefined });
+    }
     navigate('/upload?welcome=1', { replace: true });
-  }, [loading, isPaid, subscriptionChanged, navigate]);
+  }, [loading, isPaid, subscriptionChanged, subscription, navigate]);
 
   // If we already know the outcome, don't render the verifying modal at all
   // — the redirect effect above is about to fire on the next tick. Without

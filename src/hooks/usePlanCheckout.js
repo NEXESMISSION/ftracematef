@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { startCheckout, markPreCheckout, clearPreCheckoutSnapshot } from '../lib/checkout.js';
 import { friendlyError } from '../lib/errors.js';
+import { trackEvent } from '../lib/track.js';
 
 /**
  * Shared checkout flow used by every plan-grid surface in the app:
@@ -44,6 +45,9 @@ export function usePlanCheckout({ redirectUnauthedToLogin = true } = {}) {
 
   const choose = async (planId) => {
     setError(null);
+    // CTA intent — fires for every plan button on every surface (landing,
+    // /pricing, paywall), before any auth redirect, so per-plan CTR is real.
+    trackEvent('custom', { name: 'cta_plan_click', id: planId });
     if (!user) {
       if (redirectUnauthedToLogin) {
         // Persist the chosen plan immediately. sessionStorage survives the

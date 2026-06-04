@@ -28,6 +28,7 @@
   color: var(--adm-ink);
   font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* ── Top bar ──────────────────────────────────────────────────────────────── */

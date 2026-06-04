@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { trackEvent } from './track.js';
 
 /**
  * Free-tier trial of the studio for signed-in non-paying users.
@@ -123,5 +124,8 @@ export async function consumeFreeSession() {
   // Stamp AFTER a successful RPC: a network failure shouldn't lock the user
   // out of a retry on the next render.
   markConsumedThisVisit();
+  // Funnel signal: a free trial session actually started. `data` is the
+  // post-increment count, so it doubles as which session number this was.
+  trackEvent('custom', { name: 'trial_session', count: Number(data) || undefined });
   return data;
 }

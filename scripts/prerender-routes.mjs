@@ -186,6 +186,33 @@ const ROUTES = [
   },
 ];
 
+// ── Homepage body (/) ───────────────────────────────────────────────────────
+// The SPA ships an empty <div id="root">, so non-JS crawlers (GPTBot, ClaudeBot,
+// PerplexityBot, and Google's first HTML pass) saw NOTHING on the most-linked,
+// highest-priority URL — and no internal links flowed to /draw, /how-to-use, or
+// /pricing. This static body fixes both: a keyword-rich H1 + the four steps +
+// internal links. React's createRoot() replaces it on mount, so humans still
+// get the full interactive landing page.
+const HOME_BODY = `
+<main>
+  <h1>Trace any image onto real paper with AR — the easy way to learn to draw</h1>
+  <p>TraceMate turns your phone into an augmented-reality light box. Point your camera at paper, see any photo or drawing as a live overlay, and trace it by hand — no printing, no grid, no expensive light pad. It runs in your browser on iPhone, Android, iPad, and desktop, with nothing to install.</p>
+  <h2>How it works — four easy steps</h2>
+  <ol>
+    <li>Upload or pick any image.</li>
+    <li>Point your phone camera at your paper.</li>
+    <li>See the outline overlaid on the page.</li>
+    <li>Trace it by hand with your favorite tools.</li>
+  </ol>
+  <h2>Popular guides &amp; tutorials</h2>
+  <ul>
+    <li><a href="${SITE}/draw">How to draw anime characters with AR tracing</a></li>
+    <li><a href="${SITE}/how-to-use">How to use TraceMate and get proportions right</a></li>
+    <li><a href="${SITE}/pricing">Pricing — free sessions, then $5/mo or $15 lifetime</a></li>
+  </ul>
+  <p>Every new account includes free tracing sessions. <a href="${SITE}/upload">Start tracing now</a>.</p>
+</main>`;
+
 // ── "How to draw <character>" pages (data-driven from src/lib/characters.js) ──
 // Mirrors src/pages/DrawCharacter.jsx so non-JS crawlers read the full tutorial.
 // No copyrighted artwork — text-only tutorials that teach tracing-your-own-ref.
@@ -381,6 +408,20 @@ async function main() {
   }
 
   console.log(`[prerender] wrote ${ROUTES.length} per-route HTML files into dist/`);
+
+  // Homepage: inject the static body into the real dist/index.html so the
+  // highest-priority URL is no longer an empty shell to crawlers. Done from the
+  // pristine baseHtml AFTER the route loop, so per-route files stay unaffected.
+  try {
+    const homeOut = baseHtml.replace(
+      /<div id="root">\s*<\/div>/i,
+      () => `<div id="root">${HOME_BODY}</div>`,
+    );
+    await writeFile(indexPath, homeOut, 'utf8');
+    console.log('[prerender] injected homepage body into dist/index.html');
+  } catch (err) {
+    console.error(`[prerender] homepage body injection skipped: ${err.message}`);
+  }
 
   // Inject the character pages into the sitemap (dist/sitemap.xml is freshly
   // copied from public/ each build, so this never accumulates duplicates).

@@ -1,6 +1,7 @@
 /* ============ Upload Page ============ */
 .upload-body {
   min-height: 100vh;
+  min-height: 100dvh; /* iOS dynamic toolbar — keep the bottom CTA on-screen */
   display: flex;
   flex-direction: column;
   background: var(--cream);
