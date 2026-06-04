@@ -19,8 +19,8 @@
 //   DODO_PRODUCT_*            — product IDs so we can map to plan names
 //   DODO_PRICE_<PLAN>_CENTS_<CCY>  — per-currency price floors. Configure
 //                                    one per (plan, currency) pair you accept,
-//                                    e.g. DODO_PRICE_MONTHLY_CENTS_USD=700,
-//                                    DODO_PRICE_MONTHLY_CENTS_EUR=560. A
+//                                    e.g. DODO_PRICE_MONTHLY_CENTS_USD=500,
+//                                    DODO_PRICE_MONTHLY_CENTS_EUR=460. A
 //                                    currency without a configured floor is
 //                                    rejected — events from new regions need
 //                                    a config change, not a code change.
@@ -72,7 +72,7 @@ const PLAN_FROM_PRODUCT: Record<string, string> = {};
 //
 // Multi-currency by design. Set one floor per (plan, currency) pair you
 // accept; new regions only need a config change, not a code edit:
-//   DODO_PRICE_MONTHLY_CENTS_USD=700
+//   DODO_PRICE_MONTHLY_CENTS_USD=500
 //   DODO_PRICE_MONTHLY_CENTS_EUR=560
 //   DODO_PRICE_QUARTERLY_CENTS_USD=1000
 //   DODO_PRICE_QUARTERLY_CENTS_EUR=800

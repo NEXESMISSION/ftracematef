@@ -11,11 +11,11 @@ export const PLANS = [
   {
     id: 'monthly',
     name: 'Monthly',
-    price: 7,
+    price: 5,
     wasPrice: 9,
     period: '/ month',
     shortPeriod: '/ mo',
-    badge: '22% off',
+    badge: '44% off',
     cta: 'Start Monthly',
     features: [
       'Full quality outlines',
@@ -40,7 +40,7 @@ export const PLANS = [
       'Full quality outlines',
       'All tools unlocked',
       'Works on any device',
-      'Save 52% vs monthly',
+      'Save 33% vs monthly',
     ],
   },
   {
@@ -76,7 +76,7 @@ export const PLAN_BY_ID = Object.fromEntries(PLANS.map((p) => [p.id, p]));
 
 export const PLAN_LABEL = {
   free:      'Free tier',
-  monthly:   'Monthly · $7/mo',
+  monthly:   'Monthly · $5/mo',
   quarterly: '3 Months · $10',
   lifetime:  'Lifetime · $15',
 };

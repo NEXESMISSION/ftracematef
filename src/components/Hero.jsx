@@ -86,14 +86,6 @@ export default function Hero({ onPlayClick }) {
               </Link>
             )}
 
-            {/* Explicit sign-up path for visitors who'd rather make an account
-                first than jump straight into a trial. */}
-            {!isOrLikelySignedIn && (
-              <Link className="btn-signup" to="/login" aria-label="Create your profile">
-                Create profile
-              </Link>
-            )}
-
             {DEMO_VIDEO_ID && (
               <button type="button" className="see-action" onClick={() => onPlayClick(DEMO_VIDEO_ID)}>
                 <span className="play-circle" aria-hidden="true">

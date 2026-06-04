@@ -287,47 +287,6 @@ main, header, section, footer { position: relative; z-index: 1; }
 }
 .nav-login-link:hover { color: var(--coral); }
 
-/* "Create profile" — the brand's neo-brutalist secondary CTA (cream pill, ink
-   border + hard shadow). Used in the hero next to Try-it-Now and in the header
-   next to Log in. Clearly distinct from the coral primary, fully on-palette. */
-.btn-signup {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 17px 32px;
-  font-family: 'Nunito', sans-serif;
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--ink);
-  background: var(--paper, #fffdf7);
-  border: 2.5px solid var(--ink);
-  border-radius: 16px;
-  box-shadow: 4px 4px 0 var(--ink);
-  white-space: nowrap;
-  cursor: pointer;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
-}
-.btn-signup:hover {
-  transform: translate(-2px, -2px) rotate(-0.6deg);
-  box-shadow: 6px 6px 0 var(--ink);
-  background: #fff;
-}
-.btn-signup:active {
-  transform: translate(0, 0);
-  box-shadow: 2px 2px 0 var(--ink);
-}
-/* Compact header variant. */
-.btn-signup-sm {
-  padding: 10px 18px;
-  font-size: 15px;
-  border-radius: 12px;
-  border-width: 2px;
-  box-shadow: 3px 3px 0 var(--ink);
-}
-.btn-signup-sm:hover { box-shadow: 4px 4px 0 var(--ink); }
-.btn-signup-sm:active { box-shadow: 2px 2px 0 var(--ink); }
-
 /* nav-level wc-btn — extra small */
 .nav .wc-btn.sm {
   padding: 12px 24px;
@@ -2452,11 +2411,6 @@ main, header, section, footer { position: relative; z-index: 1; }
      stays in the header next to the brand instead of wrapping below it. */
   .nav { padding-top: 20px; gap: 12px; flex-wrap: nowrap; }
   .nav-links { display: none; }
-  /* Space is tight on phones — keep the header to two CTAs (Create profile +
-     Try it Now). Returning users still get "Log in" from the hero. */
-  .nav-login-link { display: none; }
-  .nav-cta-group { gap: 10px; }
-  .btn-signup-sm { padding: 9px 14px; font-size: 14px; }
   /* Shrink the brand so brand + CTA always fit on the narrowest phones. */
   .brand .brand-word { width: clamp(96px, 24vw, 130px); }
   .brand-icon { width: 28px; height: 28px; }

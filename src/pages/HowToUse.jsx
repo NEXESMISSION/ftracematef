@@ -210,7 +210,7 @@ export default function HowToUse() {
               <tbody>
                 <tr><td>No install</td><td>Runs in your browser</td><td>App Store download</td></tr>
                 <tr><td>One-time option</td><td>$15 lifetime (10 spots)</td><td>Subscription only</td></tr>
-                <tr><td>Lowest paid tier</td><td>$7/mo</td><td>Usually higher</td></tr>
+                <tr><td>Lowest paid tier</td><td>$5/mo</td><td>Usually higher</td></tr>
                 <tr><td>Works on Android + desktop</td><td>Yes</td><td>Often iOS-only</td></tr>
                 <tr><td>Image stays on device</td><td>Yes</td><td>Varies</td></tr>
                 <tr><td>Try before paying</td><td>One free session</td><td>Rarely</td></tr>
@@ -270,8 +270,7 @@ export default function HowToUse() {
               <summary>How much does it cost?</summary>
               <p>
                 Every account gets one free tracing session. Paid plans are
-                $7/month, $10 per 3 months, or a one-time $15 lifetime plan
-                (limited to 10 spots).
+                $5/month or a one-time $15 lifetime plan (limited to 10 spots).
               </p>
             </details>
           </div>

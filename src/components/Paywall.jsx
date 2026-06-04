@@ -72,7 +72,7 @@ export default function Paywall({ trialUsed = false }) {
   }, []);
 
   const greeting = profile?.display_name || user?.email?.split('@')[0] || 'friend';
-  const monthlyPrice = PLAN_BY_ID.monthly?.price ?? 7;
+  const monthlyPrice = PLAN_BY_ID.monthly?.price ?? 5;
 
   return (
     <div className="studio-shell">
