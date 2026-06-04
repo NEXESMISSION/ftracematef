@@ -26,11 +26,10 @@ export default function Landing() {
       <Nav />
       <Hero onPlayClick={openVideo} />
       <Marquee />
-      {/* "How it works" is hidden for now (kept in code — flip `false` to
-          true to bring the four-step explainer back). "Made for you" reels
-          carry the section on their own. */}
+      {/* "How it works" — the four-step explainer (four images) above the
+          "Made for you" reels. */}
       <div className="how-aud-group">
-        {false && <HowItWorks />}
+        <HowItWorks />
         <AudienceSections />
       </div>
       {!isPaid && <Pricing />}

@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import Img from './Img.jsx';
@@ -7,34 +6,6 @@ import Img from './Img.jsx';
 // renders once a real id is in place — no more dead button shipping a
 // broken `YOUR_VIDEO_ID` embed.
 const DEMO_VIDEO_ID = '';
-
-// Hero centerpiece: one looping, muted, inline-autoplay reel. The MP4 is heavily
-// optimized (square 800×800, no audio, +faststart so the moov atom is up front
-// and playback starts before the full file lands) and a tiny WebP poster fills
-// the frame instantly so it's never an empty box on first paint.
-function HeroReel() {
-  const videoRef = useRef(null);
-  // Nudge playback on mount — some browsers (iOS Safari) need the explicit call
-  // even with the autoPlay attribute.
-  useEffect(() => { videoRef.current?.play?.().catch(() => {}); }, []);
-  return (
-    <div className="hero-phone-video">
-      <video
-        ref={videoRef}
-        className="hero-phone-reel"
-        src="/videos/hero.mp4"
-        poster="/videos/hero.webp"
-        muted
-        loop
-        autoPlay
-        playsInline
-        preload="auto"
-        aria-hidden="true"
-        tabIndex={-1}
-      />
-    </div>
-  );
-}
 
 // Synchronous heuristic — see Nav.jsx for the same trick.
 function hasPersistedSession() {
@@ -113,7 +84,7 @@ export default function Hero({ onPlayClick }) {
         <div className="hero-phone">
           <span className="hero-spark hero-spark-l" aria-hidden="true">✦</span>
           <div className="phone-frame">
-            <HeroReel />
+            <Img src="/images/hero/phone-preview-v3.webp" alt="Trace Mate app preview" priority />
           </div>
           <span className="hero-spark hero-spark-r" aria-hidden="true">✧</span>
         </div>
