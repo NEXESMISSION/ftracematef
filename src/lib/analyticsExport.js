@@ -55,10 +55,13 @@ export async function gatherFullExport(range, { overview = null, onProgress = ()
   try { referrers = await listReferrers(); } catch { /* optional */ }
 
   // Every registered account, in full: profile, plan/billing, trace activity,
-  // survey answers, signup attribution, referral. Admins excluded.
+  // survey answers, signup attribution, referral. Operator-owned accounts
+  // (admins + exclude_from_analytics) are dropped so the export matches Pulse.
   onProgress('Loading registered users…');
   let users = [];
-  try { users = (await listAllUsers()).filter((u) => !u.is_admin); } catch { /* optional */ }
+  try {
+    users = (await listAllUsers()).filter((u) => !u.is_admin && !u.exclude_from_analytics);
+  } catch { /* optional */ }
 
   return {
     range,
@@ -140,7 +143,7 @@ export function buildReportText(b) {
   L.push('TRACE MATE — FULL ANALYTICS EXPORT');
   L.push(`Generated: ${b.generatedAt}`);
   L.push(`Date range: ${b.range}`);
-  L.push('Note: operator/admin traffic is excluded from every number below.');
+  L.push('Note: operator-owned accounts (admins + accounts flagged exclude_from_analytics) are excluded from every number below.');
 
   // 1. Summary
   h1('1. SUMMARY');
@@ -256,7 +259,7 @@ export function buildReportText(b) {
   h1('8. REGISTERED USERS — every account in detail');
   if (!b.users || b.users.length === 0) L.push('  (no users, or user list unavailable)');
   else {
-    L.push(`Total registered (admins excluded): ${b.users.length}`);
+    L.push(`Total registered (operator-owned accounts excluded): ${b.users.length}`);
     for (const u of b.users) {
       L.push(`\n${'-'.repeat(60)}`);
       L.push(`${safe(u.email || u.display_name)}  [${safe(u.id)}]`);

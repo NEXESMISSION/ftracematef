@@ -752,15 +752,16 @@ export function AuthProvider({ children }) {
   }, [session?.user?.id]);
 
   // Operator devices opt out of analytics entirely. The moment an admin profile
-  // loads, flag this device so lib/track.js stops queuing/sending events — the
-  // operator's own browsing (signed in OR anonymous afterwards) never pollutes
-  // the numbers. Complements the read-layer admin exclusion for already-stitched
-  // data. (No un-set: an admin's device staying out of analytics is the intent.)
+  // — or any account flagged exclude_from_analytics (the operator's alt/brand
+  // accounts) — loads, flag this device so lib/track.js stops queuing/sending
+  // events. The operator's own browsing (signed in OR anonymous afterwards)
+  // never pollutes the numbers. Complements the read-layer exclusion for
+  // already-stitched data. (No un-set: staying out of analytics is the intent.)
   useEffect(() => {
-    if (profile?.is_admin) {
+    if (profile?.is_admin || profile?.exclude_from_analytics) {
       try { window.localStorage.setItem('tm:no-track', '1'); } catch { /* ignore */ }
     }
-  }, [profile?.is_admin]);
+  }, [profile?.is_admin, profile?.exclude_from_analytics]);
 
   // Presence heartbeat: stamp profiles.last_seen_at + current_page +
   // current_image_label every ~60s while the tab is visible. Powers the

@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
   // about than the foreign-key embed magic.
   const { data: profiles, error: profErr } = await admin
     .from('profiles')
-    .select('id, email, display_name, avatar_url, is_admin, created_at, last_seen_at, free_trial_started_at, free_sessions_used, dodo_customer_id, total_trace_seconds, trace_sessions, traces_recorded, first_trace_at, last_trace_at, current_page, current_image_label, current_run_id, signup_landing, signup_referrer, signup_source, signup_campaign, first_pricing_at, first_paywall_at, first_checkout_at, last_checkout_at, last_checkout_plan, exit_survey_at, exit_survey_source, exit_survey_feeling, exit_survey_note, survey_completed_at, survey_age, survey_draws, survey_note')
+    .select('id, email, display_name, avatar_url, is_admin, exclude_from_analytics, created_at, last_seen_at, free_trial_started_at, free_sessions_used, dodo_customer_id, total_trace_seconds, trace_sessions, traces_recorded, first_trace_at, last_trace_at, current_page, current_image_label, current_run_id, signup_landing, signup_referrer, signup_source, signup_campaign, first_pricing_at, first_paywall_at, first_checkout_at, last_checkout_at, last_checkout_plan, exit_survey_at, exit_survey_source, exit_survey_feeling, exit_survey_note, survey_completed_at, survey_age, survey_draws, survey_note')
     .order('created_at', { ascending: false })
     .limit(2000);
   if (profErr) return json({ error: profErr.message }, 500);
@@ -180,6 +180,7 @@ Deno.serve(async (req) => {
       display_name:        p.display_name,
       avatar_url:          p.avatar_url,
       is_admin:            !!p.is_admin,
+      exclude_from_analytics: !!p.exclude_from_analytics,
       created_at:          p.created_at,
       last_seen_at:        p.last_seen_at,
       last_sign_in_at:     lastSignIn.get(p.id) ?? null,
