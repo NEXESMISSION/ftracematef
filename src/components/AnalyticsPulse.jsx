@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import createGlobe from 'cobe';
 import { getAnalytics, listVisitors, getVisitorProfile } from '../lib/admin.js';
+import { gatherFullExport, buildReportText, downloadText } from '../lib/analyticsExport.js';
 import { friendlyError } from '../lib/errors.js';
 
 const RANGES = [
@@ -99,27 +100,31 @@ function Globe({ countries }) {
     window.addEventListener('pointerup', onPointerUp);
     canvas.style.cursor = 'grab';
 
+    // Crisp on retina without over-rendering on low-DPI. Higher mapSamples +
+    // softer brightness reads cleaner; warm coral markers match the brand.
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const globe = createGlobe(canvas, {
-      devicePixelRatio: 2,
-      width: width * 2,
-      height: width * 2,
+      devicePixelRatio: dpr,
+      width: width * dpr,
+      height: width * dpr,
       phi: 0,
-      theta: 0.25,
+      theta: 0.28,
       dark: 1,
-      diffuse: 1.2,
-      mapSamples: 16000,
-      mapBrightness: 6,
-      baseColor: [0.28, 0.30, 0.34],
-      markerColor: [0.95, 0.45, 0.20],
-      glowColor: [0.18, 0.20, 0.24],
+      diffuse: 1.25,
+      mapSamples: 22000,
+      mapBrightness: 5.2,
+      baseColor: [0.26, 0.28, 0.33],
+      markerColor: [0.95, 0.49, 0.46],
+      glowColor: [0.16, 0.18, 0.22],
       markers,
       onRender: (state) => {
-        // Idle auto-spin only when not actively dragging.
-        if (!pointerDrag.current) phi += 0.0045;
+        // Idle auto-spin only when not actively dragging. Slightly slower for a
+        // calmer, smoother glide.
+        if (!pointerDrag.current) phi += 0.0038;
         state.phi = phi + rRef.current;
         state.theta = thetaRef.current;
-        state.width = width * 2;
-        state.height = width * 2;
+        state.width = width * dpr;
+        state.height = width * dpr;
       },
     });
     return () => {
@@ -549,6 +554,49 @@ function LifetimeFunnel({ lifetime }) {
   );
 }
 
+/* ── full export (download-only) ──────────────────────────────────────────── */
+// One button that, on click, gathers EVERYTHING (per-visitor journeys, clicks,
+// scroll depth, time-on-page, sources, referrers, referral program, heatmaps)
+// and downloads it as a detailed text report. Nothing here loads until clicked.
+function DownloadReport({ range, overview }) {
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState('');
+  const [err, setErr] = useState('');
+
+  const run = async () => {
+    if (busy) return;
+    setBusy(true); setErr(''); setStatus('Starting…');
+    try {
+      const bundle = await gatherFullExport(range, { overview, onProgress: setStatus });
+      setStatus('Formatting report…');
+      const text = buildReportText(bundle);
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadText(`tracemate-analytics-${range}-${stamp}.txt`, text);
+      setStatus(`Done — exported ${fmt(bundle.journeys.length)} visitor journeys of ${fmt(bundle.totalVisitors)}.`);
+    } catch (e) {
+      setErr(friendlyError(e, 'Could not build the export.'));
+      setStatus('');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="pulse-export">
+      <div className="pulse-export-info">
+        <strong>Full data export</strong>
+        <span>Everything, in detail — journeys · clicks · scroll · time on page · sources · referrals. Loads only when you download.</span>
+      </div>
+      <button type="button" className="pulse-export-btn" onClick={run} disabled={busy}>
+        {busy ? 'Gathering…' : '⬇ Download everything'}
+      </button>
+      {(status || err) && (
+        <p className={`pulse-export-status ${err ? 'is-err' : ''}`} role="status">{err || status}</p>
+      )}
+    </div>
+  );
+}
+
 /* ── main ─────────────────────────────────────────────────────────────────── */
 export default function AnalyticsPulse() {
   const [range, setRange] = useState('7d');
@@ -556,11 +604,9 @@ export default function AnalyticsPulse() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [heatPath, setHeatPath] = useState('/welcome');
-  const [heat, setHeat] = useState(null);
-  const [heatLoading, setHeatLoading] = useState(false);
-
-  // Overview load (on range change).
+  // Overview load only (on range change). This is the lightweight rollup that
+  // powers the visual page. The heavy per-visitor journeys + heatmaps are NOT
+  // fetched here — they load only when the operator hits "Download everything".
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -572,22 +618,9 @@ export default function AnalyticsPulse() {
     return () => { alive = false; };
   }, [range]);
 
-  // Heatmap load (on range or selected path change).
-  useEffect(() => {
-    if (!heatPath) return;
-    let alive = true;
-    setHeatLoading(true);
-    getAnalytics(range, heatPath)
-      .then((res) => { if (alive) setHeat(res.heatmap); })
-      .catch(() => { if (alive) setHeat(null); })
-      .finally(() => { if (alive) setHeatLoading(false); });
-    return () => { alive = false; };
-  }, [range, heatPath]);
-
   const t = data?.totals || {};
   const funnel = data?.funnel || {};
   const countries = data?.by_country || [];
-  const pages = data?.by_page || [];
 
   return (
     <section className="admin-stats pulse" aria-labelledby="pulse-title">
@@ -614,6 +647,11 @@ export default function AnalyticsPulse() {
 
       {data && (
         <>
+          {/* Full data export — gathers EVERYTHING on demand (journeys, clicks,
+              scroll, time-on-page, sources, referrals) and downloads it. Loads
+              nothing until clicked, so the visual page stays light. */}
+          <DownloadReport range={range} overview={data} />
+
           {/* Growth Health — the interpreted headline that grades the raw KPIs
               below against benchmarks. Re-computed client-side per range. */}
           <GrowthScore data={data} range={range} />
@@ -626,10 +664,6 @@ export default function AnalyticsPulse() {
             <Kpi label="Signups" value={fmt(t.signups)} sub={`${pct(t.signups, t.visitors)} of visitors`} />
             <Kpi label="Live now" value={fmt(t.live)} accent />
           </div>
-
-          {/* App install funnel (PWA) + Lifetime "secret deal" funnel */}
-          <InstallFunnel pwa={data.pwa} />
-          <LifetimeFunnel lifetime={data.lifetime} />
 
           {/* Globe + country ranking */}
           <div className="pulse-geo">
@@ -688,58 +722,14 @@ export default function AnalyticsPulse() {
             )}
           </div>
 
-          {/* Breakdowns */}
-          <div className="pulse-grid">
-            <Breakdown title="Traffic source (tagged links)" rows={data.by_source} labelKey="source" />
-            <Breakdown title="Came from (referrer)" rows={data.by_referrer} labelKey="referrer" />
-            <Breakdown title="Device" rows={data.by_device} labelKey="device_type" />
-            <Breakdown title="Operating system" rows={data.by_os} labelKey="os" />
-            <Breakdown title="Browser" rows={data.by_browser} labelKey="browser" />
-            <Breakdown title="Language" rows={data.by_language} labelKey="lang" />
-            <Breakdown title="Top pages" rows={pages} labelKey="path" valueKey="views" />
-          </div>
-
-          {/* Heatmap viewer */}
-          <div className="pulse-card pulse-heat">
-            <div className="pulse-heat-head">
-              <h4 className="pulse-card-title">Page heatmap</h4>
-              <select
-                className="pulse-heat-select"
-                value={heatPath}
-                onChange={(e) => setHeatPath(e.target.value)}
-              >
-                {[...new Set(['/welcome', '/', '/pricing', '/how-to-use', ...pages.map((p) => p.path)])].map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
-
-            {heatLoading && <p className="pulse-empty">Loading heatmap…</p>}
-            {heat && (
-              <div className="pulse-heat-body">
-                <div className="pulse-heat-left">
-                  <p className="pulse-heat-stat">
-                    {fmt(heat.clicks)} clicks · {fmt(heat.pageviews)} views
-                  </p>
-                  <HeatCanvas points={heat.points} />
-                </div>
-                <div className="pulse-heat-right">
-                  <ScrollFunnel scroll={heat.scroll} pageviews={heat.pageviews} />
-                  <Breakdown title="Most-clicked elements" rows={heat.top_elements} labelKey="sel" valueKey="clicks" />
-                  {heat.rage?.length > 0 && (
-                    <Breakdown title="Rage clicks (frustration)" rows={heat.rage} labelKey="sel" valueKey="count" />
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          <p className="pulse-export-foot">
+            Want the deep detail — every visitor journey, clicks, scroll, time on
+            each page, referrers and referral links? Use <strong>Download
+            everything</strong> at the top. It loads on demand and never slows
+            this page down.
+          </p>
         </>
       )}
-
-      {/* Per-visitor drill-down — now part of the same single page rather than a
-          separate tab. Self-loads off the range, independent of the overview. */}
-      <h3 className="pulse-section-title">Visitors</h3>
-      <VisitorsPanel range={range} />
     </section>
   );
 }
