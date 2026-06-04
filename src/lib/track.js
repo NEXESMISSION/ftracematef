@@ -230,8 +230,17 @@ export async function promptInstall() {
   } catch { return null; }
 }
 
+// Device-level opt-out. When `tm:no-track` is set (we set it automatically the
+// moment an admin profile loads — see AuthProvider — so the operator's own
+// devices never pollute the numbers), nothing is queued or sent. This is the
+// device half of the exclusion; the read layer already drops admin-stitched
+// visitors retroactively.
+function noTrack() {
+  try { return window.localStorage.getItem('tm:no-track') === '1'; } catch { return false; }
+}
+
 function enqueue(type, props = {}, path) {
-  if (!INGEST_URL) return;
+  if (!INGEST_URL || noTrack()) return;
   const sess = sessionId();
   if (sess.started) props = { ...props, session_start: true };
   queue.push({
@@ -292,7 +301,7 @@ function flush() {
 
 /** Wire up timers + lifecycle flush hooks. Idempotent. */
 export function initTracking() {
-  if (started || !INGEST_URL || typeof window === 'undefined') return;
+  if (started || !INGEST_URL || typeof window === 'undefined' || noTrack()) return;
   started = true;
 
   // First-touch UTM capture: a link like tracemate.art/?utm_source=newsletter
@@ -353,7 +362,7 @@ export function trackEvent(type, props = {}, path) {
  * enqueue a lightweight 'identify' marker for the event timeline.
  */
 export function identify(userId) {
-  if (!userId || userId === currentUserId) return;
+  if (!userId || userId === currentUserId || noTrack()) return;
   currentUserId = userId;
   enqueue('identify', {});
   flush();

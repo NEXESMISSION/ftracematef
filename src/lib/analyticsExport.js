@@ -8,7 +8,7 @@
 // server surface. Time-on-page is derived from the event timeline (pageview →
 // next event), so we get dwell without extra tracking.
 
-import { getAnalytics, listVisitors, getVisitorProfile, listReferrers } from './admin.js';
+import { getAnalytics, listVisitors, getVisitorProfile, listReferrers, listAllUsers } from './admin.js';
 
 const MAX_VISITOR_JOURNEYS = 200; // cap the per-visitor detail pull
 const CONCURRENCY = 5;            // parallel visitor-profile fetches per batch
@@ -54,6 +54,12 @@ export async function gatherFullExport(range, { overview = null, onProgress = ()
   let referrers = [];
   try { referrers = await listReferrers(); } catch { /* optional */ }
 
+  // Every registered account, in full: profile, plan/billing, trace activity,
+  // survey answers, signup attribution, referral. Admins excluded.
+  onProgress('Loading registered users…');
+  let users = [];
+  try { users = (await listAllUsers()).filter((u) => !u.is_admin); } catch { /* optional */ }
+
   return {
     range,
     generatedAt: new Date().toISOString(),
@@ -63,6 +69,7 @@ export async function gatherFullExport(range, { overview = null, onProgress = ()
     journeys,
     heatmaps,
     referrers,
+    users,
     truncatedJourneys: visitors.length > MAX_VISITOR_JOURNEYS,
   };
 }
@@ -245,8 +252,56 @@ export function buildReportText(b) {
     L.push(`    commission: ${safe(r.commission_cents != null ? `$${(r.commission_cents / 100).toFixed(2)}` : r.commission)} · rate: ${safe(r.rate ?? r.commission_rate)} · link: ${safe(r.link || (r.code ? `/i/${r.code}` : null))}`);
   }
 
-  // 8. Per-visitor journeys (the firehose)
-  h1('8. PER-VISITOR JOURNEYS (the full detail)');
+  // 8. Registered users — every account, full detail
+  h1('8. REGISTERED USERS — every account in detail');
+  if (!b.users || b.users.length === 0) L.push('  (no users, or user list unavailable)');
+  else {
+    L.push(`Total registered (admins excluded): ${b.users.length}`);
+    for (const u of b.users) {
+      L.push(`\n${'-'.repeat(60)}`);
+      L.push(`${safe(u.email || u.display_name)}  [${safe(u.id)}]`);
+      L.push(`  Joined: ${iso(u.created_at)} · last sign-in: ${iso(u.last_sign_in_at)} · last seen: ${iso(u.last_seen_at)}${u.current_page ? `  (on ${u.current_page})` : ''}`);
+      L.push(`  Plan: ${safe(u.plan, 'free')} · status: ${safe(u.status)} · paid: ${u.is_paid ? 'YES' : 'no'}${u.paid_at ? ` (since ${iso(u.paid_at)})` : ''}${u.amount_cents != null ? ` · last charge $${(u.amount_cents / 100).toFixed(2)}` : ''}`);
+      L.push(`  Billing: period ends ${u.current_period_end ? iso(u.current_period_end) : '—'} · cancel-at-end: ${u.cancel_at_period_end ? 'yes' : 'no'} · trial used: ${u.trial_used ? 'yes' : 'no'} · last checkout plan: ${safe(u.last_checkout_plan)}`);
+      L.push(`  Funnel: first pricing ${u.first_pricing_at ? iso(u.first_pricing_at) : '—'} · first paywall ${u.first_paywall_at ? iso(u.first_paywall_at) : '—'} · first checkout ${u.first_checkout_at ? iso(u.first_checkout_at) : '—'}`);
+      L.push(`  Activity: ${fmtInt(u.trace_sessions)} traces · ${humanDur(u.total_trace_seconds)} traced · last trace ${u.last_trace_at ? iso(u.last_trace_at) : '—'}${u.traces_recorded != null ? ` · ${fmtInt(u.traces_recorded)} recorded` : ''}${u.current_streak != null ? ` · streak ${u.current_streak} (best ${u.longest_streak ?? '—'})` : ''}`);
+      L.push(`  Acquisition: source ${safe(u.signup_source)} · campaign ${safe(u.signup_campaign)} · landing ${safe(u.signup_landing)} · referrer ${safe(u.signup_referrer)}${u.referred_by ? ` · referred-by ${u.referred_by}` : ''}`);
+      if (u.survey_completed_at) {
+        const draws = Array.isArray(u.survey_draws) ? u.survey_draws.join(', ') : safe(u.survey_draws, '');
+        L.push(`  Survey: age ${safe(u.survey_age)} · gender ${safe(u.survey_gender)} · draws [${draws}]${u.survey_note ? ` · note: "${String(u.survey_note).trim()}"` : ''}  (${iso(u.survey_completed_at)})`);
+      } else {
+        L.push('  Survey: not completed');
+      }
+    }
+  }
+
+  // 9. Survey aggregate
+  h1('9. SURVEY — aggregate (post-trace)');
+  {
+    const done = (b.users || []).filter((u) => u.survey_completed_at);
+    L.push(`Responses: ${done.length} of ${b.users?.length || 0} registered users (${pct(done.length, b.users?.length || 0)})`);
+    const tally = (key, isArr = false) => {
+      const m = {};
+      for (const u of done) {
+        const v = u[key];
+        if (isArr) (Array.isArray(v) ? v : []).forEach((x) => { if (x) m[x] = (m[x] || 0) + 1; });
+        else if (v) m[v] = (m[v] || 0) + 1;
+      }
+      const rows = Object.entries(m).sort((a, c) => c[1] - a[1]).map(([k, v]) => `    - ${k}: ${v}`);
+      return rows.length ? rows.join('\n') : '    (none)';
+    };
+    L.push('  By age:'); L.push(tally('survey_age'));
+    L.push('  By gender:'); L.push(tally('survey_gender'));
+    L.push('  What they like to draw:'); L.push(tally('survey_draws', true));
+    const notes = done.filter((u) => u.survey_note && String(u.survey_note).trim());
+    if (notes.length) {
+      L.push('  Notes / requests:');
+      notes.forEach((u) => L.push(`    - "${String(u.survey_note).trim()}"  — ${safe(u.email || u.display_name)}`));
+    }
+  }
+
+  // 10. Per-visitor journeys (the firehose)
+  h1('10. PER-VISITOR JOURNEYS (anonymous + signed-in, full detail)');
   if (b.truncatedJourneys) L.push(`(Showing first ${MAX_VISITOR_JOURNEYS} of ${fmtInt(b.totalVisitors)} visitors.)`);
   b.journeys.forEach((j, idx) => {
     const v = j.profile?.visitor || j.row || {};

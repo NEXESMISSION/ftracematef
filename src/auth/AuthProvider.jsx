@@ -740,6 +740,17 @@ export function AuthProvider({ children }) {
     if (uid) identify(uid);
   }, [session?.user?.id]);
 
+  // Operator devices opt out of analytics entirely. The moment an admin profile
+  // loads, flag this device so lib/track.js stops queuing/sending events — the
+  // operator's own browsing (signed in OR anonymous afterwards) never pollutes
+  // the numbers. Complements the read-layer admin exclusion for already-stitched
+  // data. (No un-set: an admin's device staying out of analytics is the intent.)
+  useEffect(() => {
+    if (profile?.is_admin) {
+      try { window.localStorage.setItem('tm:no-track', '1'); } catch { /* ignore */ }
+    }
+  }, [profile?.is_admin]);
+
   // Presence heartbeat: stamp profiles.last_seen_at + current_page +
   // current_image_label every ~60s while the tab is visible. Powers the
   // "online now" green dot on the admin dashboard AND tells the operator
