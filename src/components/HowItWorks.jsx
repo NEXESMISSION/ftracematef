@@ -3,7 +3,9 @@
 // the .how-shorts-head + .shorts-row blocks below.
 // import DemoReel from './DemoReel.jsx';
 
+import { useEffect, useRef } from 'react';
 import Img from './Img.jsx';
+import { trackEvent } from '../lib/track.js';
 
 const STEPS = [
   { src: '/images/steps/01-upload.webp',  alt: 'Step 1 — Upload or select any image.' },
@@ -28,8 +30,29 @@ function StepArrow() {
 }
 
 export default function HowItWorks() {
+  const ref = useRef(null);
+
+  // Fire a single 'section' view event the first time the four-step explainer
+  // scrolls into view, so the Pulse dashboard can see how many visitors reach it.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    let fired = false;
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting && !fired) {
+          fired = true;
+          trackEvent('section', { id: 'how' });
+          io.disconnect();
+        }
+      }
+    }, { threshold: 0.4 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
-    <section id="how" className="how tm-section-pad">
+    <section id="how" ref={ref} className="how tm-section-pad">
       <div className="section-head">
         <p className="kicker hand">how it works</p>
         <h2>Four easy steps to your line.</h2>

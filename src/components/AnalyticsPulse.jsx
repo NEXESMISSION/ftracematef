@@ -925,6 +925,7 @@ const ACTION_META = {
   identify: { icon: '🔑', color: '#27ae60' },
   rage:     { icon: '😡', color: '#e0524b' },
   custom:   { icon: '✨', color: '#9b7bd4' },
+  section:  { icon: '📍', color: '#5aa9e6' },
 };
 const clip = (s, n = 56) => (s && s.length > n ? `${s.slice(0, n)}…` : s);
 // A label like "div.trace-overlay-wrap" / "button.lib-close" is a CSS selector,
@@ -940,6 +941,8 @@ function ActionRow({ e }) {
     label = <>Rage click <span className="pulse-act-sel">{clip(e.props?.sel, 32)}</span></>;
   } else if (e.type === 'custom') {
     label = clip(e.props?.name || 'event');
+  } else if (e.type === 'section') {
+    label = <>Viewed <span className="pulse-act-sel">{clip(e.props?.id || e.props?.name || 'section', 32)}</span></>;
   } else { // click
     const raw = e.props?.txt || e.props?.sel || '';
     label = (!e.props?.txt && isSelectorLabel(raw))

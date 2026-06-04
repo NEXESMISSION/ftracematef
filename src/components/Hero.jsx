@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import Img from './Img.jsx';
+import { trackEvent } from '../lib/track.js';
 
 // Demo YouTube video id. Set when the demo is recorded; the button only
 // renders once a real id is in place — no more dead button shipping a
@@ -52,7 +53,12 @@ export default function Hero({ onPlayClick }) {
             {/* Signed-in users get the 'See my profile' button via Nav.
                 The Hero CTA is reserved for the visitor's primary action. */}
             {!isOrLikelySignedIn && (
-              <Link className="img-btn" to="/upload" aria-label="Try it Now">
+              <Link
+                className="img-btn"
+                to="/upload"
+                aria-label="Try it Now"
+                onClick={() => trackEvent('custom', { name: 'hero_try_now' })}
+              >
                 <Img src="/images/ui/btn-try-now.webp" alt="Try it Now" priority />
               </Link>
             )}
