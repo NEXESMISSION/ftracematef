@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import Img from './Img.jsx';
@@ -18,7 +17,6 @@ function hasPersistedSession() {
 
 export default function Nav() {
   const { user, isPaid, loading } = useAuth();
-  const [menuOpen, setMenuOpen] = useState(false);
 
   // Render the right CTA on first paint:
   //  - resolved + signed-in    → "See my profile" pill
@@ -34,25 +32,7 @@ export default function Nav() {
         <Img src="/images/brand/logo.webp" alt="Trace Mate" className="brand-word" priority />
       </Link>
 
-      <button
-        type="button"
-        className="nav-burger"
-        aria-label="Menu"
-        aria-expanded={menuOpen}
-        aria-controls="nav-links"
-        onClick={() => setMenuOpen((o) => !o)}
-      >
-        <span className="nav-burger-bar" aria-hidden="true" />
-        <span className="nav-burger-bar" aria-hidden="true" />
-        <span className="nav-burger-bar" aria-hidden="true" />
-      </button>
-
-      <nav
-        id="nav-links"
-        className={`nav-links ${menuOpen ? 'is-open' : ''}`}
-        aria-label="Primary"
-        onClick={() => setMenuOpen(false)}
-      >
+      <nav className="nav-links" aria-label="Primary">
         <a href="#how">How it works</a>
         <a href="#gallery">Gallery</a>
         {!isPaid && <a href="#pricing">Pricing</a>}
