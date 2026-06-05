@@ -29,6 +29,14 @@ const SITE = 'https://www.tracemate.art';
 const esc = (s) => String(s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+// Visually-hidden (sr-only) inline style for the prerendered crawler body.
+// The static content stays in the HTML source (so non-JS crawlers like GPTBot/
+// ClaudeBot and Google's raw fetch read it), but humans never SEE it — which
+// kills the flash-of-unstyled-text on first paint. React's createRoot() then
+// replaces #root's children on mount, so the live styled app takes over with
+// no visible jump. (Google renders the JS app, so it indexes the real content.)
+const SR_ONLY = 'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0';
+
 // ── Best-practices guide (/how-to-use) ──────────────────────────────────────
 // Crawler-readable static body. Mirrors src/pages/HowToUse.jsx so AI crawlers
 // (GPTBot, ClaudeBot, PerplexityBot, Gemini) that do NOT execute JS still read
@@ -426,7 +434,7 @@ function rewriteHead(html, route) {
   if (route.bodyHtml) {
     out = out.replace(
       /<div id="root">\s*<\/div>/i,
-      () => `<div id="root">${route.bodyHtml}</div>`,
+      () => `<div id="root"><div style="${SR_ONLY}">${route.bodyHtml}</div></div>`,
     );
   }
 
@@ -459,7 +467,7 @@ async function main() {
   try {
     const homeOut = baseHtml.replace(
       /<div id="root">\s*<\/div>/i,
-      () => `<div id="root">${HOME_BODY}</div>`,
+      () => `<div id="root"><div style="${SR_ONLY}">${HOME_BODY}</div></div>`,
     );
     await writeFile(indexPath, homeOut, 'utf8');
     console.log('[prerender] injected homepage body into dist/index.html');
