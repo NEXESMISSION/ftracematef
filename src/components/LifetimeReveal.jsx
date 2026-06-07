@@ -75,56 +75,6 @@ function ConfettiBoom() {
   );
 }
 
-/* ── countdown ──────────────────────────────────────────────────────────────
- * A rolling 24h offer window, per device. The deadline is stamped in
- * localStorage so it survives refreshes and return visits — they come back to
- * the same clock still ticking down. When it hits zero it rolls a fresh 24h so
- * the urgency always feels live. Returns padded h/m/s, ticking every second. */
-const DEADLINE_KEY = 'tm:lifetime-deadline';
-const OFFER_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-// Current deadline, or a fresh now+24h if there's none or the last one lapsed.
-function readDeadline() {
-  try {
-    const raw = Number(window.localStorage.getItem(DEADLINE_KEY));
-    if (raw && !Number.isNaN(raw) && raw > Date.now()) return raw;
-    const d = Date.now() + OFFER_WINDOW_MS;
-    window.localStorage.setItem(DEADLINE_KEY, String(d));
-    return d;
-  } catch {
-    return Date.now() + OFFER_WINDOW_MS;
-  }
-}
-
-const pad = (n) => String(n).padStart(2, '0');
-
-function useCountdown() {
-  const [deadline, setDeadline] = useState(() => readDeadline());
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => {
-      const t = Date.now();
-      setNow(t);
-      // Looped back to zero → roll a fresh 24h window (and persist it) so the
-      // countdown never sits dead.
-      if (t >= deadline) {
-        const next = t + OFFER_WINDOW_MS;
-        try { window.localStorage.setItem(DEADLINE_KEY, String(next)); } catch { /* ignore */ }
-        setDeadline(next);
-      }
-    }, 1000);
-    return () => clearInterval(id);
-  }, [deadline]);
-  const ms = Math.max(0, deadline - now);
-  const total = Math.floor(ms / 1000);
-  return {
-    h: pad(Math.floor(total / 3600)),
-    m: pad(Math.floor((total % 3600) / 60)),
-    s: pad(total % 60),
-    expired: false,
-  };
-}
-
 function GoldCheck() {
   return (
     <span className="lf-check">
@@ -138,8 +88,6 @@ function GoldCheck() {
 
 /* ── reveal popup ───────────────────────────────────────────────────────── */
 function LifetimeModal({ plan, lifetimeLeft, busy, onChoose, onClose }) {
-  const { h, m, s, expired } = useCountdown();
-
   const soldOut = lifetimeLeft === 0;
   const spotsText =
     lifetimeLeft === null ? 'Only 10 spots, ever'
@@ -179,18 +127,6 @@ function LifetimeModal({ plan, lifetimeLeft, busy, onChoose, onClose }) {
           <span className="lf-badge">once · forever</span>
         </div>
 
-        {/* countdown */}
-        <div className={`lf-countdown ${expired ? 'is-expired' : ''}`}>
-          <span className="lf-countdown-label">{expired ? 'Offer ended' : 'Your price holds for'}</span>
-          <div className="lf-clock" aria-hidden="true">
-            <span className="lf-clock-unit"><b>{h}</b><i>hrs</i></span>
-            <span className="lf-clock-sep">:</span>
-            <span className="lf-clock-unit"><b>{m}</b><i>min</i></span>
-            <span className="lf-clock-sep">:</span>
-            <span className="lf-clock-unit"><b>{s}</b><i>sec</i></span>
-          </div>
-        </div>
-
         <ul className="lf-features">
           {plan.features.map((f) => <li key={f}><GoldCheck />{f}</li>)}
         </ul>
@@ -226,7 +162,6 @@ function PcCheckGold() {
 }
 
 export function LifetimeInlineCard({ plan, lifetimeLeft, busy, onChoose }) {
-  const { h, m, s, expired } = useCountdown();
   const soldOut = lifetimeLeft === 0;
   const limitedText =
     lifetimeLeft === null ? 'Limited — only 10 spots'
@@ -244,17 +179,6 @@ export function LifetimeInlineCard({ plan, lifetimeLeft, busy, onChoose }) {
         <span className="num"><span className="currency">$</span>{plan.price}</span>
       </div>
       <div className="pricing-plan-badge">once · forever</div>
-
-      <div className={`lf-countdown lf-countdown-inline ${expired ? 'is-expired' : ''}`}>
-        <span className="lf-countdown-label">{expired ? 'Offer ended' : 'Your price holds for'}</span>
-        <div className="lf-clock" aria-hidden="true">
-          <span className="lf-clock-unit"><b>{h}</b><i>hrs</i></span>
-          <span className="lf-clock-sep">:</span>
-          <span className="lf-clock-unit"><b>{m}</b><i>min</i></span>
-          <span className="lf-clock-sep">:</span>
-          <span className="lf-clock-unit"><b>{s}</b><i>sec</i></span>
-        </div>
-      </div>
 
       <ul className="pricing-plan-features">
         {plan.features.map((f) => <li key={f}><PcCheckGold />{f}</li>)}

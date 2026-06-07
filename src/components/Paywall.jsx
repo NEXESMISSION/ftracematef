@@ -12,7 +12,9 @@ import { FREE_SESSION_LIMIT } from '../lib/freeTrial.js';
 // instead of a number floating on its own.
 const PAYWALL_COPY = {
   monthly:   { equiv: 'less than a coffee a month',  cta: 'Start Monthly', popular: true },
-  quarterly: { equiv: '≈ $3.33 / month',             cta: 'Get 3 Months'  },
+  // Per-month equivalent derived from the catalog price so it can't drift if
+  // the quarterly price ever changes (it's `hidden` today, so this is latent).
+  quarterly: { equiv: `≈ $${(PLAN_BY_ID.quarterly.price / 3).toFixed(2)} / month`, cta: 'Get 3 Months' },
   lifetime:  { equiv: 'pay once · use forever',      cta: 'Claim Lifetime' },
 };
 
