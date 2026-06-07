@@ -276,6 +276,7 @@ function LiveDuration({ startedAt, lastHeartbeatAt }) {
   );
   useEffect(() => {
     const id = setInterval(() => {
+      if (document.hidden) return; // no point ticking a clock no one is looking at
       setSeconds(liveDurationSeconds(startedAt, lastHeartbeatAt));
     }, 1000);
     return () => clearInterval(id);
@@ -441,8 +442,13 @@ function useAdminMeta() {
       }
     };
     load();
-    const id = setInterval(load, 60_000);
-    return () => { cancelled = true; clearInterval(id); };
+    // Poll every 60s, but skip while the tab is hidden — getAdminStats runs a
+    // stack of full-table aggregates, so polling a backgrounded dashboard was
+    // pure wasted DB load. Refresh on return so the numbers are fresh.
+    const id = setInterval(() => { if (!document.hidden) load(); }, 60_000);
+    const onVisible = () => { if (!document.hidden && !cancelled) load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { cancelled = true; clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
   }, []);
 
   return { stats, health, error, loading };
@@ -2312,25 +2318,31 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  // Auto-refresh every 30s while the page is open. Same cadence as the
-  // tick used to fade the online dot — one timer drives both.
+  // Auto-refresh every 30s while the page is open AND visible. Skipping the
+  // poll on a backgrounded tab avoids needless admin-list-users hits against
+  // the DB (an operator who leaves the dashboard open in a background tab used
+  // to poll forever); we refresh immediately when they return so they never
+  // stare at stale data.
   useEffect(() => {
     let cancelled = false;
     (async () => { try { await loadUsers(); } catch { /* logged via setError */ } })();
     const id = setInterval(() => {
-      if (cancelled) return;
+      if (cancelled || document.hidden) return;
       loadUsers().catch(() => { /* surfaced via setError */ });
       setTick((t) => t + 1);
     }, 30_000);
-    return () => { cancelled = true; clearInterval(id); };
+    const onVisible = () => { if (!document.hidden && !cancelled) loadUsers().catch(() => {}); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { cancelled = true; clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
   }, [loadUsers]);
 
   // Lightweight local tick — only re-evaluates the heartbeat-fresh
   // computations against the current data, no network round-trip. Lets
   // a row's "tracing" state flip off as soon as the heartbeat goes
-  // stale, instead of waiting up to 30s for the next list refresh.
+  // stale, instead of waiting up to 30s for the next list refresh. Paused on a
+  // hidden tab (nothing to re-render when it's not on screen).
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 5_000);
+    const id = setInterval(() => { if (!document.hidden) setTick((t) => t + 1); }, 5_000);
     return () => clearInterval(id);
   }, []);
 
