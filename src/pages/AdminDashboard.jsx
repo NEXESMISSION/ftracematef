@@ -2039,14 +2039,14 @@ function OverviewPanel({ users, stats, health, onPickUser, onGoTo }) {
             <div className="adm-alert adm-alert-danger">
               <span className="adm-alert-ico">⚠️</span>
               <span><b>{stuck}</b> webhook{stuck === 1 ? '' : 's'} stuck over 24h — payments may not be syncing.</span>
-              <button type="button" className="adm-alert-act" onClick={() => onGoTo('money')}>View health →</button>
+              <button type="button" className="adm-alert-act" onClick={() => onGoTo('operations')}>View health →</button>
             </div>
           )}
           {atRisk > 0 && (
             <div className="adm-alert adm-alert-warn">
               <span className="adm-alert-ico">🫥</span>
               <span><b>{atRisk}</b> paying user{atRisk === 1 ? '' : 's'} inactive 14+ days — renewal risk.</span>
-              <button type="button" className="adm-alert-act" onClick={() => onGoTo('money')}>See who →</button>
+              <button type="button" className="adm-alert-act" onClick={() => onGoTo('operations')}>See who →</button>
             </div>
           )}
         </div>
@@ -2282,14 +2282,13 @@ export default function AdminDashboard() {
   // the array, not DOM.
   const PAGE_SIZE = 25;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  // Primary navigation — 5 sections. Each (except Overview) has its own
-  // secondary sub-tab so related views live together instead of as 11
-  // sibling tabs.
-  const [section, setSection]   = useState('overview'); // overview|people|analytics|money|content
-  const [peopleTab, setPeopleTab]   = useState('users');    // users | survey
-  const [anaTab, setAnaTab]         = useState('overview');  // overview | deep | sources
-  const [moneyTab, setMoneyTab]     = useState('revenue');   // revenue | referrals | health
-  const [contentTab, setContentTab] = useState('gallery');   // gallery|traced|reviews|library|announce
+  // Primary navigation — 4 sections, each grouping related views under one
+  // secondary sub-tab bar instead of a sprawl of sibling top-level tabs.
+  //   Overview · People (user directory) · Insights (all analytics) ·
+  //   Operations (revenue, referrals, content moderation, announcements)
+  const [section, setSection]   = useState('overview'); // overview|people|insights|operations
+  const [anaTab, setAnaTab]      = useState('overview'); // overview|deep|sources|survey
+  const [opsTab, setOpsTab]      = useState('revenue');  // revenue|referrals|announce|gallery|traced|reviews|library
 
   // Stats + webhook health share one fetch so the health banner stays mounted
   // across tab switches without re-firing the rollup.
@@ -2467,11 +2466,10 @@ export default function AdminDashboard() {
 
       <nav className="adm-nav" role="tablist" aria-label="Dashboard sections">
         {[
-          { id: 'overview',  label: 'Overview',  ico: '📊' },
-          { id: 'people',    label: 'People',    ico: '👥' },
-          { id: 'analytics', label: 'Analytics', ico: '📈' },
-          { id: 'money',     label: 'Money',     ico: '💰' },
-          { id: 'content',   label: 'Content',   ico: '🖼️' },
+          { id: 'overview',   label: 'Overview',   ico: '📊' },
+          { id: 'people',     label: 'People',     ico: '👥' },
+          { id: 'insights',   label: 'Insights',   ico: '📈' },
+          { id: 'operations', label: 'Operations', ico: '🛠️' },
         ].map((s) => (
           <button
             key={s.id}
@@ -2498,14 +2496,15 @@ export default function AdminDashboard() {
           />
         )}
 
-        {/* ── Analytics (Pulse + deep dive + sources, unified) ─────────── */}
-        {section === 'analytics' && (
+        {/* ── Insights (all analytics: pulse · deep dive · sources · survey) */}
+        {section === 'insights' && (
           <>
             <div className="adm-sub">
               {[
                 { id: 'overview', label: 'Pulse overview' },
                 { id: 'deep',     label: 'Deep dive' },
                 { id: 'sources',  label: 'Sources' },
+                { id: 'survey',   label: 'Survey' },
               ].map((t) => (
                 <button key={t.id} type="button"
                   className={`adm-sub-tab ${anaTab === t.id ? 'is-active' : ''}`}
@@ -2520,83 +2519,53 @@ export default function AdminDashboard() {
                 </Suspense>
               )}
               {anaTab === 'sources' && <AcquisitionPanel users={users} />}
+              {anaTab === 'survey'  && <SurveyPanel users={users} onPickUser={(uid) => setExpanded(uid)} />}
             </div>
           </>
         )}
 
-        {/* ── Money (revenue + referrals + webhook health) ────────────── */}
-        {section === 'money' && (
+        {/* ── Operations (revenue · referrals · announcements · content) ── */}
+        {section === 'operations' && (
           <>
             <div className="adm-sub">
               {[
                 { id: 'revenue',   label: 'Revenue' },
                 { id: 'referrals', label: 'Referrals' },
-                { id: 'health',    label: 'Payment health' },
+                { id: 'announce',  label: 'Announcements' },
+                { id: 'gallery',   label: 'Gallery' },
+                { id: 'traced',    label: 'Traced' },
+                { id: 'reviews',   label: 'Reviews' },
+                { id: 'library',   label: 'Library' },
               ].map((t) => (
                 <button key={t.id} type="button"
-                  className={`adm-sub-tab ${moneyTab === t.id ? 'is-active' : ''}`}
-                  onClick={() => setMoneyTab(t.id)}>{t.label}</button>
+                  className={`adm-sub-tab ${opsTab === t.id ? 'is-active' : ''}`}
+                  onClick={() => setOpsTab(t.id)}>{t.label}</button>
               ))}
             </div>
             <div className="adm-panel-host">
-              {moneyTab === 'revenue' && <MoneyRevenuePanel stats={meta.stats} />}
-              {moneyTab === 'referrals' && <ReferralsPanel />}
-              {moneyTab === 'health' && (meta.health
-                ? <WebhookHealthPanel data={meta.health} />
-                : <div className="adm-skel">Loading payment health…</div>)}
+              {opsTab === 'revenue' && (
+                <>
+                  {/* Payment/webhook health folded in here (was its own tab) —
+                      stuck payments also raise an Overview alert, so a dedicated
+                      tab that's empty "Webhooks healthy" most of the time was
+                      pure IA overhead. Shown above revenue so it's still
+                      impossible to miss when something IS stuck. */}
+                  {meta.health && <WebhookHealthPanel data={meta.health} />}
+                  <MoneyRevenuePanel stats={meta.stats} />
+                </>
+              )}
+              {opsTab === 'referrals' && <ReferralsPanel />}
+              {opsTab === 'announce'  && <AnnouncementsPanel />}
+              {opsTab === 'gallery'   && <GalleryPanel />}
+              {opsTab === 'traced'    && <TracedPanel />}
+              {opsTab === 'reviews'   && <ReviewsPanel />}
+              {opsTab === 'library'   && <LibraryPanel />}
             </div>
           </>
         )}
 
-        {/* ── Content (gallery / traced / reviews / library / announce) ── */}
-        {section === 'content' && (
-          <>
-            <div className="adm-sub">
-              {[
-                { id: 'gallery',  label: 'Gallery' },
-                { id: 'traced',   label: 'Traced' },
-                { id: 'reviews',  label: 'Reviews' },
-                { id: 'library',  label: 'Library' },
-                { id: 'announce', label: 'Announcements' },
-              ].map((t) => (
-                <button key={t.id} type="button"
-                  className={`adm-sub-tab ${contentTab === t.id ? 'is-active' : ''}`}
-                  onClick={() => setContentTab(t.id)}>{t.label}</button>
-              ))}
-            </div>
-            <div className="adm-panel-host">
-              {contentTab === 'gallery'  && <GalleryPanel />}
-              {contentTab === 'traced'   && <TracedPanel />}
-              {contentTab === 'reviews'  && <ReviewsPanel />}
-              {contentTab === 'library'  && <LibraryPanel />}
-              {contentTab === 'announce' && <AnnouncementsPanel />}
-            </div>
-          </>
-        )}
-
-        {/* ── People (users + survey) ─────────────────────────────────── */}
+        {/* ── People (user directory; Survey lives under Insights now) ─── */}
         {section === 'people' && (
-          <div className="adm-sub">
-            {[
-              { id: 'users',  label: 'Users',  count: counts.all },
-              { id: 'survey', label: 'Survey' },
-            ].map((t) => (
-              <button key={t.id} type="button"
-                className={`adm-sub-tab ${peopleTab === t.id ? 'is-active' : ''}`}
-                onClick={() => setPeopleTab(t.id)}>
-                {t.label}{t.count != null && <span className="adm-sub-count">{t.count}</span>}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {section === 'people' && peopleTab === 'survey' && (
-          <div className="adm-panel-host">
-            <SurveyPanel users={users} onPickUser={(uid) => setExpanded(uid)} />
-          </div>
-        )}
-
-        {section === 'people' && peopleTab === 'users' && (
           <>
         <section className="admin-controls">
           {/* Filter tabs include live-state filters (Online / Tracing) so the
