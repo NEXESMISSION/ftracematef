@@ -16,11 +16,11 @@
 // Collapsed sections render nothing — `{open && <Body/>}` — so the DOM stays
 // small and no child effect fires until it is needed.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getAnalytics } from '../lib/admin.js';
 import { friendlyError } from '../lib/errors.js';
 import {
-  RANGES, fmt, pct, channelIcon,
+  RANGES, fmt, pct,
   Breakdown, HeatCanvas, ScrollFunnel, InstallFunnel, LifetimeFunnel,
   VisitorsPanel, DownloadReport, Kpi, FunnelStep,
 } from './AnalyticsPulse.jsx';
@@ -88,7 +88,7 @@ function PageHeatmap({ range, path }) {
         <p className="pulse-empty">{fmt(heat.clicks)} clicks · {fmt(heat.pageviews)} views</p>
       </div>
       <div className="pulse2-heat-side">
-        <ScrollFunnel scroll={heat.scroll} pageviews={heat.pageviews} />
+        <ScrollFunnel scroll={heat.scroll} />
         <div className="pulse-card">
           <h4 className="pulse-card-title">Most-clicked elements</h4>
           {(!heat.top_elements || heat.top_elements.length === 0) ? (
@@ -114,15 +114,21 @@ function PageHeatmap({ range, path }) {
           <div className="pulse-card">
             <h4 className="pulse-card-title">Rage clicks — frustration hotspots</h4>
             <ul className="pulse-bars">
-              {heat.rage.slice(0, 8).map((e, i) => (
-                <li key={i} className="pulse-bar-row">
-                  <span className="pulse-bar-label" title={e.sel}>😡 {e.sel || '—'}</span>
-                  <span className="pulse-bar-track">
-                    <span className="pulse-bar-fill pulse-bar-fill-rage" style={{ width: '100%' }} />
-                  </span>
-                  <span className="pulse-bar-value">{fmt(e.count)}</span>
-                </li>
-              ))}
+              {(() => {
+                // Scale each bar by count/max so the chart actually encodes
+                // magnitude. Previously every bar was hardcoded to width:100%,
+                // making the visualization meaningless (only the number varied).
+                const rageMax = heat.rage.reduce((m, e) => Math.max(m, e.count || 0), 1);
+                return heat.rage.slice(0, 8).map((e, i) => (
+                  <li key={i} className="pulse-bar-row">
+                    <span className="pulse-bar-label" title={e.sel}>😡 {e.sel || '—'}</span>
+                    <span className="pulse-bar-track">
+                      <span className="pulse-bar-fill pulse-bar-fill-rage" style={{ width: `${((e.count || 0) / rageMax) * 100}%` }} />
+                    </span>
+                    <span className="pulse-bar-value">{fmt(e.count)}</span>
+                  </li>
+                ));
+              })()}
             </ul>
           </div>
         )}

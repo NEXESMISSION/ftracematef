@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 // Operator-only styles, imported here (not in main.jsx) so this ~80KB of CSS
 // loads with the lazy admin chunk and never ships to normal visitors.
@@ -7,7 +7,7 @@ import '../styles/admin-redesign.css';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import {
   listAllUsers, getUserActivity, getAdminStats, getAnalytics,
-  listReferrers, createReferrer, updateReferrer, rotateReferrerToken, markCommissionsPaid,
+  listReferrers, createReferrer, updateReferrer, markCommissionsPaid,
   listAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement,
 } from '../lib/admin.js';
 import { listCreations, deleteCreation, setCreationHidden, clearCreationNote, getReviews, getTracedImages } from '../lib/creations.js';
@@ -17,7 +17,6 @@ import {
 import { friendlyError } from '../lib/errors.js';
 import { usePresence } from '../hooks/usePresence.js';
 import { PLAN_LABEL, PLAN_BY_ID } from '../lib/plans.js';
-import { ANALYTICS_PROVIDER, ANALYTICS_EMBED_URL } from '../lib/analytics.js';
 import { formatDuration, formatRelative as formatTraceRelative } from '../lib/traceStats.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import AnalyticsPulse from '../components/AnalyticsPulse.jsx';
@@ -1494,89 +1493,6 @@ function WebhookHealthPanel({ data }) {
           ))}
         </ol>
       )}
-    </section>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────── */
-/* Traffic panel — embeds the Plausible/Umami shared dashboard */
-
-function TrafficPanel() {
-  const providerLabel =
-    ANALYTICS_PROVIDER === 'plausible'   ? 'Plausible'   :
-    ANALYTICS_PROVIDER === 'umami'       ? 'Umami'       :
-    ANALYTICS_PROVIDER === 'goatcounter' ? 'GoatCounter' :
-    null;
-
-  // No provider configured at build time → friendly setup prompt instead of
-  // a broken iframe. Operator just needs to set the env vars and rebuild.
-  if (!ANALYTICS_EMBED_URL) {
-    return (
-      <section className="admin-traffic admin-traffic-empty">
-        <header className="admin-traffic-head">
-          <h2>Traffic</h2>
-          <span className="admin-traffic-status">not configured</span>
-        </header>
-        <p className="admin-traffic-help">
-          Set <code>VITE_PLAUSIBLE_DOMAIN</code> + <code>VITE_PLAUSIBLE_EMBED_URL</code>{' '}
-          (or the <code>VITE_UMAMI_*</code> / <code>VITE_GOATCOUNTER_URL</code>{' '}
-          equivalents) in your environment and rebuild to see your visitor
-          dashboard here.
-        </p>
-      </section>
-    );
-  }
-
-  // GoatCounter's hosted dashboard sends `X-Frame-Options: DENY`, so the
-  // iframe path always shows "refused to connect". Render a clean call-to-
-  // action that opens the live dashboard in a new tab instead.
-  if (ANALYTICS_PROVIDER === 'goatcounter') {
-    return (
-      <section className="admin-traffic admin-traffic-cta">
-        <header className="admin-traffic-head">
-          <h2>Traffic</h2>
-          <span className="admin-traffic-status">{providerLabel}</span>
-        </header>
-        <div className="admin-traffic-cta-body">
-          <p>
-            GoatCounter's hosted dashboard refuses to be embedded — open the
-            live stats in a new tab.
-          </p>
-          <a
-            href={ANALYTICS_EMBED_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="admin-traffic-cta-btn"
-          >
-            Open analytics ↗
-          </a>
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section className="admin-traffic">
-      <header className="admin-traffic-head">
-        <h2>Traffic</h2>
-        {providerLabel && (
-          <a
-            className="admin-traffic-status"
-            href={ANALYTICS_EMBED_URL.split('?')[0]}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {providerLabel} ↗
-          </a>
-        )}
-      </header>
-      <iframe
-        title="Visitor analytics"
-        src={ANALYTICS_EMBED_URL}
-        loading="lazy"
-        scrolling="no"
-        className="admin-traffic-frame"
-      />
     </section>
   );
 }

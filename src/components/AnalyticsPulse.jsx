@@ -218,23 +218,28 @@ export function HeatCanvas({ points }) {
 }
 
 /* ── scroll-depth funnel ──────────────────────────────────────────────────── */
-export function ScrollFunnel({ scroll, pageviews }) {
-  const base = Math.max(pageviews || 0, scroll?.d25 || 0, 1);
+export function ScrollFunnel({ scroll }) {
   const rows = [
     { label: 'Reached 25%',  v: scroll?.d25 || 0 },
     { label: 'Reached 50%',  v: scroll?.d50 || 0 },
     { label: 'Reached 75%',  v: scroll?.d75 || 0 },
     { label: 'Reached 100%', v: scroll?.d100 || 0 },
   ];
+  // Base on the largest milestone (= sessions that scrolled at all), NOT
+  // pageviews. Scroll milestones count DISTINCT sessions while pageviews counts
+  // raw pageview events — dividing by pageviews mixed two units and could push a
+  // bar past 100%. Relative-to-the-top-milestone reads as a real funnel, and the
+  // clamp guards against any non-monotonic milestone counts.
+  const base = Math.max(...rows.map((r) => r.v), 1);
   return (
     <div className="pulse-card">
-      <h4 className="pulse-card-title">Scroll depth</h4>
+      <h4 className="pulse-card-title">Scroll reach</h4>
       <ul className="pulse-bars">
         {rows.map((r, i) => (
           <li key={i} className="pulse-bar-row">
             <span className="pulse-bar-label">{r.label}</span>
             <span className="pulse-bar-track">
-              <span className="pulse-bar-fill pulse-bar-fill-blue" style={{ width: `${(r.v / base) * 100}%` }} />
+              <span className="pulse-bar-fill pulse-bar-fill-blue" style={{ width: `${Math.min(100, (r.v / base) * 100)}%` }} />
             </span>
             <span className="pulse-bar-value">{fmt(r.v)}</span>
           </li>
