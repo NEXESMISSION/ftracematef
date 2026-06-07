@@ -203,7 +203,11 @@ Deno.serve(async (req) => {
           max_count:      2,
           window_seconds: 86_400,
         });
-        if (planAllowed === false) {
+        // Fail CLOSED: only an explicit `true` proceeds. If the RPC errors and
+        // returns null/undefined, `=== false` would have let the prorated Dodo
+        // charge through — matching the `!== true` pattern used by every other
+        // limiter in this file.
+        if (planAllowed !== true) {
           return json({ error: 'You can only change plans a couple of times per day. Try again tomorrow, or contact support.' }, 429);
         }
 

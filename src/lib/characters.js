@@ -249,7 +249,7 @@ export function charFaqs(c) {
     },
     {
       q: `Can I draw ${c.short} on my phone?`,
-      a: `Yes. TraceMate runs right in your phone browser — point the camera at paper, line up your ${c.short} reference, and trace by hand. No app install, and every account gets one free session to try.`,
+      a: `Yes. TraceMate runs right in your phone browser — point the camera at paper, line up your ${c.short} reference, and trace by hand. No app install, and every account gets 3 free sessions to try.`,
     },
   ];
 }

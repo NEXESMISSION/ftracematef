@@ -38,7 +38,7 @@ You only do this **once**. Follow it top to bottom.
 |---|---|---|---|---|
 | Trace Mate Monthly | Subscription | $5 USD | 1 month | `DODO_PRODUCT_MONTHLY` |
 | Trace Mate Quarterly | Subscription | $10 USD | 3 months | `DODO_PRODUCT_QUARTERLY` |
-| Trace Mate Lifetime | One-time | $25 USD | — | `DODO_PRODUCT_LIFETIME` |
+| Trace Mate Lifetime | One-time | $15 USD | — | `DODO_PRODUCT_LIFETIME` |
 
 ### Get an API key + webhook secret
 1. **Developer → API Keys** — create a key (start in **test mode**).
@@ -86,7 +86,7 @@ supabase secrets set \
 supabase secrets set \
   DODO_PRICE_MONTHLY_CENTS_USD=500       \
   DODO_PRICE_QUARTERLY_CENTS_USD=1000    \
-  DODO_PRICE_LIFETIME_CENTS_USD=2500
+  DODO_PRICE_LIFETIME_CENTS_USD=1500
 
 # deploy (6 functions total)
 supabase functions deploy create-checkout

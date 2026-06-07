@@ -58,7 +58,19 @@ function clampInt(v: unknown, lo: number, hi: number): number | null {
 // arbitrary client JSON (size/DoS + junk), so we keep only the known keys with
 // bounded types. Unknown keys are dropped.
 const PROP_STR_KEYS = new Set(['sel', 'txt', 'name', 'id']);
-const PROP_NUM_KEYS = new Set(['xpct', 'ypct', 'ypage', 'vw', 'depth', 'count']);
+// Numeric props are clamped to sane per-key ranges. Without this a buggy/hostile
+// client could send depth=1e9 (counts toward every scroll bucket) or xpct/ypct
+// far outside 0..1 (pushes heatmap points off-canvas) and silently corrupt the
+// rollup math. The ranges below match how each value is actually consumed:
+//   xpct/ypct  → fractional heatmap coordinates (0..1)
+//   depth      → scroll-depth percentage, bucketed at 25/50/75/100 (0..100)
+//   ypage      → absolute Y in CSS px (generous page-height ceiling)
+//   vw         → viewport width in px
+//   count      → repeat-count (e.g. rage clicks); generous ceiling
+const PROP_NUM_BOUNDS: Record<string, [number, number]> = {
+  xpct: [0, 1], ypct: [0, 1], depth: [0, 100],
+  ypage: [0, 1_000_000], vw: [0, 20_000], count: [0, 100_000],
+};
 function sanitizeProps(raw: unknown): Record<string, unknown> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
   const out: Record<string, unknown> = {};
@@ -66,9 +78,12 @@ function sanitizeProps(raw: unknown): Record<string, unknown> {
     if (PROP_STR_KEYS.has(k)) {
       const s = clampStr(v, 200);
       if (s) out[k] = s;
-    } else if (PROP_NUM_KEYS.has(k)) {
+    } else if (k in PROP_NUM_BOUNDS) {
       const n = typeof v === 'number' ? v : Number(v);
-      if (Number.isFinite(n)) out[k] = n;
+      if (Number.isFinite(n)) {
+        const [lo, hi] = PROP_NUM_BOUNDS[k];
+        out[k] = Math.max(lo, Math.min(hi, n));
+      }
     } else if (k === 'session_start') {
       if (v === true) out[k] = true;
     }
@@ -193,7 +208,11 @@ Deno.serve(async (req) => {
   const ua = clampStr(device.ua, 400) ?? '';
 
   // Drop bots entirely — a 204 keeps the client quiet (it doesn't retry on 2xx).
-  if (BOT_RE.test(ua)) return ok();
+  // An empty/absent UA is treated as a bot too: real browsers always populate
+  // navigator.userAgent, so a blank (or trivially short) one is a script/scraper
+  // that would otherwise sail past BOT_RE.test('') === false and land
+  // real-looking events, inflating every visitor/funnel number.
+  if (!ua || ua.length < 8 || BOT_RE.test(ua)) return ok();
 
   const salt = Deno.env.get('ANALYTICS_IP_SALT') ?? '';
   const rawIp = clientIp(req);

@@ -35,7 +35,7 @@ export default function DrawIndex() {
           <p className="guide-lead">
             Pick a character and learn to draw it the fast way — trace any
             reference straight onto real paper with TraceMate's AR overlay, then
-            redraw it freehand. No app, no printing, one free session to try.
+            redraw it freehand. No app, no printing, 3 free sessions to try.
           </p>
 
           <div className="guide-cta-row">
