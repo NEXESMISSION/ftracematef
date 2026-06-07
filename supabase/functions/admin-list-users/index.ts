@@ -105,11 +105,26 @@ Deno.serve(async (req) => {
     .limit(2000);
   if (profErr) return json({ error: profErr.message }, 500);
 
-  const { data: subs, error: subsErr } = await admin
-    .from('subscriptions')
-    .select('user_id, plan, status, current_period_end, cancel_at_next_billing_date, amount_cents, currency, dodo_subscription_id, created_at, updated_at, cancelled_at')
-    .order('created_at', { ascending: false });
-  if (subsErr) return json({ error: subsErr.message }, 500);
+  // Only the ACTIVE subscription per displayed user. The partial unique index
+  // (subscriptions_one_active_per_user) guarantees ≤1 active row per user, and
+  // scoping to the displayed profile ids keeps this bounded no matter how large
+  // the table grows. The previous unscoped, unlimited fetch silently TRUNCATED
+  // at PostgREST's max-rows ceiling once total subscription rows exceeded it —
+  // dropping plan/status off the dashboard for the oldest users with no warning.
+  // The IN-list is chunked so a 2000-id filter can never overflow the request URL.
+  const SUB_SELECT =
+    'user_id, plan, status, current_period_end, cancel_at_next_billing_date, amount_cents, currency, dodo_subscription_id, created_at, updated_at, cancelled_at';
+  const profileIds = (profiles ?? []).map((p) => p.id);
+  const subs: Record<string, unknown>[] = [];
+  for (let i = 0; i < profileIds.length; i += 200) {
+    const { data: sChunk, error: subsErr } = await admin
+      .from('subscriptions')
+      .select(SUB_SELECT)
+      .eq('status', 'active')
+      .in('user_id', profileIds.slice(i, i + 200));
+    if (subsErr) return json({ error: subsErr.message }, 500);
+    if (sChunk) subs.push(...sChunk);
+  }
 
   // Pull auth.users.last_sign_in_at so users who haven't pinged the heartbeat
   // since the column was added still show a meaningful "last seen". This is
