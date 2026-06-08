@@ -8,7 +8,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { listAllUsers, getUserActivity, getAdminStats } from '../lib/admin.js';
 import { AnnouncementsPanel, ReferralsPanel } from './admin/operationsPanels.jsx';
 import { GalleryPanel, ReviewsPanel, TracedPanel, LibraryPanel } from './admin/contentPanels.jsx';
-import { AcquisitionPanel, SurveyPanel } from './admin/insightsPanels.jsx';
+import { SurveyPanel } from './admin/insightsPanels.jsx';
 import { friendlyError } from '../lib/errors.js';
 import { usePresence } from '../hooks/usePresence.js';
 import { PLAN_LABEL, PLAN_BY_ID } from '../lib/plans.js';
@@ -791,7 +791,6 @@ export default function AdminDashboard() {
               {[
                 { id: 'users',    label: 'Users', count: counts.all },
                 { id: 'visitors', label: 'Visitors' },
-                { id: 'sources',  label: 'Sources' },
                 { id: 'survey',   label: 'Survey' },
               ].map((t) => (
                 <button key={t.id} type="button"
@@ -807,12 +806,6 @@ export default function AdminDashboard() {
                 <Suspense fallback={<p className="pulse-empty">Loading visitor analytics…</p>}>
                   <AnalyticsPulseDetail />
                 </Suspense>
-              </div>
-            )}
-
-            {peopleTab === 'sources' && (
-              <div className="adm-panel-host">
-                <AcquisitionPanel users={users} />
               </div>
             )}
 

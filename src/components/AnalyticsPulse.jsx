@@ -876,29 +876,39 @@ function Field({ label, value }) {
   );
 }
 
-/* Collapse the raw firehose into one node per page-visit: a `pageview` starts a
-   step; scrolls fold into a single max-depth; clicks/identify/rage/custom nest
-   under the step as actions. Turns ~90 noisy rows into a readable journey. */
-function groupTimeline(events) {
-  const groups = [];
-  let cur = null;
+/* Split the raw firehose into real sessions (by the tracker's session_id), and
+   within each session into page-steps: a `pageview` opens a step, scrolls fold
+   into a single max-depth, and clicks/identify/rage/custom/section nest under the
+   step as actions. Gives a per-session, per-page journey with the entry referrer
+   and time-on-page for each step — instead of one flat undifferentiated list. */
+function groupSessions(events) {
+  const sessions = [];
+  let sess = null;
+  let step = null;
+  const newStep = (e) => ({ path: e.path || '/', start: e.created_at, end: e.created_at, maxScroll: 0, actions: [] });
   for (const e of events || []) {
-    const t = e.created_at;
+    const sid = e.session_id || '_nosid';
+    if (!sess || sess.sid !== sid) {
+      sess = { sid, start: e.created_at, end: e.created_at, referrer: e.referrer, steps: [] };
+      sessions.push(sess);
+      step = null;
+    }
+    sess.end = e.created_at;
     if (e.type === 'pageview') {
-      cur = { path: e.path || '/', start: t, end: t, maxScroll: 0, actions: [] };
-      groups.push(cur);
+      step = newStep(e);
+      sess.steps.push(step);
     } else {
-      if (!cur) { cur = { path: e.path || '/', start: t, end: t, maxScroll: 0, actions: [] }; groups.push(cur); }
-      cur.end = t;
+      if (!step) { step = newStep(e); sess.steps.push(step); }
+      step.end = e.created_at;
       if (e.type === 'scroll') {
         const d = Number(e.props?.depth) || 0;
-        if (d > cur.maxScroll) cur.maxScroll = d;
+        if (d > step.maxScroll) step.maxScroll = d;
       } else {
-        cur.actions.push(e);
+        step.actions.push(e);
       }
     }
   }
-  return groups;
+  return sessions;
 }
 
 const ACTION_META = {
@@ -983,8 +993,20 @@ function VisitorProfile({ visitorId, onClose }) {
   }, [onClose]);
 
   const v = profile?.visitor || null;
-  const events = profile?.events || [];
-  const steps = useMemo(() => groupTimeline(events), [events]);
+  const events = useMemo(() => profile?.events || [], [profile]);
+  const sessions = useMemo(() => groupSessions(events), [events]);
+  // Behaviour roll-up across the whole event stream — clicks, rage, deepest
+  // scroll, total pages — surfaced as a one-line summary above the journey.
+  const stats = useMemo(() => {
+    let clicks = 0, rage = 0, maxScroll = 0, pages = 0;
+    for (const e of events) {
+      if (e.type === 'click') clicks++;
+      else if (e.type === 'rage') rage++;
+      else if (e.type === 'pageview') pages++;
+      else if (e.type === 'scroll') { const d = Number(e.props?.depth) || 0; if (d > maxScroll) maxScroll = d; }
+    }
+    return { clicks, rage, maxScroll, pages };
+  }, [events]);
 
   const signedUp = !!(v && v.user_id);
   const name = v ? (v.display_name || v.email || (signedUp ? 'Account' : 'Anonymous visitor')) : '';
@@ -998,7 +1020,7 @@ function VisitorProfile({ visitorId, onClose }) {
     <div onClick={onClose} className="pulse-modal-overlay" role="dialog" aria-modal="true">
       <div onClick={(e) => e.stopPropagation()} className="pulse-modal">
         <div className="pulse-modal-head">
-          <h4 className="pulse-card-title" style={{ margin: 0 }}>Visitor journey</h4>
+          <h4 className="pulse-card-title" style={{ margin: 0 }}>Visitor activity</h4>
           <button type="button" className="pulse-range-btn" onClick={onClose}>Close</button>
         </div>
 
@@ -1014,8 +1036,8 @@ function VisitorProfile({ visitorId, onClose }) {
                 <div className="pulse-id-name">{name}</div>
                 <div className="pulse-id-chips">
                   <span className="pulse-chip">{channelIcon(v.channel)} {v.channel || '—'}</span>
-                  {(v.city || v.country) && <span className="pulse-chip">📍 {[v.city, v.country].filter(Boolean).join(', ')}</span>}
-                  <span className="pulse-chip">🖥 {[v.device_type, v.os].filter(Boolean).join(' · ') || '—'}</span>
+                  {(v.city || v.region || v.country) && <span className="pulse-chip">📍 {[v.city, v.region, v.country].filter(Boolean).join(', ')}</span>}
+                  <span className="pulse-chip">🖥 {[v.device_type, v.os, v.browser].filter(Boolean).join(' · ') || '—'}</span>
                 </div>
               </div>
               {conv && <span className={`pulse-conv ${conv.cls}`}>{conv.label}</span>}
@@ -1026,34 +1048,68 @@ function VisitorProfile({ visitorId, onClose }) {
               <Field label="Came from" value={shortRef(v.referrer)} />
               <Field label="Landing page" value={v.landing_path || '—'} />
               <Field label="Source / campaign" value={[v.source, v.campaign].filter(Boolean).join(' · ') || '—'} />
-              <Field label="Account" value={signedUp ? (v.email || v.display_name || 'account') : 'anonymous'} />
-              <Field label="Plan" value={signedUp ? `${v.plan || 'free'}${v.paid ? ' · paid' : ''}` : '—'} />
-              <Field label="Language · TZ" value={[v.lang, v.tz].filter(Boolean).join(' · ') || '—'} />
               <Field label="First seen" value={fmtDate(v.first_seen_at)} />
+              <Field label="Last seen" value={fmtDate(v.last_seen_at)} />
               <Field label="Time on site" value={durationStr(v.first_seen_at, v.last_seen_at)} />
               <Field label="Sessions · pageviews" value={`${fmt(v.sessions)} · ${fmt(v.pageviews)}`} />
+              <Field label="Account" value={signedUp ? (v.email || v.display_name || 'account') : 'anonymous'} />
+              <Field label="Plan" value={signedUp ? `${v.plan || 'free'}${v.paid ? ' · paid' : ''}` : '—'} />
+              {signedUp && v.account_created_at && <Field label="Member since" value={fmtDate(v.account_created_at)} />}
+              {v.paid && v.current_period_end && <Field label="Renews" value={fmtDate(v.current_period_end)} />}
+              <Field label="Language · TZ" value={[v.lang, v.tz].filter(Boolean).join(' · ') || '—'} />
             </div>
 
-            {/* Step-by-step page journey */}
-            <h4 className="pulse-card-title">Journey — {steps.length} {steps.length === 1 ? 'page' : 'pages'}</h4>
-            {steps.length === 0 ? <p className="pulse-empty">No events recorded.</p> : (
-              <ol className="pulse-timeline">
-                {steps.map((g, i) => (
-                  <li key={i} className={`pulse-step ${i === steps.length - 1 ? 'is-last' : ''}`}>
-                    {i !== steps.length - 1 && <span className="pulse-step-line" />}
-                    <span className="pulse-step-dot">{i + 1}</span>
-                    <div className="pulse-step-head">
-                      <strong className="pulse-step-path">{g.path}</strong>
-                      <span className="pulse-step-time">{fmtTime(g.start)}</span>
-                      {g.maxScroll > 0 && <ScrollChip depth={g.maxScroll} />}
-                    </div>
-                    {g.actions.length > 0 && (
-                      <div className="pulse-step-actions">
-                        {g.actions.map((e, j) => <ActionRow key={j} e={e} />)}
+            {/* Behaviour summary + per-session, per-page journey */}
+            <div className="pulse-journey-head">
+              <h4 className="pulse-card-title" style={{ margin: 0 }}>
+                Activity — {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'} · {stats.pages} {stats.pages === 1 ? 'page' : 'pages'}
+              </h4>
+              <div className="pulse-behav">
+                <span title="Clicks">👆 {fmt(stats.clicks)}</span>
+                {stats.rage > 0 && <span className="pulse-behav-rage" title="Rage clicks">😡 {fmt(stats.rage)}</span>}
+                {stats.maxScroll > 0 && <span title="Deepest scroll">↕ {stats.maxScroll}%</span>}
+              </div>
+            </div>
+            {sessions.length === 0 ? <p className="pulse-empty">No events recorded.</p> : (
+              <ol className="pulse-sessions">
+                {sessions.map((sess, si) => {
+                  const sdur = durationStr(sess.start, sess.end);
+                  return (
+                    <li key={si} className="pulse-session">
+                      <div className="pulse-session-head">
+                        <span className="pulse-session-badge">Session {si + 1}</span>
+                        <span className="pulse-session-meta">
+                          {fmtTime(sess.start)}
+                          {sdur !== '—' && ` · ${sdur}`}
+                          {` · ${sess.steps.length} ${sess.steps.length === 1 ? 'page' : 'pages'}`}
+                        </span>
+                        {sess.referrer && <span className="pulse-session-ref" title={sess.referrer}>← {shortRef(sess.referrer)}</span>}
                       </div>
-                    )}
-                  </li>
-                ))}
+                      <ol className="pulse-timeline">
+                        {sess.steps.map((g, i) => {
+                          const dur = durationStr(g.start, g.end);
+                          return (
+                            <li key={i} className={`pulse-step ${i === sess.steps.length - 1 ? 'is-last' : ''}`}>
+                              {i !== sess.steps.length - 1 && <span className="pulse-step-line" />}
+                              <span className="pulse-step-dot">{i + 1}</span>
+                              <div className="pulse-step-head">
+                                <strong className="pulse-step-path">{g.path}</strong>
+                                <span className="pulse-step-time">{fmtTime(g.start)}</span>
+                                {dur !== '—' && <span className="pulse-step-dur" title="Time on page">⏱ {dur}</span>}
+                                {g.maxScroll > 0 && <ScrollChip depth={g.maxScroll} />}
+                              </div>
+                              {g.actions.length > 0 && (
+                                <div className="pulse-step-actions">
+                                  {g.actions.map((e, j) => <ActionRow key={j} e={e} />)}
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </li>
+                  );
+                })}
               </ol>
             )}
           </>
