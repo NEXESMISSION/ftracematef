@@ -21,7 +21,7 @@ import { getAnalytics } from '../lib/admin.js';
 import { friendlyError } from '../lib/errors.js';
 import {
   RANGES, fmt, pct,
-  Breakdown, HeatCanvas, ScrollFunnel, InstallFunnel, LifetimeFunnel,
+  Breakdown, HeatCanvas, ScrollFunnel, InstallFunnel,
   VisitorsPanel, DownloadReport, Kpi, FunnelStep,
 } from './AnalyticsPulse.jsx';
 
@@ -302,7 +302,6 @@ export default function AnalyticsPulseDetail() {
             </div>
             <div className="pulse2-grid">
               <InstallFunnel pwa={data.pwa} />
-              <LifetimeFunnel lifetime={data.lifetime} />
             </div>
           </Section>
 

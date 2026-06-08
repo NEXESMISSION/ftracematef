@@ -234,12 +234,6 @@ export function buildReportText(b) {
     L.push(`  Native prompt — available: ${fmtInt(p.prompt_available)} · accepted: ${fmtInt(p.prompt_accepted)} · dismissed: ${fmtInt(p.prompt_dismissed)}`);
     L.push(`  Installed: ${fmtInt(p.installed)} · Opened as installed app: ${fmtInt(p.standalone_visitors)}`);
   }
-  h2('Lifetime "secret deal" funnel');
-  {
-    const l = ov.lifetime || {};
-    L.push(`  Teaser seen: ${fmtInt(l.teaser_views)} · Unwrapped: ${fmtInt(l.unwraps)} · Claim clicks: ${fmtInt(l.claims)}`);
-  }
-
   // 6. Timeseries
   h1('6. DAILY TIMESERIES');
   const ts = ov.timeseries || [];

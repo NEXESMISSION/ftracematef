@@ -155,10 +155,7 @@ export function AcquisitionPanel({ users }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
-/* Referrals — affiliate partners + commission payouts. Each partner has a
-   unique /i/<code> link; signups and sales referred through it are tracked
-   here, with a one-click "mark paid" once you've sent their commission. Data
-   comes from the admin-referrals Edge Function (get_referral_stats rollup). */
+/* Survey — post-trace demographics (age + what they want to draw). */
 
 const SURVEY_AGE_ORDER = ['13-17', '18-24', '25-34', '35-44', '45+'];
 const SURVEY_AGE_LABEL = {

@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import '../styles/admin.css';
 import '../styles/admin-redesign.css';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { listAllUsers, getUserActivity, getAdminStats, getAnalytics } from '../lib/admin.js';
+import { listAllUsers, getUserActivity, getAdminStats } from '../lib/admin.js';
 import { AnnouncementsPanel, ReferralsPanel } from './admin/operationsPanels.jsx';
 import { GalleryPanel, ReviewsPanel, TracedPanel, LibraryPanel } from './admin/contentPanels.jsx';
 import { AcquisitionPanel, SurveyPanel } from './admin/insightsPanels.jsx';
@@ -641,27 +641,24 @@ export default function AdminDashboard() {
   });
 
   const counts = useMemo(() => {
-    if (!users) return { all: 0, paid: 0, unpaid: 0, online: 0, tracing: 0, ghost: 0, cold: 0, warm: 0, trying: 0 };
+    if (!users) return { all: 0, paid: 0, unpaid: 0, online: 0, tracing: 0, warm: 0 };
     // Admins (operator self-views, team test accounts) skew every funnel
     // they appear in. Drop them from every tile so headline numbers reflect
     // real users only. Admins still render in the list with their badge.
     const real = users.filter((u) => !u.is_admin);
-    let paid = 0, online = 0, tracing = 0;
-    let ghost = 0, cold = 0, warm = 0, trying = 0;
+    let paid = 0, online = 0, tracing = 0, warm = 0;
     for (const u of real) {
       if (u.is_paid) paid++;
       if (isOnline(u.last_seen_at)) {
         online++;
         if (isTracingNow(u)) tracing++;
       }
-      const stage = userStage(u);
-      if      (stage === 'ghost')  ghost++;
-      else if (stage === 'cold')   cold++;
-      else if (stage === 'warm')   warm++;
-      else if (stage === 'trying') trying++;
+      // 'warm' = opened checkout, didn't finish — the one recoverable segment
+      // worth a dedicated filter (the rest is visible via the per-row stage pill).
+      if (userStage(u) === 'warm') warm++;
     }
     void tick;
-    return { all: real.length, paid, unpaid: real.length - paid, online, tracing, ghost, cold, warm, trying };
+    return { all: real.length, paid, unpaid: real.length - paid, online, tracing, warm };
   }, [users, tick]);
 
   const filtered = useMemo(() => {
@@ -676,7 +673,7 @@ export default function AdminDashboard() {
     const matches = users.filter((u) => {
       if (filter === 'paid'    && !u.is_paid) return false;
       if (filter === 'unpaid'  &&  u.is_paid) return false;
-      if (['ghost','cold','warm','trying'].includes(filter) && userStage(u) !== filter) return false;
+      if (filter === 'warm' && userStage(u) !== 'warm') return false;
       if (filter === 'online'  && !isOnline(u.last_seen_at)) return false;
       if (filter === 'tracing' && !isTracingNow(u)) return false;
       if (q) {
@@ -852,14 +849,9 @@ export default function AdminDashboard() {
               { id: 'tracing', label: 'Tracing', count: counts.tracing },
               { id: 'paid',    label: 'Paid',    count: counts.paid },
               { id: 'unpaid',  label: 'Unpaid',  count: counts.unpaid },
-              // Funnel stages — derived client-side from the journey columns
-              // shipped on the user record. Lets the operator zero in on
-              // ghosts (signed up, did nothing) or warm leads (bailed during
-              // checkout) without scanning the whole list.
-              { id: 'ghost',   label: 'Ghost',   count: counts.ghost,  hint: 'Signed up, never traced or saw pricing' },
-              { id: 'cold',    label: 'Cold',    count: counts.cold,   hint: 'Saw pricing or paywall, didn\'t open checkout' },
-              { id: 'warm',    label: 'Warm',    count: counts.warm,   hint: 'Opened checkout but didn\'t finish' },
-              { id: 'trying',  label: 'Trying',  count: counts.trying, hint: 'Used the studio, hasn\'t reached pricing yet' },
+              // The one funnel-stage filter worth keeping: people who opened
+              // checkout but didn't finish — recoverable revenue worth chasing.
+              { id: 'warm',    label: 'Bailed',  count: counts.warm,   hint: 'Opened checkout but didn\'t finish — recoverable' },
             ].map((t) => (
               <button
                 key={t.id}
@@ -1004,22 +996,8 @@ export default function AdminDashboard() {
                         </dd>
                       </div>
                       <div>
-                        <dt>Expires</dt>
-                        <dd>
-                          {u.plan === 'lifetime'
-                            ? 'Never'
-                            : u.current_period_end
-                              ? formatDate(u.current_period_end)
-                              : '—'}
-                        </dd>
-                      </div>
-                      <div>
                         <dt>{online ? 'Status' : 'Last seen'}</dt>
                         <dd>{presenceLabel}</dd>
-                      </div>
-                      <div>
-                        <dt>Joined</dt>
-                        <dd>{formatDate(u.created_at)}</dd>
                       </div>
                     </dl>
 

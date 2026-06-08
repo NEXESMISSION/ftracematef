@@ -179,17 +179,6 @@ export async function updateReferrer(id, patch) {
   return true;
 }
 
-// Issue a fresh self-view access token (invalidates the old partner link).
-export async function rotateReferrerToken(id) {
-  const { data, error } = await supabase.functions.invoke('admin-referrals', {
-    method: 'POST',
-    body: { action: 'rotate_token', id },
-  });
-  if (error) throw new Error(await unwrapFunctionError(error));
-  if (data?.error) throw new Error(data.error);
-  return data?.access_token;
-}
-
 // Flip every pending commission for a partner to paid (after you've sent the
 // money). Returns the count marked paid.
 export async function markCommissionsPaid(referrerId) {
