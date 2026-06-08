@@ -28,6 +28,9 @@ export default function Landing() {
       <Nav />
       <main id="main">
         <Hero onPlayClick={openVideo} />
+        {/* Install buttons sit right under the hero so the app is one tap away
+            from the first screen, not buried at the bottom of the page. */}
+        <GetApp />
         <Marquee />
         {/* "How it works" — the four-step explainer (four images) above the
             "Made for you" reels. */}
@@ -37,7 +40,6 @@ export default function Landing() {
         </div>
         <Gallery />
         {!isPaid && <Pricing />}
-        <GetApp />
       </main>
       <WelcomeOverlay />
       <CatPopup />

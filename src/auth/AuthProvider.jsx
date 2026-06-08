@@ -81,12 +81,15 @@ export function AuthProvider({ children }) {
   const forceSignOutSuperseded = useCallback(async () => {
     if (supersededRef.current) return;
     supersededRef.current = true;
-    console.warn('[AuthProvider] session superseded by another device — signing out.');
-    try { window.localStorage.removeItem('tm:session-id'); } catch { /* ignore */ }
-    try { await supabase.auth.signOut(); } catch { /* ignore */ }
-    try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
-    // Hard reload to /login so any rendered protected page is wiped.
-    window.location.replace('/login');
+    // SINGLE-SESSION ENFORCEMENT IS DISABLED (owner request): a session must
+    // PERSIST and never be force-ended just because the same account is open in
+    // another context — the PWA vs the browser, a relaunched PWA with its own
+    // storage partition, or a second device. Those legitimately have different
+    // local session ids and used to "supersede" each other, logging the user
+    // out after almost every close. We keep the detection plumbing + the
+    // harmless claim_session() DB stamp, but NO LONGER sign out or redirect.
+    // To re-enable single-session, restore the signOut + location.replace here.
+    console.info('[AuthProvider] another session claimed this account — single-session enforcement is disabled, keeping this session signed in.');
   }, []);
 
   // Confirm-before-kick. The raw "remoteSid != localSid" check fired far too

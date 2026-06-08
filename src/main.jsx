@@ -56,3 +56,15 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </ErrorBoundary>
   </React.StrictMode>
 );
+
+// Dismiss the instant cream loading splash (#tm-boot in index.html) once React
+// has committed AND the browser has painted a frame — two rAFs guarantee both,
+// so the app's first real frame is what shows through as the splash fades.
+// A timeout backstop guarantees it never lingers if rAF is throttled.
+function dismissBootSplash() {
+  document.documentElement.classList.add('app-ready');
+  const boot = document.getElementById('tm-boot');
+  if (boot) window.setTimeout(() => boot.remove(), 450);
+}
+requestAnimationFrame(() => requestAnimationFrame(dismissBootSplash));
+window.setTimeout(dismissBootSplash, 4000);
