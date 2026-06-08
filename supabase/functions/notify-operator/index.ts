@@ -232,6 +232,62 @@ Deno.serve(async (req) => {
     );
   }
 
+  // Weekly growth report: rich snapshot rendered from get_growth_report()'s
+  // jsonb (sent as payload.report by notify_growth_report()).
+  if (event === 'growth_report') {
+    const r  = (payload.report ?? {}) as Record<string, any>;
+    const k  = r.kpis ?? {};
+    const f  = r.funnel ?? {};
+    const sv = r.survey ?? {};
+    const tr = r.traced ?? {};
+    const days = r.period?.days ?? 7;
+    const money = (cents: unknown) => `$${(Number(cents ?? 0) / 100).toFixed(2)}`;
+    const row = (label: string, val: unknown) =>
+      `<tr><td style="padding:6px 0; color:#555;">${label}</td><td style="padding:6px 0; text-align:right;"><strong>${val}</strong></td></tr>`;
+    const roi = Array.isArray(r.source_roi) ? r.source_roi : [];
+    const roiRows = roi.slice(0, 8).map((s: any) => `
+      <tr>
+        <td style="padding:6px 10px 6px 0; color:#444;">${escapeHtml(s.source)}</td>
+        <td style="padding:6px 10px 6px 0; text-align:right;">${Number(s.signups ?? 0)}</td>
+        <td style="padding:6px 10px 6px 0; text-align:right;">${Number(s.paid ?? 0)}</td>
+        <td style="padding:6px 0; text-align:right;"><strong>${money(s.revenue_cents)}</strong></td>
+      </tr>`).join('');
+    return sendEmail(
+      `Trace Mate · weekly growth — ${Number(k.signups_period ?? 0)} signups, ${money(k.revenue_cents_period)} new`,
+      `<div style="font-family: system-ui, -apple-system, sans-serif; max-width: 560px; line-height: 1.5;">
+        <h2 style="margin:0 0 4px; font-size:19px;">Weekly growth report</h2>
+        <p style="margin:0 0 16px; color:#888; font-size:12px;">Last ${days} days</p>
+        <table style="border-collapse: collapse; width: 100%; font-size:14px; margin-bottom:18px;">
+          ${row('New signups', Number(k.signups_period ?? 0))}
+          ${row('New paid customers', Number(k.paid_period ?? 0))}
+          ${row('New revenue', money(k.revenue_cents_period))}
+          ${row('Active users', Number(k.active_users_period ?? 0))}
+          ${row('New visitors', Number(k.new_visitors_period ?? 0))}
+          ${row('Total users', Number(k.total_users ?? 0))}
+          ${row('Total paying', Number(k.total_paying ?? 0))}
+          ${row('Est. MRR', money(k.mrr_cents))}
+        </table>
+        <h3 style="margin:0 0 8px; font-size:15px;">Funnel</h3>
+        <p style="margin:0 0 18px; color:#444; font-size:14px;">
+          ${Number(f.visitors ?? 0)} visitors → ${Number(f.signups ?? 0)} signups (${Number(f.signup_rate_pct ?? 0)}%) → ${Number(f.paid ?? 0)} paid (${Number(f.paid_rate_pct ?? 0)}%)
+        </p>
+        ${roiRows ? `<h3 style="margin:0 0 8px; font-size:15px;">Revenue by source</h3>
+        <table style="border-collapse: collapse; width: 100%; font-size:13px; margin-bottom:18px;">
+          <thead><tr style="text-align:left; color:#888;">
+            <th style="padding:4px 10px 4px 0; font-weight:600;">source</th>
+            <th style="padding:4px 10px 4px 0; font-weight:600; text-align:right;">signups</th>
+            <th style="padding:4px 10px 4px 0; font-weight:600; text-align:right;">paid</th>
+            <th style="padding:4px 0; font-weight:600; text-align:right;">revenue</th>
+          </tr></thead>
+          <tbody>${roiRows}</tbody>
+        </table>` : ''}
+        <p style="margin:0; color:#555; font-size:13px;">
+          Survey: ${Number(sv.respondents ?? 0)} respondents${sv.top_age ? ` · top age ${escapeHtml(sv.top_age)}` : ''} · ${Number(tr.total ?? 0)} images traced
+        </p>
+      </div>`,
+    );
+  }
+
   // Diagnostic: send a one-shot test email to OPERATOR_EMAIL (or a custom
   // address passed as `to`). Returns the resolved RESEND_FROM and the Resend
   // response id so the operator can confirm delivery vs. silent-bounce.
