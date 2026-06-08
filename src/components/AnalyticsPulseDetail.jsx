@@ -1,4 +1,4 @@
-// AnalyticsPulseDetail — "Pulse 2", the deep-dive companion to the light Pulse
+// AnalyticsPulseDetail — the admin's full visitor-analytics page (was "Pulse 2").
 // tab. Where Pulse is the at-a-glance visual page, this is the full firehose:
 // every breakdown (channels / sources / referrers / countries / devices / OS /
 // browsers / languages), per-page engagement with on-demand click heatmaps +
@@ -198,6 +198,24 @@ function Timeseries({ series }) {
   );
 }
 
+/* ── plain-English summary ──────────────────────────────────────────────────── */
+// Reads the rollup into one sentence — the "so what" that sits above the numbers,
+// so the page answers itself before you open a single section.
+function summarize(t, channels, pages, range) {
+  const v = t.visitors || 0;
+  const span = range === 'all' ? 'All time' : `Last ${RANGES.find((r) => r.id === range)?.label || range}`;
+  if (!v) return `${span}: no visitors yet — share your link to start tracking.`;
+  const n = (count, word) => `${fmt(count)} ${word}${(count || 0) === 1 ? '' : 's'}`;
+  const top = (rows, key) => (rows || []).reduce((a, b) => ((b?.[key] || 0) > (a?.[key] || 0) ? b : a), null);
+  const ch = top(channels, 'visitors');
+  const pg = top(pages, 'views');
+  let s = `${span}: ${n(v, 'visitor')} (${fmt(t.new_visitors)} new) · ${n(t.sessions, 'session')} · ${n(t.pageviews, 'pageview')}. `;
+  s += t.signups ? `${fmt(t.signups)} signed up (${pct(t.signups, v)} of visitors). ` : 'No signups yet. ';
+  if (ch) s += `Top source: ${ch.channel} (${fmt(ch.visitors)}). `;
+  if (pg) s += `Busiest page: ${pg.path} (${fmt(pg.views)} views).`;
+  return s.trim();
+}
+
 /* ── main ─────────────────────────────────────────────────────────────────── */
 export default function AnalyticsPulseDetail() {
   const [range, setRange] = useState('7d');
@@ -228,8 +246,8 @@ export default function AnalyticsPulseDetail() {
     <section className="admin-stats pulse pulse2" aria-labelledby="pulse2-title">
       <header className="admin-stats-head">
         <div>
-          <h2 id="pulse2-title" className="admin-stats-title">Pulse 2 — full detail</h2>
-          <p className="pulse2-lede">Everything Pulse summarises, in depth. Sections load on demand — open only what you need.</p>
+          <h2 id="pulse2-title" className="admin-stats-title">Visitor analytics</h2>
+          <p className="pulse2-lede">Every visitor, session and source — in depth. Open only the sections you need; the heavy detail loads on demand.</p>
         </div>
         <div className="pulse-range" role="tablist" aria-label="Date range">
           {RANGES.map((r) => (
@@ -252,8 +270,8 @@ export default function AnalyticsPulseDetail() {
 
       {data && (
         <>
-          {/* On-demand full export — gathers EVERYTHING only on click. */}
-          <DownloadReport range={range} overview={data} />
+          {/* TL;DR — the whole page in one sentence, read straight from the rollup. */}
+          <p className="pulse2-summary">{summarize(t, data.by_channel, pages, range)}</p>
 
           {/* Summary KPIs — cheap, always visible. */}
           <div className="pulse-kpis">
@@ -264,6 +282,9 @@ export default function AnalyticsPulseDetail() {
             <Kpi label="Signups" value={fmt(t.signups)} sub={`${pct(t.signups, t.visitors)} of visitors`} />
             <Kpi label="Live now" value={fmt(t.live)} accent />
           </div>
+
+          {/* On-demand full export — gathers EVERYTHING only on click. */}
+          <DownloadReport range={range} overview={data} />
 
           {/* Acquisition — where visitors came from. */}
           <Section id="acq" title="Acquisition" subtitle="where visitors came from" count={`${(data.by_channel || []).length} channels`} defaultOpen>

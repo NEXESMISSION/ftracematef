@@ -2277,6 +2277,16 @@
    Pulse 2 — the detailed deep-dive page (collapsible, load-on-demand sections)
    ════════════════════════════════════════════════════════════════════════════ */
 .admin-shell .pulse2-lede { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); max-width: 60ch; }
+/* TL;DR readout — the page in one sentence, above the numbers */
+.admin-shell .pulse2-summary {
+  display: flex; gap: 10px; margin: 0 0 16px; padding: 13px 16px;
+  border: 2px solid var(--ink); border-radius: 12px; background: var(--cream-deep);
+  box-shadow: 4px 4px 0 var(--ink);
+  font-size: 14px; line-height: 1.55; font-weight: 600; color: var(--ink);
+}
+.admin-shell .pulse2-summary::before {
+  content: "✦"; flex-shrink: 0; color: var(--coral); font-size: 15px; line-height: 1.55;
+}
 .admin-shell .pulse-bar-fill-rage { background: #e0524b; }
 
 /* Collapsible section */
