@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import Landing from './Landing.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { isStandalone } from '../lib/track.js';
 
 // Root route serves the marketing landing to visitors and bounces signed-in
 // users straight to /account — most returning users want their dashboard, not
@@ -84,6 +85,12 @@ export default function Home() {
   // first paint while AuthProvider is still hydrating.
   if (user) return <Navigate to="/account" replace />;
   if (loading && hasPersistedSession()) return null;
+
+  // Installed PWA: never show the marketing landing — it's an app, so an
+  // unauthenticated launch goes straight to login (signed-in users already
+  // bounced to /account above). Keeps the standalone experience clean:
+  // login → app, no landing page to wade through.
+  if (isStandalone()) return <Navigate to="/login" replace />;
 
   return <Landing />;
 }
