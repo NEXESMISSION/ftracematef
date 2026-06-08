@@ -14,7 +14,6 @@ import { usePresence } from '../hooks/usePresence.js';
 import { PLAN_LABEL, PLAN_BY_ID } from '../lib/plans.js';
 import { formatDuration, formatRelative as formatTraceRelative } from '../lib/traceStats.js';
 import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
-import AnalyticsPulse from '../components/AnalyticsPulse.jsx';
 // Pulse 2 (the heavy deep-dive) is lazy-loaded so its bytes — and cobe's — only
 // download when the operator opens that tab, keeping the default admin chunk lean.
 const AnalyticsPulseDetail = lazy(() => import('../components/AnalyticsPulseDetail.jsx'));
@@ -575,7 +574,6 @@ export default function AdminDashboard() {
   // light secondary sub-tab bar.
   const [section, setSection]     = useState('home');      // home | people | manage
   const [peopleTab, setPeopleTab] = useState('users');     // users | visitors | survey
-  const [visTab, setVisTab]       = useState('overview');  // overview | deep | sources (under Visitors)
   const [manageTab, setManageTab] = useState('revenue');   // revenue | referrals | content | announce
   const [contentTab, setContentTab] = useState('gallery'); // gallery | traced | reviews | library (under Content)
 
@@ -793,6 +791,7 @@ export default function AdminDashboard() {
               {[
                 { id: 'users',    label: 'Users', count: counts.all },
                 { id: 'visitors', label: 'Visitors' },
+                { id: 'sources',  label: 'Sources' },
                 { id: 'survey',   label: 'Survey' },
               ].map((t) => (
                 <button key={t.id} type="button"
@@ -804,28 +803,17 @@ export default function AdminDashboard() {
             </div>
 
             {peopleTab === 'visitors' && (
-              <>
-                <div className="adm-sub adm-sub-inner">
-                  {[
-                    { id: 'overview', label: 'Overview' },
-                    { id: 'deep',     label: 'Deep dive' },
-                    { id: 'sources',  label: 'Sources' },
-                  ].map((t) => (
-                    <button key={t.id} type="button"
-                      className={`adm-sub-tab ${visTab === t.id ? 'is-active' : ''}`}
-                      onClick={() => setVisTab(t.id)}>{t.label}</button>
-                  ))}
-                </div>
-                <div className="adm-panel-host">
-                  {visTab === 'overview' && <AnalyticsPulse />}
-                  {visTab === 'deep' && (
-                    <Suspense fallback={<p className="pulse-empty">Loading detailed analytics…</p>}>
-                      <AnalyticsPulseDetail />
-                    </Suspense>
-                  )}
-                  {visTab === 'sources' && <AcquisitionPanel users={users} />}
-                </div>
-              </>
+              <div className="adm-panel-host">
+                <Suspense fallback={<p className="pulse-empty">Loading visitor analytics…</p>}>
+                  <AnalyticsPulseDetail />
+                </Suspense>
+              </div>
+            )}
+
+            {peopleTab === 'sources' && (
+              <div className="adm-panel-host">
+                <AcquisitionPanel users={users} />
+              </div>
             )}
 
             {peopleTab === 'survey' && (

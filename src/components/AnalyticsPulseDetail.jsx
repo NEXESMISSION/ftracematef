@@ -269,19 +269,14 @@ export default function AnalyticsPulseDetail() {
           <Section id="acq" title="Acquisition" subtitle="where visitors came from" count={`${(data.by_channel || []).length} channels`} defaultOpen>
             <div className="pulse2-grid">
               <Breakdown title="Channels (classified)" rows={data.by_channel} labelKey="channel" />
-              <Breakdown title="Traffic sources (tagged links)" rows={data.by_source} labelKey="source" />
-              <Breakdown title="Referrers (sites they came from)" rows={data.by_referrer} labelKey="referrer" />
             </div>
           </Section>
 
           {/* Audience — who and on what. */}
-          <Section id="aud" title="Audience" subtitle="geo · device · language" count={`${(data.by_country || []).length} countries`}>
+          <Section id="aud" title="Audience" subtitle="geo · device" count={`${(data.by_country || []).length} countries`}>
             <div className="pulse2-grid">
               <Breakdown title="Countries" rows={data.by_country} labelKey="country" />
               <Breakdown title="Devices" rows={data.by_device} labelKey="device_type" />
-              <Breakdown title="Operating systems" rows={data.by_os} labelKey="os" />
-              <Breakdown title="Browsers" rows={data.by_browser} labelKey="browser" />
-              <Breakdown title="Languages" rows={data.by_language} labelKey="lang" />
             </div>
           </Section>
 
@@ -291,7 +286,7 @@ export default function AnalyticsPulseDetail() {
           </Section>
 
           {/* Funnels — acquisition + product. */}
-          <Section id="funnels" title="Conversion funnels" subtitle="acquisition · PWA install · Lifetime">
+          <Section id="funnels" title="Conversion funnels" subtitle="acquisition · PWA install">
             <div className="pulse-card pulse-funnel">
               <h4 className="pulse-card-title">Acquisition funnel ({range})</h4>
               <div className="pulse-funnel-row">
