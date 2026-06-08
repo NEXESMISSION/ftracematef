@@ -23,6 +23,7 @@ import {
   isTracingNow, normalizeUsers, STATUS_TONE, formatDate, formatDateTime, formatRelative,
   formatMoney, isOnline, STAGE_DEFS, userStage, PAGE_LABEL, lastSeenLabel, liveDurationSeconds,
 } from './admin/adminLib.js';
+import AdminHome from './admin/AdminHome.jsx';
 
 /* ─────────────────────────────────────────────────────────────────────── */
 /* Per-user activity log (drill-down) */
@@ -485,264 +486,12 @@ function ActivityDrawer({ user, onClose }) {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────────────── */
-/* Gallery panel — moderate the community creations feed (C1/C2/C3). Admins   */
-/* can delete any creation (DB policy added in the note+admin migration).      */
-/* ─────────────────────────────────────────────────────────────────────── */
-/* Overview — the at-a-glance home. Pulls the headline numbers (money, funnel,
-   live, sources) into ONE screen so the operator rarely needs the deep tabs.
-   Stats come from useAdminMeta() (passed in); visitor/funnel/channel/geo come
-   from a single getAnalytics('7d') fetch this panel owns.                    */
-
-// country-code → flag emoji (regional indicator pair). 🌐 for unknown.
-function ccFlag(cc) {
-  if (!cc || cc.length !== 2) return '🌐';
-  try {
-    return String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 127397 + c.charCodeAt(0)));
-  } catch { return '🌐'; }
-}
-
-// Compact money for headline tiles: $1.2k / $980 (no cents on big numbers).
+// Compact money for the revenue KPI tiles (e.g. $1.2k). USD shows a $ sign.
 function compactMoney(cents, currency = 'USD') {
   const n = (Number(cents) || 0) / 100;
   const sym = currency === 'USD' ? '$' : '';
   if (n >= 1000) return `${sym}${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k`;
   return `${sym}${n % 1 === 0 ? n : n.toFixed(2)}`;
-}
-
-function OverviewPanel({ users, stats, health, onPickUser, onGoTo }) {
-  const [an, setAn] = useState(null);
-  const [anErr, setAnErr] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    getAnalytics('7d')
-      .then((r) => { if (!cancelled) setAn(r.overview); })
-      .catch(() => { if (!cancelled) setAnErr(true); });
-    return () => { cancelled = true; };
-  }, []);
-
-  const real = useMemo(() => (users || []).filter((u) => !u.is_admin), [users]);
-  const liveUsers = useMemo(
-    () => real
-      .filter((u) => isOnline(u.last_seen_at))
-      .sort((a, b) => (isTracingNow(b) ? 1 : 0) - (isTracingNow(a) ? 1 : 0)),
-    [real],
-  );
-  const onlineCount  = liveUsers.length;
-  const tracingCount = liveUsers.filter(isTracingNow).length;
-
-  const rev    = stats?.revenue || {};
-  const fn     = stats?.funnel || {};
-  const totals = an?.totals || {};
-  const afn    = an?.funnel || {};
-
-  const visitors = totals.visitors ?? afn.visitors ?? 0;
-  const signups  = totals.signups ?? afn.signups ?? 0;
-  const paidNow  = fn.currently_paid ?? real.filter((u) => u.is_paid).length;
-  const live     = totals.live ?? onlineCount;
-  const newV     = totals.new_visitors ?? 0;
-  const retV     = totals.returning_visitors ?? 0;
-  const convPct  = visitors ? Math.round((signups / visitors) * 100) : 0;
-
-  // Funnel (visitors → signups → paid) over the 7d window.
-  const fVisitors = afn.visitors ?? visitors;
-  const fSignups  = afn.signups ?? signups;
-  const fPaid     = afn.paid ?? 0;
-  const fMax      = Math.max(fVisitors, 1);
-  const pct = (n, base) => (base ? Math.round((n / base) * 100) : 0);
-
-  const channels = (an?.by_channel || []).slice().sort((a, b) => (b.visitors || 0) - (a.visitors || 0)).slice(0, 6);
-  const chMax = Math.max(1, ...channels.map((c) => c.visitors || 0));
-  const countries = (an?.by_country || []).slice().sort((a, b) => (b.visitors || 0) - (a.visitors || 0)).slice(0, 6);
-  const coMax = Math.max(1, ...countries.map((c) => c.visitors || 0));
-
-  // 14-day trend from get_admin_stats activity (signups + paid).
-  const days = stats?.activity || [];
-  const dMax = Math.max(1, ...days.map((d) => d.signups || 0));
-
-  const plans = rev.plans || {};
-  const planEntries = Object.entries(plans);
-
-  // Alerts.
-  const stuck = health?.stuck_24h_count || 0;
-  const atRisk = (stats?.at_risk || []).length;
-
-  return (
-    <>
-      {/* Alerts strip */}
-      {(stuck > 0 || atRisk > 0) && (
-        <div className="adm-alerts">
-          {stuck > 0 && (
-            <div className="adm-alert adm-alert-danger">
-              <span className="adm-alert-ico">⚠️</span>
-              <span><b>{stuck}</b> webhook{stuck === 1 ? '' : 's'} stuck over 24h — payments may not be syncing.</span>
-              <button type="button" className="adm-alert-act" onClick={() => onGoTo('operations')}>View health →</button>
-            </div>
-          )}
-          {atRisk > 0 && (
-            <div className="adm-alert adm-alert-warn">
-              <span className="adm-alert-ico">🫥</span>
-              <span><b>{atRisk}</b> paying user{atRisk === 1 ? '' : 's'} inactive 14+ days — renewal risk.</span>
-              <button type="button" className="adm-alert-act" onClick={() => onGoTo('operations')}>See who →</button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* KPI row */}
-      <div className="adm-kpis">
-        <div className="adm-kpi adm-kpi-blue">
-          <span className="adm-kpi-label">Visitors · 7d</span>
-          <span className="adm-kpi-value">{visitors.toLocaleString()}</span>
-          <span className="adm-kpi-sub">{newV} new · {retV} returning</span>
-        </div>
-        <div className="adm-kpi adm-kpi-violet">
-          <span className="adm-kpi-label">Signups · 7d</span>
-          <span className="adm-kpi-value">{signups.toLocaleString()}</span>
-          <span className="adm-kpi-sub">{convPct}% of visitors</span>
-        </div>
-        <div className="adm-kpi adm-kpi-green">
-          <span className="adm-kpi-label">Paying now</span>
-          <span className="adm-kpi-value">{paidNow.toLocaleString()}</span>
-          <span className="adm-kpi-sub"><b>+{rev.paid_this_week || 0}</b> this week</span>
-        </div>
-        <div className="adm-kpi adm-kpi-coral">
-          <span className="adm-kpi-label">MRR</span>
-          <span className="adm-kpi-value">{compactMoney(rev.mrr_cents)}</span>
-          <span className="adm-kpi-sub">{compactMoney(rev.lifetime_revenue_cents)} lifetime</span>
-        </div>
-        <div className="adm-kpi adm-kpi-amber">
-          <span className="adm-kpi-label">Live now</span>
-          <span className="adm-kpi-value">{live}</span>
-          <span className="adm-kpi-sub">{tracingCount} tracing</span>
-        </div>
-      </div>
-
-      <div className="adm-grid" style={{ marginTop: 16 }}>
-        {/* Funnel */}
-        <div className="adm-card">
-          <div className="adm-card-h"><span className="adm-card-title">Conversion funnel</span><span className="adm-card-meta">last 7 days</span></div>
-          {anErr ? <p className="adm-empty">Couldn’t load analytics.</p> : !an ? <p className="adm-empty">Loading…</p> : (
-            <div className="adm-funnel">
-              {[
-                { k: 'Visitors', v: fVisitors, cls: 'f1', base: null },
-                { k: 'Signups',  v: fSignups,  cls: 'f2', base: fVisitors },
-                { k: 'Paid',     v: fPaid,     cls: 'f3', base: fSignups },
-              ].map((r2) => (
-                <div className="adm-funnel-row" key={r2.k}>
-                  <span className="adm-funnel-label">{r2.k}</span>
-                  <div className="adm-funnel-track">
-                    <div className={`adm-funnel-fill ${r2.cls}`} style={{ width: `${Math.max(2, pct(r2.v, fMax))}%` }}>
-                      {r2.v.toLocaleString()}
-                    </div>
-                  </div>
-                  <span className="adm-funnel-pct">
-                    {r2.base == null ? '—' : `${pct(r2.v, r2.base)}%`}
-                    {r2.base != null && <small>of {r2.k === 'Signups' ? 'visitors' : 'signups'}</small>}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Money */}
-        <div className="adm-card">
-          <div className="adm-card-h"><span className="adm-card-title">Revenue</span><span className="adm-card-meta">{paidNow} paying</span></div>
-          <div className="adm-money">
-            <div className="adm-money-cell"><span className="adm-money-k">MRR</span><span className="adm-money-v">{compactMoney(rev.mrr_cents)}</span></div>
-            <div className="adm-money-cell"><span className="adm-money-k">Lifetime</span><span className="adm-money-v">{compactMoney(rev.lifetime_revenue_cents)}</span></div>
-            <div className="adm-money-cell"><span className="adm-money-k">New today</span><span className="adm-money-v">{rev.paid_today || 0}</span></div>
-            <div className="adm-money-cell"><span className="adm-money-k">This month</span><span className="adm-money-v">{rev.paid_this_month || 0}</span></div>
-          </div>
-          {planEntries.length > 0 && (
-            <div className="adm-chips">
-              {planEntries.map(([plan, n]) => (
-                <span className="adm-chip" key={plan}>{PLAN_LABEL[plan] ?? plan} <b>{n}</b></span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Trend */}
-        <div className="adm-card">
-          <div className="adm-card-h"><span className="adm-card-title">Daily signups</span><span className="adm-card-meta">last 14 days</span></div>
-          {days.length === 0 ? <p className="adm-empty">No data yet.</p> : (
-            <>
-              <div className="adm-trend">
-                {days.map((d) => (
-                  <div className="adm-trend-col" key={d.date} title={`${d.date} · ${d.signups} signups · ${d.paid} paid`}>
-                    {d.paid > 0 && <div className="adm-trend-bar t2" style={{ height: `${pct(d.paid, dMax)}%` }} />}
-                    <div className="adm-trend-bar" style={{ height: `${Math.max(2, pct(d.signups, dMax))}%` }} />
-                    <span className="adm-trend-day">{d.date.slice(8)}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="adm-legend">
-                <span><i style={{ background: 'var(--adm-coral)' }} />Signups</span>
-                <span><i style={{ background: 'var(--adm-green)' }} />Paid</span>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Top channels */}
-        <div className="adm-card">
-          <div className="adm-card-h"><span className="adm-card-title">Top sources</span><span className="adm-card-meta">visitors · 7d</span></div>
-          {!an ? <p className="adm-empty">Loading…</p> : channels.length === 0 ? <p className="adm-empty">No traffic yet.</p> : (
-            <div className="adm-bars">
-              {channels.map((c) => (
-                <div className="adm-bar-row" key={c.name || 'direct'}>
-                  <span className="adm-bar-name">{c.name || 'direct'}</span>
-                  <div className="adm-bar-track"><div className="adm-bar-fill" style={{ width: `${pct(c.visitors, chMax)}%` }} /></div>
-                  <span className="adm-bar-val">{c.visitors}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Top countries */}
-        <div className="adm-card">
-          <div className="adm-card-h"><span className="adm-card-title">Top countries</span><span className="adm-card-meta">visitors · 7d</span></div>
-          {!an ? <p className="adm-empty">Loading…</p> : countries.length === 0 ? <p className="adm-empty">No geo yet.</p> : (
-            <div className="adm-bars">
-              {countries.map((c) => (
-                <div className="adm-bar-row" key={c.country_code || c.country || '??'}>
-                  <span className="adm-bar-name"><span className="adm-bar-flag">{ccFlag(c.country_code)}</span>{c.country || c.country_code || 'Unknown'}</span>
-                  <div className="adm-bar-track"><div className="adm-bar-fill c2" style={{ width: `${pct(c.visitors, coMax)}%` }} /></div>
-                  <span className="adm-bar-val">{c.visitors}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Live now feed */}
-        <div className="adm-card">
-          <div className="adm-card-h"><span className="adm-card-title">Live right now</span><span className="adm-card-meta">{onlineCount} online · {tracingCount} tracing</span></div>
-          {liveUsers.length === 0 ? <p className="adm-empty">Nobody’s online right now.</p> : (
-            <div className="adm-feed">
-              {liveUsers.slice(0, 8).map((u) => {
-                const tracing = isTracingNow(u);
-                return (
-                  <div className="adm-feed-row" key={u.id} onClick={() => onPickUser(u.id)}>
-                    <span className={`adm-feed-dot ${tracing ? 'tracing' : ''}`} />
-                    <div className="adm-feed-who">
-                      <div className="adm-feed-email">{u.email || '—'}</div>
-                      <div className="adm-feed-meta">{u.current_page ? `on /${u.current_page}` : 'online'}{u.is_paid ? ' · paid' : ''}</div>
-                    </div>
-                    {tracing && <span className="adm-feed-badge">tracing</span>}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  );
 }
 
 /* Money › Revenue — the numbers behind the headline, plus the at-risk list. */
@@ -820,13 +569,15 @@ export default function AdminDashboard() {
   // the array, not DOM.
   const PAGE_SIZE = 25;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  // Primary navigation — 4 sections, each grouping related views under one
-  // secondary sub-tab bar instead of a sprawl of sibling top-level tabs.
-  //   Overview · People (user directory) · Insights (all analytics) ·
-  //   Operations (revenue, referrals, content moderation, announcements)
-  const [section, setSection]   = useState('overview'); // overview|people|insights|operations
-  const [anaTab, setAnaTab]      = useState('overview'); // overview|deep|sources|survey
-  const [opsTab, setOpsTab]      = useState('revenue');  // revenue|referrals|announce|gallery|traced|reviews|library
+  // Primary navigation — 3 areas. Dashboard = the command center (AdminHome);
+  // People = users directory + visitor analytics + survey; Manage = revenue,
+  // referrals, content moderation, announcements. Each non-home area has a
+  // light secondary sub-tab bar.
+  const [section, setSection]     = useState('home');      // home | people | manage
+  const [peopleTab, setPeopleTab] = useState('users');     // users | visitors | survey
+  const [visTab, setVisTab]       = useState('overview');  // overview | deep | sources (under Visitors)
+  const [manageTab, setManageTab] = useState('revenue');   // revenue | referrals | content | announce
+  const [contentTab, setContentTab] = useState('gallery'); // gallery | traced | reviews | library (under Content)
 
   // Stats + webhook health share one fetch so the health banner stays mounted
   // across tab switches without re-firing the rollup.
@@ -1010,10 +761,9 @@ export default function AdminDashboard() {
 
       <nav className="adm-nav" role="tablist" aria-label="Dashboard sections">
         {[
-          { id: 'overview',   label: 'Overview',   ico: '📊' },
-          { id: 'people',     label: 'People',     ico: '👥' },
-          { id: 'insights',   label: 'Insights',   ico: '📈' },
-          { id: 'operations', label: 'Operations', ico: '🛠️' },
+          { id: 'home',   label: 'Dashboard', ico: '📊' },
+          { id: 'people', label: 'People',    ico: '👥' },
+          { id: 'manage', label: 'Manage',    ico: '🛠️' },
         ].map((s) => (
           <button
             key={s.id}
@@ -1029,87 +779,65 @@ export default function AdminDashboard() {
       </nav>
 
       <main className="adm-wrap">
-        {/* ── Overview ─────────────────────────────────────────────────── */}
-        {section === 'overview' && (
-          <OverviewPanel
+        {/* Dashboard (home) */}
+        {section === 'home' && (
+          <AdminHome
             users={users}
             stats={meta.stats}
-            health={meta.health}
             onPickUser={(uid) => setExpanded(uid)}
             onGoTo={(s) => setSection(s)}
           />
         )}
 
-        {/* ── Insights (all analytics: pulse · deep dive · sources · survey) */}
-        {section === 'insights' && (
+        {/* People (users / visitors / survey) */}
+        {section === 'people' && (
           <>
             <div className="adm-sub">
               {[
-                { id: 'overview', label: 'Pulse overview' },
-                { id: 'deep',     label: 'Deep dive' },
-                { id: 'sources',  label: 'Sources' },
+                { id: 'users',    label: 'Users', count: counts.all },
+                { id: 'visitors', label: 'Visitors' },
                 { id: 'survey',   label: 'Survey' },
               ].map((t) => (
                 <button key={t.id} type="button"
-                  className={`adm-sub-tab ${anaTab === t.id ? 'is-active' : ''}`}
-                  onClick={() => setAnaTab(t.id)}>{t.label}</button>
+                  className={`adm-sub-tab ${peopleTab === t.id ? 'is-active' : ''}`}
+                  onClick={() => setPeopleTab(t.id)}>
+                  {t.label}{t.count != null && <span className="adm-sub-count">{t.count}</span>}
+                </button>
               ))}
             </div>
-            <div className="adm-panel-host">
-              {anaTab === 'overview' && <AnalyticsPulse />}
-              {anaTab === 'deep' && (
-                <Suspense fallback={<p className="pulse-empty">Loading detailed analytics…</p>}>
-                  <AnalyticsPulseDetail />
-                </Suspense>
-              )}
-              {anaTab === 'sources' && <AcquisitionPanel users={users} />}
-              {anaTab === 'survey'  && <SurveyPanel users={users} onPickUser={(uid) => setExpanded(uid)} />}
-            </div>
-          </>
-        )}
 
-        {/* ── Operations (revenue · referrals · announcements · content) ── */}
-        {section === 'operations' && (
-          <>
-            <div className="adm-sub">
-              {[
-                { id: 'revenue',   label: 'Revenue' },
-                { id: 'referrals', label: 'Referrals' },
-                { id: 'announce',  label: 'Announcements' },
-                { id: 'gallery',   label: 'Gallery' },
-                { id: 'traced',    label: 'Traced' },
-                { id: 'reviews',   label: 'Reviews' },
-                { id: 'library',   label: 'Library' },
-              ].map((t) => (
-                <button key={t.id} type="button"
-                  className={`adm-sub-tab ${opsTab === t.id ? 'is-active' : ''}`}
-                  onClick={() => setOpsTab(t.id)}>{t.label}</button>
-              ))}
-            </div>
-            <div className="adm-panel-host">
-              {opsTab === 'revenue' && (
-                <>
-                  {/* Payment/webhook health folded in here (was its own tab) —
-                      stuck payments also raise an Overview alert, so a dedicated
-                      tab that's empty "Webhooks healthy" most of the time was
-                      pure IA overhead. Shown above revenue so it's still
-                      impossible to miss when something IS stuck. */}
-                  {meta.health && <WebhookHealthPanel data={meta.health} />}
-                  <MoneyRevenuePanel stats={meta.stats} />
-                </>
-              )}
-              {opsTab === 'referrals' && <ReferralsPanel />}
-              {opsTab === 'announce'  && <AnnouncementsPanel />}
-              {opsTab === 'gallery'   && <GalleryPanel />}
-              {opsTab === 'traced'    && <TracedPanel />}
-              {opsTab === 'reviews'   && <ReviewsPanel />}
-              {opsTab === 'library'   && <LibraryPanel />}
-            </div>
-          </>
-        )}
+            {peopleTab === 'visitors' && (
+              <>
+                <div className="adm-sub adm-sub-inner">
+                  {[
+                    { id: 'overview', label: 'Overview' },
+                    { id: 'deep',     label: 'Deep dive' },
+                    { id: 'sources',  label: 'Sources' },
+                  ].map((t) => (
+                    <button key={t.id} type="button"
+                      className={`adm-sub-tab ${visTab === t.id ? 'is-active' : ''}`}
+                      onClick={() => setVisTab(t.id)}>{t.label}</button>
+                  ))}
+                </div>
+                <div className="adm-panel-host">
+                  {visTab === 'overview' && <AnalyticsPulse />}
+                  {visTab === 'deep' && (
+                    <Suspense fallback={<p className="pulse-empty">Loading detailed analytics…</p>}>
+                      <AnalyticsPulseDetail />
+                    </Suspense>
+                  )}
+                  {visTab === 'sources' && <AcquisitionPanel users={users} />}
+                </div>
+              </>
+            )}
 
-        {/* ── People (user directory; Survey lives under Insights now) ─── */}
-        {section === 'people' && (
+            {peopleTab === 'survey' && (
+              <div className="adm-panel-host">
+                <SurveyPanel users={users} onPickUser={(uid) => setExpanded(uid)} />
+              </div>
+            )}
+
+            {peopleTab === 'users' && (
           <>
         <section className="admin-controls">
           {/* Filter tabs include live-state filters (Online / Tracing) so the
@@ -1327,6 +1055,56 @@ export default function AdminDashboard() {
             </span>
           </div>
         )}
+          </>
+        )}
+          </>
+        )}
+
+        {/* Manage (revenue / referrals / content / announcements) */}
+        {section === 'manage' && (
+          <>
+            <div className="adm-sub">
+              {[
+                { id: 'revenue',   label: 'Revenue' },
+                { id: 'referrals', label: 'Referrals' },
+                { id: 'content',   label: 'Content' },
+                { id: 'announce',  label: 'Announcements' },
+              ].map((t) => (
+                <button key={t.id} type="button"
+                  className={`adm-sub-tab ${manageTab === t.id ? 'is-active' : ''}`}
+                  onClick={() => setManageTab(t.id)}>{t.label}</button>
+              ))}
+            </div>
+            <div className="adm-panel-host">
+              {manageTab === 'revenue' && (
+                <>
+                  {meta.health && <WebhookHealthPanel data={meta.health} />}
+                  <MoneyRevenuePanel stats={meta.stats} />
+                </>
+              )}
+              {manageTab === 'referrals' && <ReferralsPanel />}
+              {manageTab === 'announce'  && <AnnouncementsPanel />}
+              {manageTab === 'content' && (
+                <>
+                  <div className="adm-sub adm-sub-inner">
+                    {[
+                      { id: 'gallery', label: 'Gallery' },
+                      { id: 'traced',  label: 'Traced' },
+                      { id: 'reviews', label: 'Reviews' },
+                      { id: 'library', label: 'Library' },
+                    ].map((t) => (
+                      <button key={t.id} type="button"
+                        className={`adm-sub-tab ${contentTab === t.id ? 'is-active' : ''}`}
+                        onClick={() => setContentTab(t.id)}>{t.label}</button>
+                    ))}
+                  </div>
+                  {contentTab === 'gallery' && <GalleryPanel />}
+                  {contentTab === 'traced'  && <TracedPanel />}
+                  {contentTab === 'reviews' && <ReviewsPanel />}
+                  {contentTab === 'library' && <LibraryPanel />}
+                </>
+              )}
+            </div>
           </>
         )}
       </main>

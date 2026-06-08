@@ -1,0 +1,131 @@
+/* Admin Dashboard ("home") — clean command-center surface.
+   Self-contained (admh- namespace) so it can't collide with the legacy
+   admin- and adm- panels reused elsewhere in the dashboard. */
+
+.admh {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  --admh-ink: #1a1410;
+  --admh-line: rgba(26, 20, 16, 0.10);
+  --admh-card: #fffdfa;
+  --admh-muted: #8a7d6b;
+  --admh-accent: #e87a7a;
+}
+
+/* ── KPI strip ─────────────────────────────────────────────────────────── */
+.admh-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+.admh-kpi {
+  background: var(--admh-card);
+  border: 1px solid var(--admh-line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.admh-kpi.is-live { border-color: rgba(127, 191, 156, 0.5); }
+.admh-kpi-val {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--admh-ink);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.admh-kpi-label { font-size: 12px; color: var(--admh-muted); font-weight: 600; }
+.admh-kpi-label i { font-style: normal; opacity: 0.6; margin-left: 4px; font-weight: 500; }
+.admh-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #4cae8f; box-shadow: 0 0 0 4px rgba(76, 174, 143, 0.18);
+  animation: admh-pulse 2s ease-in-out infinite;
+}
+@keyframes admh-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+/* ── Sections ──────────────────────────────────────────────────────────── */
+.admh-section { display: flex; flex-direction: column; gap: 14px; }
+.admh-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+}
+.admh-head h2 { margin: 0; font-size: 17px; font-weight: 800; color: var(--admh-ink); }
+.admh-range { font-size: 12px; font-weight: 500; color: var(--admh-muted); }
+.admh-link {
+  background: none; border: none; cursor: pointer;
+  color: var(--admh-accent); font-weight: 700; font-size: 13px; padding: 4px;
+}
+.admh-link:hover { text-decoration: underline; }
+
+.admh-grid { display: grid; gap: 14px; }
+.admh-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.admh-grid-2 { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 860px) {
+  .admh-grid-3, .admh-grid-2 { grid-template-columns: 1fr; }
+}
+
+.admh-card {
+  background: var(--admh-card);
+  border: 1px solid var(--admh-line);
+  border-radius: 16px;
+  padding: 16px 18px;
+  min-height: 90px;
+}
+.admh-card h3 {
+  margin: 0 0 12px; font-size: 13px; font-weight: 700;
+  color: var(--admh-muted); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.admh-card-wide { grid-column: 1 / -1; }
+.admh-empty { margin: 6px 0; color: var(--admh-muted); font-size: 13px; }
+
+/* ── Bars (top pages / sources / survey) ───────────────────────────────── */
+.admh-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.admh-bar-row { display: grid; grid-template-columns: minmax(0,1fr) 90px auto; align-items: center; gap: 10px; }
+.admh-bar-label { font-size: 13px; color: var(--admh-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admh-bar-track { height: 8px; background: rgba(26,20,16,0.06); border-radius: 5px; overflow: hidden; }
+.admh-bar-fill { display: block; height: 100%; background: linear-gradient(90deg, #f0a36a, var(--admh-accent)); border-radius: 5px; }
+.admh-bar-val { font-size: 12px; font-weight: 700; color: var(--admh-muted); min-width: 36px; text-align: right; }
+
+/* ── Funnel ────────────────────────────────────────────────────────────── */
+.admh-funnel { display: flex; flex-direction: column; gap: 10px; }
+.admh-fstep {
+  display: grid; grid-template-columns: 1fr auto; align-items: baseline;
+  gap: 8px; padding: 8px 12px; border-radius: 10px; background: rgba(26,20,16,0.04);
+}
+.admh-fstep-val { font-size: 18px; font-weight: 800; color: var(--admh-ink); grid-row: 1; }
+.admh-fstep-label { font-size: 12px; color: var(--admh-muted); grid-column: 1; grid-row: 2; }
+.admh-fstep-pct { font-size: 13px; font-weight: 700; color: #4cae8f; grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+
+/* ── People list ───────────────────────────────────────────────────────── */
+.admh-people, .admh-live { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.admh-person, .admh-live-row {
+  width: 100%; display: flex; align-items: center; gap: 10px; justify-content: space-between;
+  background: none; border: none; cursor: pointer; text-align: left;
+  padding: 8px 10px; border-radius: 10px;
+}
+.admh-person:hover, .admh-live-row:hover { background: rgba(26,20,16,0.04); }
+.admh-person-who { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.admh-person-email, .admh-live-email { font-size: 13px; font-weight: 600; color: var(--admh-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admh-person-when { font-size: 11px; color: var(--admh-muted); }
+.admh-tag {
+  font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  background: rgba(26,20,16,0.07); color: var(--admh-muted);
+}
+.admh-tag-paid { background: rgba(76,174,143,0.16); color: #2f7d63; }
+.admh-tag-good { background: rgba(76,174,143,0.16); color: #2f7d63; }
+.admh-tag-warn { background: rgba(232,160,32,0.16); color: #9a6a00; }
+.admh-tag-info { background: rgba(127,179,232,0.18); color: #3a6ea5; }
+.admh-tag-muted { background: rgba(26,20,16,0.07); color: var(--admh-muted); }
+
+/* ── Live now ──────────────────────────────────────────────────────────── */
+.admh-live-row { justify-content: flex-start; }
+.admh-presence { width: 9px; height: 9px; border-radius: 50%; background: #4cae8f; flex: none; }
+.admh-presence.is-tracing { background: var(--admh-accent); box-shadow: 0 0 0 4px rgba(232,122,122,0.16); }
+.admh-live-where { font-size: 12px; color: var(--admh-muted); margin-left: auto; }
+
+/* ── Recently traced ───────────────────────────────────────────────────── */
+.admh-traced { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.admh-traced img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 10px; background: #f3efe7; display: block; }
