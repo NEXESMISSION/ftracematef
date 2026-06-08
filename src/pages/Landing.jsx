@@ -4,10 +4,8 @@ import Nav from '../components/Nav.jsx';
 import Hero from '../components/Hero.jsx';
 import Marquee from '../components/Marquee.jsx';
 import HowItWorks from '../components/HowItWorks.jsx';
-import AudienceSections from '../components/AudienceSections.jsx';
 import Gallery from '../components/Gallery.jsx';
 import Pricing from '../components/Pricing.jsx';
-import GetApp from '../components/GetApp.jsx';
 import Footer from '../components/Footer.jsx';
 import WelcomeOverlay from '../components/WelcomeOverlay.jsx';
 import CatPopup from '../components/CatPopup.jsx';
@@ -27,17 +25,12 @@ export default function Landing() {
       <SvgDefs />
       <Nav />
       <main id="main">
+        {/* Install buttons are integrated into the hero CTA (device-matched:
+            iPhone / Android install on phones, "Try it now" on desktop). */}
         <Hero onPlayClick={openVideo} />
-        {/* Install buttons sit right under the hero so the app is one tap away
-            from the first screen, not buried at the bottom of the page. */}
-        <GetApp />
         <Marquee />
-        {/* "How it works" — the four-step explainer (four images) above the
-            "Made for you" reels. */}
-        <div className="how-aud-group">
-          <HowItWorks />
-          <AudienceSections />
-        </div>
+        {/* The four-step "How it works" explainer. */}
+        <HowItWorks />
         <Gallery />
         {!isPaid && <Pricing />}
       </main>

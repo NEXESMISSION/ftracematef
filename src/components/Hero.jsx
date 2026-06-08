@@ -1,7 +1,12 @@
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import Img from './Img.jsx';
-import { trackEvent } from '../lib/track.js';
+import InstallModal from './InstallModal.jsx';
+import {
+  trackEvent, trackInstall, isStandalone,
+  isInstallPromptAvailable, promptInstall,
+} from '../lib/track.js';
 
 // Demo YouTube video id. Set when the demo is recorded; the button only
 // renders once a real id is in place — no more dead button shipping a
@@ -19,12 +24,56 @@ function hasPersistedSession() {
   return false;
 }
 
+// Coarse device class for choosing the hero CTA: phones get the matching
+// install button, desktop gets "Try it now". iPadOS 13+ masquerades as a Mac,
+// so a touch-capable "Mac" is treated as iOS (it can install the PWA too).
+function detectDevice() {
+  if (typeof navigator === 'undefined') return 'desktop';
+  const ua = navigator.userAgent || '';
+  if (/Android/i.test(ua)) return 'android';
+  if (/iPhone|iPod/i.test(ua)) return 'ios';
+  if (/iPad/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'ios';
+  return 'desktop';
+}
+
 export default function Hero({ onPlayClick }) {
   const { user, loading } = useAuth();
-  // Suppress the visitor 'Try it Now' CTA while auth is loading IF there's
-  // a persisted session — otherwise the button flashes for ~1s before
-  // disappearing for signed-in users.
+  // Suppress the visitor CTA while auth is loading IF there's a persisted
+  // session — otherwise the button flashes for ~1s before disappearing for
+  // signed-in users.
   const isOrLikelySignedIn = user || (loading && hasPersistedSession());
+
+  // Computed once on mount (client-only — the prerendered crawler body never
+  // runs this).
+  const [device] = useState(detectDevice);
+  const [standalone] = useState(() => isStandalone());
+  // Platform for the step-by-step InstallModal (iOS always; Android only as a
+  // fallback when no native prompt is available).
+  const [modalPlatform, setModalPlatform] = useState(null);
+
+  const isMobile = device === 'ios' || device === 'android';
+  // Show the install CTA only to visitors on a phone who aren't already running
+  // the installed app. Desktop (and already-installed) visitors get "Try it now".
+  const showInstall = isMobile && !standalone;
+
+  const onAndroidInstall = async () => {
+    trackInstall('pwa_pick_android');
+    // Direct, one-tap native install when Chrome has offered the prompt.
+    if (isInstallPromptAvailable()) {
+      const outcome = await promptInstall();
+      if (outcome) return; // accepted or dismissed natively — nothing more to show
+    }
+    // No native prompt available (already used, or unsupported browser) →
+    // fall back to the "Add to home screen" step guide.
+    setModalPlatform('android');
+  };
+
+  const onIosInstall = () => {
+    trackInstall('pwa_pick_ios');
+    // iOS Safari has no programmatic install — always show the step guide.
+    setModalPlatform('ios');
+  };
+
   return (
     <section className="hero tm-section-pad">
       <div className="hero-grid">
@@ -50,17 +99,40 @@ export default function Hero({ onPlayClick }) {
           </p>
 
           <div className="ctas">
-            {/* Signed-in users get the 'See my profile' button via Nav.
-                The Hero CTA is reserved for the visitor's primary action. */}
+            {/* Signed-in users get their actions via Nav; the hero CTA is the
+                visitor's primary action. Desktop → "Try it now"; phone → the
+                matching one-tap install button. */}
             {!isOrLikelySignedIn && (
-              <Link
-                className="img-btn"
-                to="/upload"
-                aria-label="Try it Now"
-                onClick={() => trackEvent('custom', { name: 'hero_try_now' })}
-              >
-                <Img src="/images/ui/btn-try-now.webp" alt="Try it Now" priority />
-              </Link>
+              showInstall ? (
+                device === 'android' ? (
+                  <button
+                    type="button"
+                    className="img-btn"
+                    onClick={onAndroidInstall}
+                    aria-label="Install on Android"
+                  >
+                    <Img src="/images/store/android.webp" alt="Install on Android" priority />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="img-btn"
+                    onClick={onIosInstall}
+                    aria-label="Install on iPhone"
+                  >
+                    <Img src="/images/store/ios.webp" alt="Install on iPhone" priority />
+                  </button>
+                )
+              ) : (
+                <Link
+                  className="img-btn"
+                  to="/upload"
+                  aria-label="Try it Now"
+                  onClick={() => trackEvent('custom', { name: 'hero_try_now' })}
+                >
+                  <Img src="/images/ui/btn-try-now.webp" alt="Try it Now" priority />
+                </Link>
+              )
             )}
 
             {DEMO_VIDEO_ID && (
@@ -95,6 +167,9 @@ export default function Hero({ onPlayClick }) {
           <span className="hero-spark hero-spark-r" aria-hidden="true">✧</span>
         </div>
       </div>
+
+      {/* iOS guide / Android fallback steps. Portaled to <body> by InstallModal. */}
+      <InstallModal platform={modalPlatform} onClose={() => setModalPlatform(null)} />
     </section>
   );
 }
