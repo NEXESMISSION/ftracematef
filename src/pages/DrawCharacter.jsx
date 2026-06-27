@@ -7,6 +7,7 @@ import {
   CHARACTER_BY_SLUG, getRelated,
   charTitle, charLead, charWhy, charSteps, charFaqs,
   charFeatures, charProportion, charMistakes, charVariations,
+  charConstruction, charPalette, charProTips,
 } from '../lib/characters.js';
 
 /**
@@ -38,6 +39,9 @@ export default function DrawCharacter() {
   const proportion = charProportion(c);
   const mistakes = charMistakes(c);
   const variations = charVariations(c);
+  const construction = charConstruction(c);
+  const palette = charPalette(c);
+  const proTips = charProTips(c);
 
   return (
     <>
@@ -73,6 +77,20 @@ export default function DrawCharacter() {
             </>
           )}
 
+          {palette.length > 0 && (
+            <>
+              <h2>{c.short}’s canonical colors</h2>
+              <ul className="guide-palette">
+                {palette.map((sw) => (
+                  <li key={sw.part + sw.hex}>
+                    <span className="guide-swatch" style={{ background: sw.hex }} aria-hidden="true" />
+                    <b>{sw.part}:</b> {sw.color}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
           {proportion && (
             <div className="guide-callout">
               <span className="guide-callout-icon" aria-hidden="true">📐</span>
@@ -87,10 +105,28 @@ export default function DrawCharacter() {
             ))}
           </ol>
 
+          {construction.length > 0 && (
+            <>
+              <h2>Build {c.short} step by step</h2>
+              <ol className="guide-steps">
+                {construction.map((s) => <li key={s}>{s}</li>)}
+              </ol>
+            </>
+          )}
+
           <h2>Tips for drawing {c.short}</h2>
           <ul>
             {c.tips.map((t) => <li key={t}>{t}</li>)}
           </ul>
+
+          {proTips.length > 0 && (
+            <>
+              <h2>Pro tips — finishing {c.short}</h2>
+              <ul className="guide-list">
+                {proTips.map((t) => <li key={t}>{t}</li>)}
+              </ul>
+            </>
+          )}
 
           {mistakes.length > 0 && (
             <>

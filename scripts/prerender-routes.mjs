@@ -19,6 +19,7 @@ import {
   CHARACTERS, getRelated,
   charTitle, charDescription, charLead, charWhy, charSteps, charFaqs,
   charFeatures, charProportion, charMistakes, charVariations,
+  charConstruction, charPalette, charProTips,
 } from '../src/lib/characters.js';
 import { VISIBLE_PLANS } from '../src/lib/plans.js';
 
@@ -281,6 +282,10 @@ function characterBody(c) {
     .map((m) => `<li><strong>Mistake:</strong> ${esc(m.mistake)} <strong>Fix:</strong> ${esc(m.fix)}</li>`).join('');
   const variations = charVariations(c)
     .map((v) => `<li><strong>${esc(v.name)}.</strong> ${esc(v.note)}</li>`).join('');
+  const construction = charConstruction(c).map((s) => `<li>${esc(s)}</li>`).join('');
+  const palette = charPalette(c)
+    .map((sw) => `<li><strong>${esc(sw.part)}:</strong> ${esc(sw.color)}</li>`).join('');
+  const proTips = charProTips(c).map((t) => `<li>${esc(t)}</li>`).join('');
   return `
 <main>
   <article>
@@ -291,11 +296,14 @@ function characterBody(c) {
     <h2>Why trace ${esc(c.short)}?</h2>
     <p>${esc(charWhy(c))}</p>
     ${features ? `<h2>What makes ${esc(c.short)} recognizable</h2>\n    <ul>${features}</ul>` : ''}
+    ${palette ? `<h2>${esc(c.short)} canonical colors</h2>\n    <ul>${palette}</ul>` : ''}
     ${proportion ? `<p><strong>Proportion check:</strong> ${esc(proportion)}</p>` : ''}
     <h2>Trace ${esc(c.short)} in 5 steps</h2>
     <ol>${steps}</ol>
+    ${construction ? `<h2>Build ${esc(c.short)} step by step</h2>\n    <ol>${construction}</ol>` : ''}
     <h2>Tips for drawing ${esc(c.short)}</h2>
     <ul>${tips}</ul>
+    ${proTips ? `<h2>Pro tips — finishing ${esc(c.short)}</h2>\n    <ul>${proTips}</ul>` : ''}
     ${mistakes ? `<h2>Common mistakes drawing ${esc(c.short)} (and the fix)</h2>\n    <ul>${mistakes}</ul>` : ''}
     ${variations ? `<h2>Which ${esc(c.short)} to trace</h2>\n    <ul>${variations}</ul>` : ''}
     <h2>${esc(c.short)} — frequently asked questions</h2>

@@ -88,6 +88,71 @@ export const CHARACTERS = [
         "q": "should i trace the blindfold or the sunglasses version first?",
         "a": "blindfold if you want it easiest — the band hides the eyes entirely. sunglasses are also beginner-friendly since the eyes are covered. save the fully uncovered six-eyes version for when you're ready to nail eye spacing and tilt."
       }
+    ],
+    "construction": [
+      "start with a slightly tall oval for the head — gojo's face skews lean, a softened inverted egg, not round. drop a vertical centerline; tilt it for three-quarter views and keep it curving over the skull so the hair sits right.",
+      "set the eye line just below the halfway mark. gojo's eyes are large but narrow and almond, set fairly wide apart — leave a full eye's width between them. tilt the outer corners up slightly for the sharp, half-lidded look.",
+      "build the nose low and the mouth close under it, leaving a long flat plane between brow and eye. give him a defined but narrow jaw that tapers to a soft point — he's sharp, not blocky. ears land between brow line and nose base.",
+      "block the hair as one big mass first, not strands. gojo's hair is voluminous and pushed up and back off the forehead, parting into thick spiky clumps that frame the face. rough the silhouette before any internal lines.",
+      "place the eyewear last as its own layer — either the blindfold band wrapping flat across the eye line and around the skull, or round dark glasses sitting on the nose, bridge crossing the centerline. build it over the finished face so it conforms.",
+      "finish details: heavy upper lashline, the pale spiky hair tips, a few stray bangs over the brow, then jaw and neck. add the high collar of the dark uniform last."
+    ],
+    "palette": [
+      {
+        "part": "hair",
+        "color": "white / pale ash-blue",
+        "hex": "#E8ECF2"
+      },
+      {
+        "part": "hair (cool shadow)",
+        "color": "soft blue-grey",
+        "hex": "#B7C3D4"
+      },
+      {
+        "part": "eyes (the six eyes)",
+        "color": "pale icy light-blue, luminous not saturated",
+        "hex": "#ABD9EF"
+      },
+      {
+        "part": "eye shadow/ring detail",
+        "color": "cooler mid-blue at the iris edge",
+        "hex": "#6FB4DD"
+      },
+      {
+        "part": "skin",
+        "color": "fair, slightly cool",
+        "hex": "#F4DECB"
+      },
+      {
+        "part": "uniform",
+        "color": "near-black navy",
+        "hex": "#1B1E26"
+      },
+      {
+        "part": "blindfold/glasses",
+        "color": "black with cool grey sheen",
+        "hex": "#22242B"
+      }
+    ],
+    "proTips": [
+      "keep his hair white — render it with cool blue-grey shadows, never warm grey or beige. the blue undertone in the shadow is what reads as 'gojo' rather than generic white hair.",
+      "keep the six eyes pale and luminous — they're a light icy blue, not a vivid saturated blue. don't flood the iris with dark color; the glow comes from keeping it light, ringing the edge a touch cooler, and leaving one or two crisp white catchlights as negative space.",
+      "vary line weight: heavier on the upper lashline, jaw underside, and hair silhouette; lighter inside the hair clumps, on the nose, and around the iris so the eyes stay bright. uniform-width lines make him look stiff and off-model.",
+      "let the hair breathe — leave negative space between the spiky clumps instead of filling every gap. gojo's hair reads as light and airy, so the white of the paper between strands is doing real work."
+    ],
+    "faqsMore": [
+      {
+        "q": "blindfold version or sunglasses version — which should i practice first?",
+        "a": "start with the blindfold. it's a flat band that simplifies the eye area into one shape, so you nail the head and hair construction without fighting the eyes. graduate to the round glasses, then the bare six eyes last — that's the hardest to keep on-model."
+      },
+      {
+        "q": "his hair never looks right — too flat or too messy. what am i missing?",
+        "a": "you're probably drawing strands before mass. block the whole volume as one pushed-up, swept-back silhouette first, then carve a handful of thick clumps out of it. gojo has few large spikes, not many thin ones."
+      },
+      {
+        "q": "should the eyes match, or is one different?",
+        "a": "both eyes are the same pale light-blue — the six eyes are a matched pair, not heterochromia. keep them symmetrical in color and just let lighting, not hue, vary between them."
+      }
     ]
   },
   {
@@ -164,6 +229,66 @@ export const CHARACTERS = [
       {
         "q": "do I have to draw the second mouth?",
         "a": "only in true-form shots, where the mouths sit on the cheeks/abdomen. the standard vessel face has no extra mouth — match what your own reference shows rather than adding it by default."
+      }
+    ],
+    "construction": [
+      "start with a slightly tall oval for the cranium, then square off the jaw — sukuna is lean and angular, not soft. mark a vertical centerline and an eye line a touch below the midpoint.",
+      "lay in the four eyes FIRST, before nose or mouth — they anchor the whole face. one pair on the normal eye line, the second pair stacked directly above on the forehead with the same tilt and spacing. keep all four narrow and sharp with hard upper lids and red irises.",
+      "drop the tattoo framework while the face is still clean: TWO parallel straight stripes across the forehead above the upper eyes (not one), curved stripes cupping under each eye pair along the cheekbone, and a marking running down the bridge of the nose. these are flat line tattoos, not shading — place them as construction guides.",
+      "build the mouth wide and thin-lipped, then add the second mouth as a faint horizontal seam on each cheek — sukuna's cheek-mouths sit roughly between jaw and cheekbone, only obvious when grinning.",
+      "mass the hair as a single spiky block: short, swept-up pink spikes with a jagged crown and sharp points — rough the silhouette before any internal strands.",
+      "finish with the details — pointed canines, slit pupils, undereye sharpness, and clean the tattoo lines so they wrap the form rather than sitting flat."
+    ],
+    "palette": [
+      {
+        "part": "hair",
+        "color": "ash pink / dusty pink",
+        "hex": "#E8A6B0"
+      },
+      {
+        "part": "eyes (iris)",
+        "color": "crimson red",
+        "hex": "#C0202C"
+      },
+      {
+        "part": "eyes (sclera)",
+        "color": "off-white in vessel form; darkens toward red in full manifestation",
+        "hex": "#F2ECE6"
+      },
+      {
+        "part": "skin",
+        "color": "pale fair",
+        "hex": "#F0D8C4"
+      },
+      {
+        "part": "facial tattoos",
+        "color": "near-black ink",
+        "hex": "#15110F"
+      },
+      {
+        "part": "kimono (Heian form)",
+        "color": "deep black",
+        "hex": "#1A1A1A"
+      }
+    ],
+    "proTips": [
+      "keep the tattoo lines a hair thinner than your face outline — they read as skin markings, not as carved grooves. heavy tattoo lines instantly look off-model.",
+      "leave the sclera and the inner planes of the cheeks as clean negative space. sukuna's menace comes from sharpness and contrast, not from over-rendering — resist shading every eye socket.",
+      "put your darkest weight at the upper lids and the corners of all four eyes, and let line weight taper as it leaves the jaw. that single hard accent on the lids carries the whole expression.",
+      "for the grin, the cheek-mouths only show teeth when the main mouth is open wide — if he's calm or smirking, keep them as faint seams or omit them. drawing them gaping at all times reads as a mistake."
+    ],
+    "faqsMore": [
+      {
+        "q": "how many lines go across the forehead?",
+        "a": "two parallel stripes, not one. a single bar is the most common off-model slip — keep the two matched in length and weight, sitting just above the upper pair of eyes."
+      },
+      {
+        "q": "do the cheek tattoos curve up or down?",
+        "a": "they curve down and outward, following the cheekbone away from the eyes — like brackets cupping each eye pair. straight or upward strokes break the on-model look."
+      },
+      {
+        "q": "should i draw the second mouth on the cheeks every time?",
+        "a": "no. it's a sukuna signature but it's only prominent when he's grinning or talking. for a calm or three-quarter portrait you can drop it to a thin seam, which often reads cleaner."
       }
     ]
   },
@@ -242,6 +367,71 @@ export const CHARACTERS = [
         "q": "why do my spikes look wrong even when the outline is traced right?",
         "a": "usually the spikes are too many and too thin, or they all point the same way. make them large triangles that radiate outward from the crown at different angles and lengths, with pointed bangs framing the face below the band."
       }
+    ],
+    "construction": [
+      "start with a slightly rounded square head — naruto's jaw is soft but not pointed. drop a centerline; on a 3/4 view bow it toward the turn so the face wraps.",
+      "set the eye line just below the head's midline. naruto's eyes are large and round-ish but sit about one eye-width apart — normal spacing, not wide. block them as two leaning almonds, not circles.",
+      "anchor the three features that lock the likeness to each other: the broad nose base sits about one eye-width below the inner eye corners, the mouth a nose-length under that, and the whisker marks ride the cheek between nose level and the eye's outer corner — three roughly parallel strokes per side, the middle one longest.",
+      "lay the headband as a band across the upper forehead first, then build the hair mass OVER and around it. the band cuts the forehead high and the metal plate sits flat and centered.",
+      "build hair as one spiky silhouette before any internal strands — wedge-shaped clumps radiating out, longest spikes pushing up and to the sides, shorter framing spikes falling beside the band. keep it a chunky mass, not feathered.",
+      "last, drop in details: pupils and eye highlights, the whisker lines cleaned to even weight, headband knot/straps, and the jacket collar line at the neck."
+    ],
+    "palette": [
+      {
+        "part": "hair",
+        "color": "golden blond",
+        "hex": "#F2C744"
+      },
+      {
+        "part": "eyes",
+        "color": "bright blue",
+        "hex": "#4AA8E0"
+      },
+      {
+        "part": "skin",
+        "color": "light tan",
+        "hex": "#F4C9A0"
+      },
+      {
+        "part": "whisker marks",
+        "color": "black",
+        "hex": "#1C1C1C"
+      },
+      {
+        "part": "jumpsuit (main)",
+        "color": "orange",
+        "hex": "#F07A1A"
+      },
+      {
+        "part": "jumpsuit accents / shippuden panels",
+        "color": "black",
+        "hex": "#1C1C1C"
+      },
+      {
+        "part": "headband (silver plate, blue cloth band)",
+        "color": "silver-grey plate",
+        "hex": "#B8BCC0"
+      }
+    ],
+    "proTips": [
+      "vary line weight — heavier on the jaw, hair silhouette, and headband band; lighter inside the eyes and on the whisker marks so they read as marks, not scars.",
+      "leave the hair highlights as negative space. don't draw shine lines — let the white of the paper sit where light hits the top of the spikes, and only shade the undersides of the clumps.",
+      "keep the whisker marks even and symmetrical — three thin black lines per cheek, same weight left and right, with a clear white catchlight at the top of each pupil so the gaze reads open and bright.",
+      "when you redraw freehand after tracing, rough the hair as one blocky wedge-mass first — beginners feather it into soft anime hair, which instantly stops looking like naruto."
+    ],
+    "faqsMore": [
+      {
+        "q": "should the whisker marks curve or stay straight?",
+        "a": "keep them basically straight and parallel, following the cheek's angle toward the ear. they're flat black marks on the skin — a slight bow on a 3/4 view is fine, but don't curl them around the cheek like brackets."
+      },
+      {
+        "q": "how do i keep naruto's hair from looking like a generic anime spike-head?",
+        "a": "treat it as a chunky, wedge-shaped mass with relatively few large spikes, parted around the headband. his hair is blocky and bright, not thin or wispy — fewer, fatter spikes read more on-model than many thin ones."
+      },
+      {
+        "q": "orange-and-blue or orange-and-black for the outfit?",
+        "a": "both are canon — orange with blue accents is the part i jumpsuit, orange with black panels is shippuden. pick one and stay consistent; don't mix blue and black accents on the same drawing. the blue belongs to the part i suit and the cloth headband — the metal plate itself stays silver-grey in both eras."
+      }
     ]
   },
   {
@@ -318,6 +508,71 @@ export const CHARACTERS = [
       {
         "q": "why is the leaf symbol on his headband crossed out?",
         "a": "the single horizontal slash marks him as a missing-nin who cut ties with the village. keep it as one clean line — leaving the emblem intact reads as the wrong character."
+      }
+    ],
+    "construction": [
+      "start with a vertical oval for the cranium, then taper the lower third into a narrow, slightly pointed chin — itachi's face is long and lean, not round. drop a centerline straight down the middle.",
+      "place the eye line at the vertical midpoint, then split the lower half again for the nose base, and halve that for the mouth. itachi's eyes sit fairly low and level — keep them calm and half-lidded, not wide.",
+      "set the two defining under-eye lines FIRST: long straight indentations starting just below the inner eye corner and running straight down the cheek parallel to the nose. lock them in before the features so eyes, nose, and lines all align.",
+      "block the hair as one heavy mass: a center part with two long bangs framing the face down past the jaw, the crown low over the forehead, and the rest pulled into a low ponytail behind. draw the silhouette before any strands.",
+      "add the forehead protector band sitting low across the brow, steel plate over the bangs with a single horizontal slash through the leaf symbol, then refine the eyes — for sharingan, three tomoe around the pupil; mangekyo is three crossing curved blades forming a three-pointed pinwheel.",
+      "last, carve detail: thin nose, narrow downturned-calm mouth, the high collar of the akatsuki cloak, then commit line weight and the hair strand breaks."
+    ],
+    "palette": [
+      {
+        "part": "hair",
+        "color": "near-black with cool dark-blue/charcoal sheen",
+        "hex": "#2b2b38"
+      },
+      {
+        "part": "eyes (base)",
+        "color": "dark onyx charcoal-black, calm",
+        "hex": "#1f1f24"
+      },
+      {
+        "part": "sharingan iris",
+        "color": "crimson red with black tomoe",
+        "hex": "#c01a1a"
+      },
+      {
+        "part": "skin",
+        "color": "pale, slightly cool fair tone",
+        "hex": "#f0d8c4"
+      },
+      {
+        "part": "akatsuki cloak",
+        "color": "black with red, white-outlined clouds",
+        "hex": "#161616"
+      },
+      {
+        "part": "cloud accents",
+        "color": "red",
+        "hex": "#b81d24"
+      },
+      {
+        "part": "forehead protector",
+        "color": "steel-grey plate, blue band",
+        "hex": "#8a8f96"
+      }
+    ],
+    "proTips": [
+      "keep the two under-eye lines thin and confident — one clean stroke each. if they wobble or get thick, he reads tired or scarred instead of calm and severe. they are itachi's single most recognizable feature, so commit.",
+      "use heaviest line weight on the hair silhouette, the cloak collar, and the upper eyelids; keep the nose and the inner hair strands as the lightest lines so the face stays soft against the dark mass.",
+      "leave the hair highlight as negative space — don't draw shine lines on black hair. block a clean band of untouched white along the crown and the top of the bangs, then ink the dark around it.",
+      "stay on-model by guarding the calm: brows low and relaxed, lids half-closed, mouth a flat short line. the instant the brows arch or the eyes widen he stops being itachi. understatement is the whole character."
+    ],
+    "faqsMore": [
+      {
+        "q": "tomoe or mangekyo — which sharingan should i draw?",
+        "a": "depends on the look. three black tomoe in a crimson iris is his standard sharingan. three crossing curved blades forming a three-pointed pinwheel is his mangekyo — note that's his shape, not sasuke's shuriken one. pick one and keep both eyes matched."
+      },
+      {
+        "q": "why does my itachi look too young or too soft?",
+        "a": "usually the face is too round and the lines are missing. lengthen the jaw to a lean point, drop the eyes slightly, and make sure the under-eye lines are present — they age and harden the face instantly."
+      },
+      {
+        "q": "how dark do i actually ink the hair?",
+        "a": "treat it as near-black but not flat black — leave a reserved highlight band and let a hint of cool blue-grey read in the shadow edges. solid pure black kills the form and the sheen."
       }
     ]
   },
@@ -396,6 +651,71 @@ export const CHARACTERS = [
         "q": "should i trace base or super saiyan first?",
         "a": "base. the rounded black spikes and the forelock are more forgiving and teach you the core silhouette. once that's automatic, super saiyan is the same head with the hair swept up, sharpened, and thinned to fewer points."
       }
+    ],
+    "construction": [
+      "block the head as a slightly tall oval, wider at the temples and tapering to a softish pointed chin — goku's jaw is angular but not square. tilt the oval for the pose before anything else.",
+      "drop a centerline down the face and a horizontal eye line at the vertical midpoint. goku's eyes sit ON that midline, not high — anime-tall eyes mean the iris fills most of the opening. put the nose roughly midway between eye line and chin, and the mouth in the lower third, closer to the chin than the nose.",
+      "set the eyes about one eye-width apart, large and slightly narrowed (determined, not cute). the inner corners point down toward the nose; the upper lash line is the heaviest dark mass. brows sit low and close to the eyes — that low brow is half of goku's expression.",
+      "lay in the hair as a MASS first, not strands: a wide spiky silhouette that flares up and outward from the crown, framing the face. block the big shapes, then carve the front bangs — the iconic single point or split that drops over the forehead, plus the stray center lock.",
+      "once the mass reads right, break the silhouette into individual flame-like spikes, each tapering to a sharp tip, radiating from a couple of crown 'roots'. keep every spike flowing in one rooted direction so it doesn't go fuzzy.",
+      "add features last: small simple nose (often just a tick), neutral-to-firm mouth, ears on the eye-line-to-nose band, then the gi collar and the line of the neck into the trapezius."
+    ],
+    "palette": [
+      {
+        "part": "hair (base form)",
+        "color": "black with blue-black sheen",
+        "hex": "#1a1a22"
+      },
+      {
+        "part": "eyes (iris)",
+        "color": "near-black with a faint warm undertone",
+        "hex": "#211a17"
+      },
+      {
+        "part": "skin",
+        "color": "warm light tan",
+        "hex": "#f0c69a"
+      },
+      {
+        "part": "gi (dogi top & pants)",
+        "color": "orange",
+        "hex": "#e8731f"
+      },
+      {
+        "part": "undershirt / wristbands / obi sash",
+        "color": "deep navy blue",
+        "hex": "#16346e"
+      },
+      {
+        "part": "boots",
+        "color": "navy blue with yellow trim",
+        "hex": "#16346e"
+      },
+      {
+        "part": "super saiyan hair (variant)",
+        "color": "golden yellow",
+        "hex": "#f5d020"
+      }
+    ],
+    "proTips": [
+      "keep line weight heaviest on the outer hair silhouette and the upper eyelids — thin your lines on internal hair details and the nose so the face doesn't go muddy.",
+      "leave the hair highlight as NEGATIVE SPACE — don't draw a white shape, just stop your black short of the crown sheen. base-form goku's blue-black sheen lives where the light hits, usually upper-left of the spikes.",
+      "shade the gi only in the folds and the underside of the collar; orange reads best left mostly flat with a few hard creases at the elbows, sash, and knees.",
+      "staying on-model lives in the brow-to-eye gap and the hair root count — keep brows low and near the lids, and resist adding extra spikes. after tracing, redraw the hair freehand once with your reference covered to lock the silhouette into muscle memory."
+    ],
+    "faqsMore": [
+      {
+        "q": "is goku's hair actually black or dark blue?",
+        "a": "canonically black. the blue you see is a painted sheen for volume — leave it as a highlight on a black mass, don't color the hair blue."
+      },
+      {
+        "q": "what color are goku's eyes — they look brown sometimes?",
+        "a": "base-form goku's eyes are black, not brown. the warm tint in some art is just lighting; keep the iris near-black (#211a17) so it reads on-model. they only turn teal-green in super saiyan."
+      },
+      {
+        "q": "do the spikes change between kid goku, adult goku, and super saiyan?",
+        "a": "yes — kid goku has a rounder, lower spread with more separate points; adult goku's mass is taller and wider; super saiyan pulls every spike upward and rigid, drops the front bangs, and turns the whole mass golden (#f5d020) with sharper, fewer roots."
+      }
     ]
   },
   {
@@ -472,6 +792,70 @@ export const CHARACTERS = [
       {
         "q": "do i draw the chest scar?",
         "a": "only on post-timeskip luffy. the X-shaped chest scar comes from akainu at marineford, so skip it for the younger pre-timeskip version."
+      }
+    ],
+    "construction": [
+      "start with a base circle for the cranium, then add a soft rounded jaw that tapers to a narrow, slightly pointed chin — luffy's head reads round-to-oval, wider across the cheeks than at the jaw, not blocky.",
+      "drop a centerline and a low eye line — luffy's eyes sit low, around the lower third of the face, with a tall forehead/cranium above. space the two eyes fairly wide apart and keep them large and rounded.",
+      "block the scar now even though you finish it last: two short stitch marks under his left eye, which is the viewer's right when he faces you. then set the small button nose on the centerline and the wide grin below it — his open smile stretches very wide, often out past the outer eye corners.",
+      "lay the hair in as one rounded black mass capping the cranium — short outward tufts, low and slightly spiky, not tall. seat the straw hat on top: a shallow rounded crown with a wide brim, and rough in the band line where the crown meets the brim.",
+      "add details: thin curved brows set just above the eyes, the simple ear, the red hat band, then clean up the jaw-to-neck line and the open collar of the red vest."
+    ],
+    "palette": [
+      {
+        "part": "hair",
+        "color": "black",
+        "hex": "#1a1a1a"
+      },
+      {
+        "part": "eyes",
+        "color": "dark brown / near-black",
+        "hex": "#3b2a20"
+      },
+      {
+        "part": "skin",
+        "color": "warm tan",
+        "hex": "#f3b98a"
+      },
+      {
+        "part": "vest",
+        "color": "red",
+        "hex": "#d4322c"
+      },
+      {
+        "part": "scar",
+        "color": "muted pinkish skin tone",
+        "hex": "#c97c63"
+      },
+      {
+        "part": "straw hat",
+        "color": "straw yellow",
+        "hex": "#e6c34c"
+      },
+      {
+        "part": "hat band",
+        "color": "red",
+        "hex": "#cc2e29"
+      }
+    ],
+    "proTips": [
+      "keep line weight even and confident — luffy is drawn with clean uniform outlines, no sketchy hatching. thicken only the outer silhouette and the underside of the hair mass where the hat seats.",
+      "leave the hair flat black with one or two hard-edged negative-space highlights — don't render individual strands. give each eye a single small white catchlight and keep the whites clean.",
+      "shade sparingly: a soft tone under the hat brim across the forehead, beneath the jaw, and inside the vest collar. his face stays mostly bright and open — over-shading kills the on-model look.",
+      "guard the proportions to stay on-model: low wide-set eyes, big stretchy grin, small nose, and the scar always under his left eye. if the scar drifts to the wrong side or the eyes ride too high, it stops reading as luffy."
+    ],
+    "faqsMore": [
+      {
+        "q": "which side is luffy's scar on?",
+        "a": "under his left eye — the viewer's right when he's facing you. it's two small stitch marks on the cheekbone, not a long slash, so keep it small and low."
+      },
+      {
+        "q": "is luffy's hair ever shown with a highlight or is it pure black?",
+        "a": "it's flat black in most official art. any highlight is a hard-edged negative-space shape, not a soft gradient — leave it as a clean white sliver rather than airbrushing it."
+      },
+      {
+        "q": "should i trace the straw hat every time?",
+        "a": "trace it once off your reference to learn where the brim sits relative to the eyes, then practice the head freehand without it. the hat hides proportion mistakes, so redrawing bare-headed is how you actually learn the face."
       }
     ]
   },
@@ -550,6 +934,70 @@ export const CHARACTERS = [
         "q": "what color is his hair, and how do I keep it from looking like a wig?",
         "a": "moss-green, short and spiky. trace it as outward-pointing clumps from a low hairline with small gaps between them; the gaps and sharp tips are what stop it reading as a smooth helmet."
       }
+    ],
+    "construction": [
+      "start with the base head — zoro's skull reads square-ish, not round. block a slightly tall box for the cranium, then a firm tapering jaw that ends in a fairly sharp, narrow chin. keep the cheekbones high and the jawline angular.",
+      "drop a vertical centerline and a horizontal eye line. zoro's eyes sit low and level, set wide and narrow. on a 3/4 turn, bow the centerline around the face mass so the far eye compresses — don't keep it flat.",
+      "place the signature features relative to each other: heavy straight brows ride just above the eye line, close and slightly down-angled for the permanent scowl. the nose is small and straight, ending around the halfway mark between eye line and chin. the mouth is wide and flat, set a touch low. the scarred eye is his LEFT (viewer's right) — a vertical slash over the permanently closed lid in post-timeskip. establish which version you're drawing before you ink.",
+      "build the hair as one mass, not strands. it's short, swept-up moss-green, spiky from the crown with the spikes leaning back and slightly up — a low forehead, hairline close to the brows. the three gold earrings hang off the LEFT ear (viewer's right); rough them in now so the ear placement is right.",
+      "add the bandana (when worn) as a band across the forehead with two tails, then layer details last: the chest scar (the long diagonal slash from mihawk), neck tendons, and the angular shadow shapes under the brow and jaw."
+    ],
+    "palette": [
+      {
+        "part": "hair",
+        "color": "moss / dark spring green",
+        "hex": "#4a8b3b"
+      },
+      {
+        "part": "eyes",
+        "color": "dark grey-black (often inked near-black)",
+        "hex": "#2b2b2b"
+      },
+      {
+        "part": "skin",
+        "color": "light tan / warm beige",
+        "hex": "#f0c9a0"
+      },
+      {
+        "part": "haramaki (belly sash)",
+        "color": "green pre-timeskip, black post-timeskip",
+        "hex": "#2f6b30"
+      },
+      {
+        "part": "bandana / coat (post-timeskip)",
+        "color": "black",
+        "hex": "#1a1a1a"
+      },
+      {
+        "part": "earrings",
+        "color": "gold (three, left ear)",
+        "hex": "#d4af37"
+      },
+      {
+        "part": "wado ichimonji (hilt + saya)",
+        "color": "white hilt wrap and white scabbard",
+        "hex": "#e8e4dc"
+      }
+    ],
+    "proTips": [
+      "vary your line weight — thick, confident outlines on the jaw, hair silhouette, and brow; thinner interior lines for the nose and minor folds. zoro should look heavy and solid, never wispy.",
+      "leave the hair highlight as negative space — don't draw individual strands. a clean unshaded band near the crown plus the paper-white gaps between spikes sells the moss-green better than rendering every clump.",
+      "keep the scowl in the brow distance and eye spacing, not in extra wrinkles. on-model zoro is the wide narrow eyes plus low straight brows — if the eyes drift round or the brows lift, he stops reading as him.",
+      "place shadow as hard angular shapes — under the brow ridge, beneath the jaw and cheekbone, and inside the neck. avoid soft gradients; oda's style is high-contrast cel shading. let the eye scar catch a thin highlight so it reads as raised."
+    ],
+    "faqsMore": [
+      {
+        "q": "which eye has the scar, and when do i draw it?",
+        "a": "his left eye — viewer's right. it's a vertical slash over the permanently closed lid and only exists post-timeskip. for pre-timeskip zoro, leave both eyes open and skip it entirely."
+      },
+      {
+        "q": "what color is the wado ichimonji's scabbard?",
+        "a": "white — both the hilt wrap and the saya are white. that all-white sword is the easy way to pick it out from his other two katana, so don't tint the sheath red."
+      },
+      {
+        "q": "why does my zoro look too young or too soft?",
+        "a": "usually a too-round head and too-tall eyes. square the cranium, sharpen the chin, drop the eyes lower and make them narrower, and thicken the brows. his proportions are blockier and more adult than most straw hats."
+      }
     ]
   },
   {
@@ -626,6 +1074,71 @@ export const CHARACTERS = [
       {
         "q": "are his eyes the same color as his hair?",
         "a": "no — close but distinct. his eyes are red (a dark garnet) with a lighter red gradient toward the pupil. shade them deeper and cooler than the orange hair tips so they don't blend together."
+      }
+    ],
+    "construction": [
+      "block in a slightly tall egg for the head — wider at the cheekbones, tapering to a soft pointed chin. tanjiro's face is more angular than round, so flatten the sides a touch.",
+      "drop a centerline and an eye line across the middle. set the eyes WIDE and large with a gentle downturn at the outer corners — kind, not sharp. leave a full eye-width of gap between them.",
+      "place the scar high on the LEFT side of his forehead (viewer's right), above the eyebrow. it's an elongated burn mark, not a round dot. block it now as a landmark so the bangs and eyebrow build around it.",
+      "anchor the eyebrows thick and fairly straight, low over the eyes. nose is small with a defined bridge; mouth sits close under it. keep the lower face short — chin doesn't drop far below the jaw corners.",
+      "lay the hair as a single dark mass first: a center-ish part, bangs splitting over the brow, framing layers down the cheeks, length stopping near the jaw. carve spiky tips out of the silhouette last — don't draw strand by strand.",
+      "add details on top: the black-and-green checkered haori collar, the hanafuda earrings hanging from each ear, then the eye highlights and scar texture."
+    ],
+    "palette": [
+      {
+        "part": "hair (main)",
+        "color": "dark burgundy / near-black maroon",
+        "hex": "#3a1f1f"
+      },
+      {
+        "part": "hair (tips, sun-faded)",
+        "color": "warm reddish-brown",
+        "hex": "#7a3b2e"
+      },
+      {
+        "part": "eyes",
+        "color": "reddish to burgundy-garnet, lighter rims",
+        "hex": "#8a2f2a"
+      },
+      {
+        "part": "skin",
+        "color": "warm light tan",
+        "hex": "#f0c9a4"
+      },
+      {
+        "part": "scar",
+        "color": "reddish-brown raised mark",
+        "hex": "#9c4a32"
+      },
+      {
+        "part": "haori (checkered pattern)",
+        "color": "black and dark green ichimatsu check",
+        "hex": "#3e7a4e"
+      },
+      {
+        "part": "earrings (hanafuda)",
+        "color": "white card with red sun and red rays",
+        "hex": "#e8e2d4"
+      }
+    ],
+    "proTips": [
+      "keep his expression soft. the downturned outer eye corners and slightly raised inner brows read as earnest — if the eyes go sharp or symmetrical, he stops looking like tanjiro and starts looking like a generic lead.",
+      "vary line weight: heaviest on the hair silhouette and upper eyelids, lightest inside the iris and on the nose. let the hair read as a dark shape, not equal-weight outlines around every spike.",
+      "leave the brightest highlight as untouched negative space — one clean catchlight per eye, plus a soft sheen band across the top of the hair mass. don't paint white over a filled area; plan the gap.",
+      "once traced, redraw freehand and check three landmarks: scar on his left forehead, black-and-green checkered haori collar, hanafuda earrings. all three present plus gentle eyes means it's on-model even if your linework differs."
+    ],
+    "faqsMore": [
+      {
+        "q": "which side does tanjiro's scar go on?",
+        "a": "his left forehead — that's the viewer's right when he faces you. it sits above the eyebrow, not on it, and it's an elongated burn mark. flip it and he looks subtly wrong even if people can't say why."
+      },
+      {
+        "q": "is his hair black or red?",
+        "a": "both, intentionally. the roots are a dark burgundy that reads near-black, fading to warmer reddish-brown at the tips. paint it as a dark base with a red-brown gradient toward the ends rather than flat black."
+      },
+      {
+        "q": "what's actually on the hanafuda earrings?",
+        "a": "white cards with a red sun and red rays fanning down from it — no green leaves. keep them simple: the white card plus the red sun motif is enough to read as tanjiro's earrings."
       }
     ]
   },
@@ -704,6 +1217,71 @@ export const CHARACTERS = [
         "q": "why does my Levi look too young or too soft?",
         "a": "usually three things: eyes too big, brows too high, and missing under-eye shadows. narrow the eyes, drop and flatten the brows, and add the dark circles."
       }
+    ],
+    "construction": [
+      "start with a slightly tall, narrow oval for the cranium — levi's skull reads compact and rounded, not wide. drop the centerline and a low eye line that sits just below the vertical midpoint, since his eyes sit low and heavy on the face.",
+      "block the jaw as a short, soft taper to a small chin — keep it lean but not pointed; levi's face is angular yet smooth, not chiseled. mark the cheekbone faintly, no hollow.",
+      "place the eyes narrow and almond, angled slightly downward at the outer corners — this is the core of the bored, half-lidded glare. set the upper lid low and the brow nearly flat and close above it. inter-eye gap of about one eye-width.",
+      "build the nose small and straight with a subtle pointed tip on the centerline, and a flat, neutral mouth a touch wider than the nose base — no curve.",
+      "lay the hair as one mass first: an undercut, so the lower back and sides are tight and short, and the top falls in straight center-parted bangs that hang over the brow and frame the eyes. block the silhouette before any strands.",
+      "add details last — the thin line under each eye, the straight bang tips, and the high collar with the ODM straps. keep the parting clean and the bang edges crisp."
+    ],
+    "palette": [
+      {
+        "part": "hair",
+        "color": "black with a cool blue-grey sheen",
+        "hex": "#1c1f26"
+      },
+      {
+        "part": "eyes (irises)",
+        "color": "dull slate grey, faintly cool",
+        "hex": "#7c828a"
+      },
+      {
+        "part": "skin",
+        "color": "pale, slightly cool fair tone",
+        "hex": "#ecd3c0"
+      },
+      {
+        "part": "survey corps jacket",
+        "color": "warm tan / light brown",
+        "hex": "#b89a6a"
+      },
+      {
+        "part": "cravat / shirt",
+        "color": "off-white cream",
+        "hex": "#efe9dc"
+      },
+      {
+        "part": "ODM gear straps",
+        "color": "dark muted brown leather",
+        "hex": "#4a3a2a"
+      },
+      {
+        "part": "wings of freedom emblem",
+        "color": "white wings over a blue ground",
+        "hex": "#3f5d8a"
+      }
+    ],
+    "proTips": [
+      "keep the lineweight thin and even — levi is a clean, controlled character. heavy or scratchy lines fight the model. reserve your darkest weight for the upper eyelid and the under-eye line so the glare reads.",
+      "leave the hair as deliberate negative space: don't render every strand. block the black mass, then carve a few sharp highlight gaps along the part and bang edges so it stays glossy, not muddy.",
+      "his eyes are the whole likeness — keep them low, narrow, and slightly downturned with a flat brow. if he starts looking surprised, lower the lids and flatten the brow until the bored look returns.",
+      "shade with cool greys, not warm browns — a soft shadow under the bangs, along the jaw, and inside the high collar. catch the blue-grey sheen in the hair with a faint cool highlight rather than pure white."
+    ],
+    "faqsMore": [
+      {
+        "q": "how do i keep levi looking bored/cold instead of angry?",
+        "a": "anger needs a furrowed, angled brow — levi's brow stays flat and relaxed. lower the upper lids halfway, keep the mouth a straight neutral line, and angle the outer eye corners slightly down. the deadpan comes from stillness, not tension."
+      },
+      {
+        "q": "undercut or longer hair — which version am i drawing?",
+        "a": "his standard survey corps look is the undercut: short, tight back and sides with a straight center-parted top. the longer, softer 'no undercut' version is mostly the older timeskip look. match the part and the back length to whichever reference you brought before you redraw freehand."
+      },
+      {
+        "q": "what color are levi's eyes, really?",
+        "a": "dull slate grey — desaturated and only faintly cool, not bright blue and not pure black. lay a muted grey base, pull a small cool highlight, and resist saturating it; push it too blue and it stops reading as his."
+      }
     ]
   },
   {
@@ -780,6 +1358,71 @@ export const CHARACTERS = [
       {
         "q": "what makes a face actually look like Eren and not a generic anime guy?",
         "a": "the eye-and-brow zone: narrow teal-green eyes with a hard upper lid and low, slightly furrowed brows. nail that plus a clean center part and you've got him before any detail."
+      }
+    ],
+    "construction": [
+      "start with the head as a slightly tall egg — eren's skull is a touch narrower and longer than round, jaw tapering to a defined but not sharp chin. mark the centerline early since most of his expressions are 3/4 and the face turns on that axis.",
+      "drop the eye line just below the vertical midpoint. eren's eyes sit fairly low and wide-set, with a hard upper lid line — keep them slightly narrowed, not big and round. the inner corners point down a hair, which reads as his default intensity.",
+      "place the brow line close above the eyes — the short gap between brow and lid is the whole face. straight, low brows. the nose is small and understated, a simple bridge wedge, sitting midway between eye line and chin.",
+      "block the hair as one mass before any strands: a center part with bangs falling in two main curtains framing the forehead, length to the jaw early-series, longer and tied back in the timeskip. let the silhouette of the mass read first, then carve.",
+      "lay in the jaw-length side curtains and the V-notch at the part, then break the bangs into a few uneven clumps — chunky wedges, not feathered hairs. the back is slightly layered, not spiky.",
+      "details last: the neck is thick (he's athletic), add the survey corps collar or the crossing X-pattern of the ODM harness straps across the chest, and only then the iris detail and lash accents."
+    ],
+    "palette": [
+      {
+        "part": "hair",
+        "color": "dark brown",
+        "hex": "#4a3b32"
+      },
+      {
+        "part": "eyes",
+        "color": "muted grey-blue (faint teal shift)",
+        "hex": "#5b7a80"
+      },
+      {
+        "part": "skin",
+        "color": "warm light tan",
+        "hex": "#e8c4a0"
+      },
+      {
+        "part": "survey corps jacket",
+        "color": "light tan-brown",
+        "hex": "#b59a78"
+      },
+      {
+        "part": "jacket collar / cuffs",
+        "color": "white",
+        "hex": "#f2efe9"
+      },
+      {
+        "part": "ODM harness straps",
+        "color": "tan leather",
+        "hex": "#9c8260"
+      },
+      {
+        "part": "wings of freedom emblem",
+        "color": "blue & white",
+        "hex": "#2e5b86"
+      }
+    ],
+    "proTips": [
+      "keep his eye color as muted grey-blue, not pure blue and not green — it shifts a touch toward teal with lighting but never goes saturated. swatch a desaturated blue-grey and stay there or he goes off-model fast.",
+      "vary line weight: heaviest on the jaw, upper eyelids, and the hair silhouette; lightest inside the bangs and on the nose. a uniform-weight eren looks stiff and loses the intensity.",
+      "leave the hair highlight as negative space — don't draw a white band, just let a clean unshaded zone sit along the top of the hair mass and the side curtains. cel-style, hard edge, no soft gradient.",
+      "his default is a slight scowl, carried by the low straight brows and the short brow-to-lid gap — not by a frown line. if he looks calm or wide-eyed, lower the brows and narrow the lids before touching the mouth."
+    ],
+    "faqsMore": [
+      {
+        "q": "how do i make him look early-series vs timeskip eren?",
+        "a": "early series: jaw-length loose hair, softer rounder face, clearer slightly more blue-grey eyes. timeskip: longer hair pulled back into a low half-tie with curtain bangs framing the face, gaunter cheeks, heavier shadow under the eyes, flatter dead-eyed stare."
+      },
+      {
+        "q": "why does my eren read as a generic anime boy?",
+        "a": "usually three things — eyes too big and round, hair too spiky, and the brow sitting too high. pull the eyes narrower and lower, keep bangs as chunky flat wedges, and crowd the brow down near the lids."
+      },
+      {
+        "q": "what's the difference between eren and mikasa's faces so i don't draw them the same?",
+        "a": "eren's face is longer with a more pointed chin, lower straighter brows, and a default scowl; mikasa's is a touch rounder and softer with calmer half-lidded eyes. their hair colors also differ — eren dark brown, mikasa pure black."
       }
     ]
   },
@@ -858,6 +1501,71 @@ export const CHARACTERS = [
         "q": "how do i draw the tail so it actually looks like a lightning bolt?",
         "a": "keep the corners square and the angles sharp — it is a flat zig-zag, not a curvy ribbon. it is the one part of pikachu that is not rounded."
       }
+    ],
+    "construction": [
+      "start with the base head: pikachu's head is a wide, slightly squashed circle — closer to a rounded oval that's a touch wider than tall. block it in light, this is your anchor for everything.",
+      "drop a centerline down the middle and an eye line across the lower-third of the head — pikachu's eyes, cheeks and nose all sit low, crowding the bottom half. the top half is mostly forehead and ear-room.",
+      "place the two big oval eyes on the eye line, spaced about one-and-a-half eye-widths apart, then set a tiny dot of a nose high and centered just below them. the round red cheeks sit low and out near the jawline, roughly under the outer corners of the eyes — not up beside them.",
+      "add the ears as the 'hair mass': two long tapering cones rising from the top-back of the skull, angled into a V. each is fat at the base, narrows to a point, and the top third is the black tip. keep them rooted behind the crown, not on top.",
+      "build the body small under the head — pikachu is head-heavy and short. stubby arms, rounder belly, big rounded back paws with no separate toes, then the lightning-bolt tail jutting from the rump in sharp zigzag segments with a solid brown base at the bottom.",
+      "finish with the on-model details: the small mouth, the two faint cheek-line/ear-base accents, the brown stripes on the lower back, and clean up the construction lines once proportions read right."
+    ],
+    "palette": [
+      {
+        "part": "fur / body (main)",
+        "color": "bright yellow",
+        "hex": "#F7D02C"
+      },
+      {
+        "part": "cheeks",
+        "color": "red circles",
+        "hex": "#E2453B"
+      },
+      {
+        "part": "ear tips",
+        "color": "black",
+        "hex": "#2B2B2B"
+      },
+      {
+        "part": "back stripes",
+        "color": "brown",
+        "hex": "#9C6B3F"
+      },
+      {
+        "part": "eyes",
+        "color": "black with white highlight",
+        "hex": "#1A1A1A"
+      },
+      {
+        "part": "nose / mouth line",
+        "color": "dark brown-black",
+        "hex": "#3A2A1E"
+      },
+      {
+        "part": "tail base",
+        "color": "brown (lower tail)",
+        "hex": "#9C6B3F"
+      }
+    ],
+    "proTips": [
+      "vary your line weight — heaviest on the outer silhouette and under the chin/belly where weight gathers, lightest inside on cheek circles and ear seams. uniform lines flatten the chub right out of him.",
+      "leave the eye highlight as untouched paper — don't paint white over black. one clean negative-space dot in the upper part of each eye is what makes him look alive; a second tiny one reads even cuter.",
+      "the cheeks are flat red discs, not glossy spheres — minimal shading. let the yellow fur carry the form instead: a soft shadow under the chin, beneath the ears, and along the belly curve where the body tucks back.",
+      "staying on-model is mostly proportion policing — keep the head dominant, the ears rooted at the back crown (not antennae on top), the cheeks low, the back paws rounded and toeless, and the tail a hard-edged bolt with no soft curves. redraw freehand after tracing to lock those relationships into your hand."
+    ],
+    "faqsMore": [
+      {
+        "q": "are the ear tips half black or just the very point?",
+        "a": "roughly the top third of each ear is black, with a clean diagonal cut where black meets yellow. don't taper it to a thin point — it's a solid chunk, and the divide is usually straighter on the front edge."
+      },
+      {
+        "q": "do the brown back stripes go all the way up?",
+        "a": "no — they sit only on the lower back, two short brown bands, and they're absent on the chest and face. female pikachu also have a heart-dent at the tail tip if you want that detail."
+      },
+      {
+        "q": "why does my pikachu look too tall or grown-up?",
+        "a": "you've probably shrunk the head or stretched the body. the modern on-model pikachu is short and head-heavy — head nearly as tall as the torso. push the cheeks lower, widen the eyes, and round the belly to pull him back to chibi proportions."
+      }
     ]
   },
   {
@@ -935,6 +1643,71 @@ export const CHARACTERS = [
         "q": "what pink is her hair — how light?",
         "a": "pale/pastel pink, not hot pink or red. think soft rose — and the two pointed tufts are that same pale pink, not a different accent color."
       }
+    ],
+    "construction": [
+      "start with a slightly squashed circle for the cranium, then add a soft rounded jaw — anya's face is babyish: wide at the cheeks, short chin, almost as wide as it is tall. keep the bottom of the face rounded, never pointed.",
+      "drop a centerline and place the eye line LOW — roughly at or just below the vertical midpoint. anya is small-child proportioned, so the eyes sit lower and the forehead reads taller than a teen character.",
+      "block the two big rounded eyes far apart with a wide nose-bridge gap between them — leave more than one eye-width between them. her irises are large with the signature four-point starburst catchlights; eyebrows are short, thin, and sit high above the eyes.",
+      "lay in the hair mass next: a soft rounded bob of pale pink hair that frames the face in two side sweeps, short forelock bangs over the forehead, and her single upright ahoge cowlick sticking off the crown — keep it asymmetric, not centered.",
+      "add the two pink cone hairpieces if drawing the eden look — one on each side near the back of the bob. they sit on the hair, are decorative pieces, and do not replace the ahoge.",
+      "finish with small details: tiny nose dot, small mouth low on the face, the round green eye highlights, and the smug or wobbly expression last so you can place brows and mouth together for the mood."
+    ],
+    "palette": [
+      {
+        "part": "hair",
+        "color": "pale desaturated pink (reads ash-grey flat)",
+        "hex": "#E4D2D6"
+      },
+      {
+        "part": "hair shadow",
+        "color": "muted rosy mauve",
+        "hex": "#B89AA0"
+      },
+      {
+        "part": "eyes (iris)",
+        "color": "soft green",
+        "hex": "#5FB87A"
+      },
+      {
+        "part": "eye highlight",
+        "color": "white starburst catchlight",
+        "hex": "#FFFFFF"
+      },
+      {
+        "part": "skin",
+        "color": "warm pale cream",
+        "hex": "#F8E1D2"
+      },
+      {
+        "part": "eden uniform",
+        "color": "charcoal-black with white collar trim",
+        "hex": "#23232A"
+      },
+      {
+        "part": "uniform accents",
+        "color": "gold buttons / red bow",
+        "hex": "#C9A23F"
+      }
+    ],
+    "proTips": [
+      "keep the lineweight thin and even — anya is a clean, soft character. heavy black outlines age her up and break the cute read. reserve any thicker line for the upper eyelid and the hair silhouette only.",
+      "leave the eye highlights as pure negative space (white paper), not painted-over white. the big round catchlight plus the small starburst sparkle is what makes her eyes read on-model — don't crowd them.",
+      "shade the hair with one soft mauve tone tucked under the bangs and behind the side sweeps, not all over. her hair is mostly flat pale value with minimal rendering; over-shading muddies the pale pink toward grey.",
+      "stay on-model by watching the eye spacing and the ahoge placement — if the eyes drift together or too high, it stops looking like anya. her smug grin and the worried sweat-drop are separate expression states, so commit to one mood per drawing rather than blending them."
+    ],
+    "faqsMore": [
+      {
+        "q": "is anya's hair pink or grey? i can't tell from my reference.",
+        "a": "both, depending on the art. canonically it's a very desaturated pale pink that reads almost ash-grey in flat color and shifts pinker in the anime's soft lighting. trace the value your reference shows, then when you redraw freehand, mix a pale grey with a touch of rose rather than a saturated pink — saturated pink is the most common off-model mistake."
+      },
+      {
+        "q": "how big should the eyes actually be?",
+        "a": "big, but spaced wide. each eye is roughly one eye-width tall and they sit low on the face with more than a full eye-width of gap between them. beginners draw them too close and too high — overlay your trace, then redraw checking that the gap and the low eye line survived."
+      },
+      {
+        "q": "do i have to draw the pink horn things?",
+        "a": "those are her two pink cone hairpieces, decorative accessories worn with the eden look — not horns and not part of the hair itself. for casual anya you can skip them and just keep the side bob and the single ahoge cowlick. add the two cones when you want the school version."
+      }
     ]
   }
 ];
@@ -989,6 +1762,22 @@ export function charVariations(c) {
   return Array.isArray(c.variations) ? c.variations : [];
 }
 
+// Character-specific construction order — how to build the figure from base
+// shapes (distinct from the generic app-usage steps below).
+export function charConstruction(c) {
+  return Array.isArray(c.construction) ? c.construction : [];
+}
+
+// Canonical colors { part, color, hex } — doubles as a palette fact-check.
+export function charPalette(c) {
+  return Array.isArray(c.palette) ? c.palette : [];
+}
+
+// Finishing / technique advice (line weight, negative space, shading).
+export function charProTips(c) {
+  return Array.isArray(c.proTips) ? c.proTips : [];
+}
+
 export function charSteps(c) {
   return [
     {
@@ -1031,5 +1820,6 @@ export function charFaqs(c) {
   ];
   // Character-specific FAQs (verified canon) come after the generic three.
   const extra = Array.isArray(c.faqsExtra) ? c.faqsExtra : [];
-  return [...base, ...extra];
+  const more = Array.isArray(c.faqsMore) ? c.faqsMore : [];
+  return [...base, ...extra, ...more];
 }
