@@ -8,11 +8,17 @@ import { trackEvent } from '../lib/track.js';
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, detail: '' };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    // TEMP DIAGNOSTIC: surface the real error so we can see what's crashing
+    // /admin-me in production (sourcemaps are off, so the message is the signal).
+    const detail = [
+      error?.name && error.name !== 'Error' ? `${error.name}: ` : '',
+      error?.message || String(error || 'unknown'),
+    ].join('');
+    return { hasError: true, detail: String(detail).slice(0, 400) };
   }
 
   componentDidCatch(error, info) {
@@ -70,6 +76,25 @@ export default class ErrorBoundary extends Component {
               hi@tracemate.art
             </a>.
           </p>
+          {this.state.detail && (
+            <pre
+              style={{
+                textAlign: 'left',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                background: '#2b2118',
+                color: '#ffd9a8',
+                borderRadius: 10,
+                padding: '12px 14px',
+                margin: '0 0 24px',
+                fontSize: 12.5,
+                lineHeight: 1.5,
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+              }}
+            >
+              {this.state.detail}
+            </pre>
+          )}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
               type="button"
