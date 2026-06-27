@@ -11,6 +11,12 @@
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
+# The service worker must always revalidate so a new deploy's SW (and its fresh
+# precache manifest) is picked up promptly. Never let it get pinned in an HTTP
+# cache — a stale SW serving an old shell is how lazy routes break after a deploy.
+/sw.js
+  Cache-Control: no-cache
+
 # Public images are unhashed and replaced by filename version (e.g. -v3).
 # NOT immutable: if an edge ever caches a bad response (e.g. an SPA-fallback
 # HTML body for an asset requested before it finished deploying), immutable

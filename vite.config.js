@@ -13,11 +13,18 @@ export default defineConfig({
       injectRegister: 'auto',
       manifest: false,
       workbox: {
-        // Precache the app shell. Skip the operator-only admin chunk (and its
-        // cobe globe) — no visitor needs it offline, and it's dead weight in
-        // every first-visit precache.
+        // Precache the FULL app shell, including the lazy admin chunk. The admin
+        // chunk used to be excluded (globIgnores) to keep it out of visitors'
+        // precache — but that made it the ONE lazy route not served from the SW
+        // cache. After a deploy, a client still on a stale shell would import
+        // the OLD admin hash, which is gone from the CDN → 404 → the dynamic
+        // import rejects → crash to the ErrorBoundary ("Something went sideways"),
+        // and a reload kept hitting the same stale shell. Every OTHER lazy route
+        // survived because it loads from the (version-consistent) precache.
+        // Precaching the admin chunk too keeps the shell and the chunk in lock-
+        // step, which is the actual fix. It adds ~17KB gzip to the precache —
+        // the AnalyticsPulseDetail/cobe chunk was already precached anyway.
         globPatterns: ['**/*.{js,css,html,woff2}'],
-        globIgnores: ['**/AdminDashboard-*.js'],
         navigateFallback: '/index.html',
         // A payment return must always hit the network, never a stale shell.
         navigateFallbackDenylist: [/^\/checkout\//],
