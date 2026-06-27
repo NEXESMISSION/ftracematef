@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import {
   CHARACTERS, getRelated,
   charTitle, charDescription, charLead, charWhy, charSteps, charFaqs,
+  charFeatures, charProportion, charMistakes, charVariations,
 } from '../src/lib/characters.js';
 import { VISIBLE_PLANS } from '../src/lib/plans.js';
 
@@ -274,6 +275,12 @@ function characterBody(c) {
   const faqs = charFaqs(c).map((f) => `<h3>${esc(f.q)}</h3><p>${esc(f.a)}</p>`).join('');
   const related = getRelated(c.slug, 6)
     .map((r) => `<a href="${SITE}/draw/${r.slug}">How to draw ${esc(r.short)}</a>`).join(' · ');
+  const features = charFeatures(c).map((f) => `<li>${esc(f)}</li>`).join('');
+  const proportion = charProportion(c);
+  const mistakes = charMistakes(c)
+    .map((m) => `<li><strong>Mistake:</strong> ${esc(m.mistake)} <strong>Fix:</strong> ${esc(m.fix)}</li>`).join('');
+  const variations = charVariations(c)
+    .map((v) => `<li><strong>${esc(v.name)}.</strong> ${esc(v.note)}</li>`).join('');
   return `
 <main>
   <article>
@@ -283,10 +290,14 @@ function characterBody(c) {
     <p><a href="${SITE}/upload">Start tracing free</a> · <a href="${SITE}/pricing">See pricing</a></p>
     <h2>Why trace ${esc(c.short)}?</h2>
     <p>${esc(charWhy(c))}</p>
+    ${features ? `<h2>What makes ${esc(c.short)} recognizable</h2>\n    <ul>${features}</ul>` : ''}
+    ${proportion ? `<p><strong>Proportion check:</strong> ${esc(proportion)}</p>` : ''}
     <h2>Trace ${esc(c.short)} in 5 steps</h2>
     <ol>${steps}</ol>
     <h2>Tips for drawing ${esc(c.short)}</h2>
     <ul>${tips}</ul>
+    ${mistakes ? `<h2>Common mistakes drawing ${esc(c.short)} (and the fix)</h2>\n    <ul>${mistakes}</ul>` : ''}
+    ${variations ? `<h2>Which ${esc(c.short)} to trace</h2>\n    <ul>${variations}</ul>` : ''}
     <h2>${esc(c.short)} — frequently asked questions</h2>
     ${faqs}
     <h2>More characters to draw</h2>

@@ -217,3 +217,113 @@
 }
 .draw-related-chip span { font-weight: 600; font-size: 12px; color: #8a7a64; }
 .draw-related-chip:hover { border-color: #e2cba0; background: #fff3df; }
+
+/* ── /draw/:slug — enriched sections (features · proportion · mistakes · versions) ── */
+
+/* Signature features — quick-reference pills of what makes the likeness. */
+.guide-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 8px 0 6px;
+  padding: 0;
+  list-style: none;
+}
+.guide-features li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #fbf6ee;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 14px;
+  color: #2c2418;
+  font-weight: 600;
+}
+.guide-features li::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #dc8c14;
+  flex: none;
+}
+
+/* Proportion pointer — a soft callout that anchors the head/face sizing. */
+.guide-callout {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: #fdf4e3;
+  border: 1px solid #f0dcb4;
+  border-left: 4px solid #dc8c14;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 8px 0 4px;
+}
+.guide-callout-icon { font-size: 18px; line-height: 1.4; flex: none; }
+.guide-callout p { margin: 0 !important; font-size: 15px; }
+.guide-callout strong { color: #2c2418; }
+
+/* Common mistakes — the failure case + the fix, side by side. */
+.guide-mistakes {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+.guide-mistake {
+  background: #fbf6ee;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 6px;
+}
+.guide-mistake-bad,
+.guide-mistake-fix {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  font-size: 15px;
+  margin: 0;
+}
+.guide-mistake-bad::before {
+  content: '✗';
+  color: #d4654e;
+  font-weight: 800;
+  flex: none;
+}
+.guide-mistake-fix::before {
+  content: '✓';
+  color: #3f9e6b;
+  font-weight: 800;
+  flex: none;
+}
+.guide-mistake-fix { color: #4a4030; }
+
+/* Versions to trace — the scenarios (forms / poses / eras) and how each differs. */
+.guide-variations {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+.guide-variation {
+  background: #fbf6ee;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.guide-variation-name {
+  display: block;
+  font-weight: 800;
+  color: #2c2418;
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+.guide-variation p { margin: 0 !important; font-size: 14.5px; color: #4a4030; }

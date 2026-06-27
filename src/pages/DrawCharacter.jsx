@@ -6,6 +6,7 @@ import NotFound from './NotFound.jsx';
 import {
   CHARACTER_BY_SLUG, getRelated,
   charTitle, charLead, charWhy, charSteps, charFaqs,
+  charFeatures, charProportion, charMistakes, charVariations,
 } from '../lib/characters.js';
 
 /**
@@ -33,6 +34,10 @@ export default function DrawCharacter() {
   const steps = charSteps(c);
   const faqs = charFaqs(c);
   const related = getRelated(c.slug, 6);
+  const features = charFeatures(c);
+  const proportion = charProportion(c);
+  const mistakes = charMistakes(c);
+  const variations = charVariations(c);
 
   return (
     <>
@@ -59,6 +64,22 @@ export default function DrawCharacter() {
           <h2>Why trace {c.short}?</h2>
           <p>{charWhy(c)}</p>
 
+          {features.length > 0 && (
+            <>
+              <h2>What makes {c.short} look like {c.short}</h2>
+              <ul className="guide-features">
+                {features.map((f) => <li key={f}>{f}</li>)}
+              </ul>
+            </>
+          )}
+
+          {proportion && (
+            <div className="guide-callout">
+              <span className="guide-callout-icon" aria-hidden="true">📐</span>
+              <p><strong>Proportion check:</strong> {proportion}</p>
+            </div>
+          )}
+
           <h2>Trace {c.short} in 5 steps</h2>
           <ol className="guide-steps">
             {steps.map((s) => (
@@ -70,6 +91,34 @@ export default function DrawCharacter() {
           <ul>
             {c.tips.map((t) => <li key={t}>{t}</li>)}
           </ul>
+
+          {mistakes.length > 0 && (
+            <>
+              <h2>Common mistakes drawing {c.short} (and the fix)</h2>
+              <ul className="guide-mistakes">
+                {mistakes.map((m) => (
+                  <li key={m.mistake} className="guide-mistake">
+                    <p className="guide-mistake-bad">{m.mistake}</p>
+                    <p className="guide-mistake-fix">{m.fix}</p>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {variations.length > 0 && (
+            <>
+              <h2>Which {c.short} to trace</h2>
+              <ul className="guide-variations">
+                {variations.map((v) => (
+                  <li key={v.name} className="guide-variation">
+                    <span className="guide-variation-name">{v.name}</span>
+                    <p>{v.note}</p>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
 
           <h2>{c.short} — frequently asked questions</h2>
           {faqs.map((f) => (
